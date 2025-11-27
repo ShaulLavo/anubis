@@ -1,11 +1,9 @@
-import { type JSX } from "react";
+import type { ParentComponent } from "solid-js";
 
-export function Code({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}): JSX.Element {
-  return <code className={className}>{children}</code>;
-}
+type CodeProps = {
+  class?: string;
+};
+
+export const Code: ParentComponent<CodeProps> = (props) => (
+  <code class={props.class}>{props.children}</code>
+);
