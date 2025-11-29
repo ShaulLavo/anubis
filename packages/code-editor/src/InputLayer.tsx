@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js'
 import { createEffect, on, splitProps } from 'solid-js'
 
-import { cn } from './utils'
+import { cn } from '@repo/ui/utils'
 
 type TextAreaAttrs = Omit<
 	JSX.TextareaHTMLAttributes<HTMLTextAreaElement>,

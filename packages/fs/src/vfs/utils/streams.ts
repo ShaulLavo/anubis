@@ -41,14 +41,25 @@ export async function writeStreamToWritable(
 	stream: VfsReadableStream
 ): Promise<void> {
 	const reader = stream.getReader()
-	while (true) {
-		const { done, value } = await reader.read()
-		if (done) break
-		if (!value) continue
-		const chunk =
-			value instanceof Uint8Array
-				? value
-				: bufferSourceToUint8Array(value as BufferSource)
-		await writable.write(chunk as FileSystemWriteChunkType)
+	try {
+		while (true) {
+			const { done, value } = await reader.read()
+			if (done) break
+			if (!value) continue
+			const chunk =
+				value instanceof Uint8Array
+					? value
+					: bufferSourceToUint8Array(value as BufferSource)
+			await writable.write(chunk as FileSystemWriteChunkType)
+		}
+	} catch (err) {
+		try {
+			await reader.cancel(err)
+		} catch {
+			// ignore cancellation errors, rethrow original
+		}
+		throw err
+	} finally {
+		reader.releaseLock()
 	}
 }

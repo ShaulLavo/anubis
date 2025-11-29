@@ -10,9 +10,8 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "clsx": "^2.1.1",
-    "solid-js": "^1.9.5",
-    "tailwind-merge": "^3.4.0"
+    "@repo/ui": "*",
+    "solid-js": "^1.9.5"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",

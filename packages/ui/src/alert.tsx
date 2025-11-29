@@ -37,7 +37,7 @@ const Alert = <T extends ValidComponent = 'div'>(
 	])
 	return (
 		<AlertPrimitive.Root
-			class={cn(alertVariants({ variant: props.variant }), local.class)}
+			class={cn(alertVariants({ variant: local.variant }), local.class)}
 			{...others}
 		/>
 	)

@@ -1,7 +1,9 @@
 import type { FsSource } from '../types'
 import { ensureFs } from './fsRuntime'
 
-const pendingFileReads = new Map<string, Promise<unknown>>()
+const pendingFileTextReads = new Map<string, Promise<string>>()
+const pendingSafeFileTextReads = new Map<string, Promise<SafeReadResult>>()
+const pendingStreamReads = new Map<string, Promise<string>>()
 const streamControllers = new Map<string, AbortController>()
 const DEFAULT_CHUNK_SIZE = 64 * 1024
 
@@ -38,28 +40,31 @@ const resolveChunkSize = (chunkSize?: number) =>
 	chunkSize && chunkSize > 0 ? chunkSize : DEFAULT_CHUNK_SIZE
 
 const trackPendingRead = <T>(
-	path: string,
+	cache: Map<string, Promise<T>>,
+	key: string,
 	operation: () => Promise<T>
 ): Promise<T> => {
-	const pending = pendingFileReads.get(path)
-	if (pending) return pending as Promise<T>
+	const pending = cache.get(key)
+	if (pending) return pending
 
 	const promise = (async () => {
 		try {
 			return await operation()
 		} finally {
-			pendingFileReads.delete(path)
+			cache.delete(key)
 		}
 	})()
 
-	pendingFileReads.set(path, promise)
+	cache.set(key, promise)
 	return promise
 }
 
 export function resetStreamingState() {
 	streamControllers.forEach(controller => controller.abort())
 	streamControllers.clear()
-	pendingFileReads.clear()
+	pendingFileTextReads.clear()
+	pendingSafeFileTextReads.clear()
+	pendingStreamReads.clear()
 }
 
 export function cancelOtherStreams(keepPath: string) {
@@ -67,7 +72,7 @@ export function cancelOtherStreams(keepPath: string) {
 		if (path === keepPath) continue
 		controller.abort()
 		streamControllers.delete(path)
-		pendingFileReads.delete(path)
+		pendingStreamReads.delete(path)
 	}
 }
 
@@ -75,7 +80,7 @@ export async function readFileText(
 	source: FsSource,
 	path: string
 ): Promise<string> {
-	return trackPendingRead(path, async () => {
+	return trackPendingRead(pendingFileTextReads, path, async () => {
 		const ctx = await ensureFs(source)
 		const file = ctx.file(path, 'r')
 		return file.text()
@@ -90,7 +95,7 @@ export async function safeReadFileText(
 	const chunkSize = resolveChunkSize(options?.chunkSize)
 	const sizeLimit = options?.sizeLimitBytes
 
-	return trackPendingRead(path, async () => {
+	return trackPendingRead(pendingSafeFileTextReads, path, async () => {
 		const ctx = await ensureFs(source)
 		const file = ctx.file(path, 'r')
 		const reader = await file.createReader()
@@ -234,14 +239,14 @@ export async function streamFileText(
 	path: string,
 	onChunk?: (text: string) => void
 ): Promise<string> {
-	const pending = pendingFileReads.get(path)
-	if (pending) return pending as Promise<string>
+	const pending = pendingStreamReads.get(path)
+	if (pending) return pending
 
 	const controller = new AbortController()
 	streamControllers.get(path)?.abort()
 	streamControllers.set(path, controller)
 
-	return trackPendingRead(path, async () => {
+	return trackPendingRead(pendingStreamReads, path, async () => {
 		let stream: FileTextStream | undefined
 
 		try {
