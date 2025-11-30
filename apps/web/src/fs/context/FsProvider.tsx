@@ -15,7 +15,6 @@ import { findNode } from '../runtime/tree'
 import { createFsState } from '../state/fsState'
 import type { FsSource } from '../types'
 import { FsContext, type FsContextValue } from './FsContext'
-import { fa } from 'zod/v4/locales'
 
 type TimingEntry = { label: string; duration: number }
 

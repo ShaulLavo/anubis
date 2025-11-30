@@ -47,7 +47,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	const lineEntries = createMemo<LineEntry[]>(() => {
 		if (!props.isFileSelected()) return []
 		const stats = state.selectedFileStats
-		if (!stats?.lineInfo?.length) return []
+		if (!stats?.lineInfo?.length || stats.text == null) return []
 		const content = stats.text
 
 		return stats.lineInfo.map(info => {

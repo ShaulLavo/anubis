@@ -939,9 +939,10 @@ const heuristicLanguage = (text: string): LanguageId | undefined => {
 	if (trimmed.startsWith('{') || trimmed.startsWith('[')) return 'json'
 	if (trimmed.startsWith('<')) return 'html'
 	const firstLine = trimmed.split('\n', 1)[0]?.trim() ?? ''
-	if (firstLine.startsWith('#') || firstLine.startsWith('---')) {
+	if (firstLine.startsWith('---')) {
 		return 'markdown'
 	}
+	// '#' alone is ambiguous (could be markdown header or shell/python comment)
 	return undefined
 }
 // greatest common divisor
