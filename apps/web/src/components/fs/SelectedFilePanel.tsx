@@ -139,7 +139,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 						}}
 					>
 						<div class="divide-y divide-zinc-800/60">
-							<For each={lineEntries().slice(0, 1000)}>
+							<For each={lineEntries()}>
 								{entry => (
 									<div class="flex items-start gap-4 px-3 py-1 text-zinc-100">
 										<span class="w-10 shrink-0 text-right text-[11px] font-semibold tracking-[0.08em] text-zinc-500 tabular-nums">

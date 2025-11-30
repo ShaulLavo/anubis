@@ -2,7 +2,6 @@ import { batch, type JSX, onMount } from 'solid-js'
 import { webLogger } from '~/logger'
 import { parseFileBuffer } from '~/utils/parse'
 import { createPieceTableSnapshot } from '~/utils/pieceTable'
-import { analyzeFileBytes } from '~/utils/textHeuristics'
 import { DEFAULT_SOURCE } from '../config/constants'
 import { createFsMutations } from '../fsMutations'
 import { collectFileHandles } from '../runtime/fileHandles'
@@ -217,11 +216,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 					return
 				}
 
-				const detection = timeSync('analyze-file', () =>
-					analyzeFileBytes(path, previewBytes)
-				)
-				const shouldParseStructurally = detection.isText
-
 				const text = await timeAsync('read-file-text', () =>
 					readFileText(source, path)
 				)
@@ -232,77 +226,17 @@ export function FsProvider(props: { children: JSX.Element }) {
 
 				selectedFileContentValue = text
 
-				if (shouldParseStructurally) {
+				fileStatsResult = timeSync('parse-file-buffer', () =>
+					parseFileBuffer(text, {
+						path,
+						previewBytes
+					})
+				)
+
+				if (fileStatsResult.contentKind === 'text') {
 					pieceTableSnapshot = timeSync('create-piece-table', () =>
 						createPieceTableSnapshot(text)
 					)
-					fileStatsResult = timeSync('parse-file-buffer', () =>
-						parseFileBuffer(text, {
-							path
-						})
-					)
-				} else {
-					fileStatsResult = {
-						text,
-						lineInfo: [
-							{
-								index: 0,
-								start: 0,
-								length: text.length,
-								indentSpaces: 0,
-								indentTabs: 0,
-								trailingWhitespace: 0,
-								hasContent: true
-							}
-						],
-						characterCount: 0,
-						lineCount: 0,
-						lineStarts: [],
-						newline: {
-							kind: 'none',
-							kinds: { none: 0, lf: 0, cr: 0, crlf: 0 },
-							normalized: false
-						},
-						unicode: {
-							hasNull: false,
-							invalidSurrogateCount: 0,
-							controlCharacterCount: 0,
-							issues: []
-						},
-						binary: { suspicious: false },
-						indentation: {
-							style: 'none',
-							width: 0,
-							spaceLines: 0,
-							tabLines: 0,
-							mixedLines: 0,
-							blankLines: 0,
-							trailingWhitespaceLines: 0,
-							totalTrailingWhitespace: 0
-						},
-						strings: [],
-						brackets: {
-							pairs: [],
-							unmatchedOpens: [],
-							unmatchedCloses: [],
-							maxDepth: 0,
-							depthByIndex: []
-						},
-						language: {
-							id: 'unknown',
-							source: 'fallback',
-							displayName: 'Plain Text',
-							rules: {
-								angleBrackets: false,
-								strings: {
-									'"': { quote: '"', multiline: false },
-									"'": { quote: "'", multiline: false },
-									'`': { quote: '`', multiline: false }
-								},
-								displayName: 'Plain Text'
-							}
-						}
-					}
 				}
 			}
 

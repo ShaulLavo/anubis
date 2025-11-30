@@ -1,3 +1,5 @@
+import { analyzeFileBytes, type TextHeuristicDecision } from './textHeuristics'
+
 type NewlineKind = 'lf' | 'crlf' | 'cr' | 'mixed' | 'none'
 
 type NewlineInfo = {
@@ -136,8 +138,8 @@ export type IndentationSummary = {
 export type ParseOptions = {
 	path?: string
 	languageHint?: LanguageId
-	hugeLineThreshold?: number
 	enableAngleBracketScan?: boolean
+	previewBytes?: Uint8Array
 }
 
 export type ParseResult = {
@@ -153,11 +155,12 @@ export type ParseResult = {
 	strings: StringRegion[]
 	brackets: BracketReport
 	language: LanguageInfo
-	hugeLine?: { index: number; length: number }
+	contentKind: 'text' | 'binary'
+	textHeuristic?: TextHeuristicDecision
 }
 
-const DEFAULT_HUGE_LINE_THRESHOLD = 32_768
 const CONTROL_CHAR_MAX_RATIO = 0.02
+const BINARY_FALLBACK_DISPLAY_LIMIT = 1024 * 64 // TODO remove this once we have virtualized rendering
 
 const DEFAULT_STRING_RULES: Record<StringRule['quote'], StringRule> = {
 	'"': { quote: '"', multiline: false },
@@ -304,6 +307,14 @@ export function parseFileBuffer(
 	text: string,
 	options: ParseOptions = {}
 ): ParseResult {
+	const detection = options.previewBytes
+		? analyzeFileBytes(options.path, options.previewBytes)
+		: undefined
+
+	if (detection && !detection.isText) {
+		return createBinaryFallbackResult(text, detection)
+	}
+
 	const normalized = normalizeNewlines(text ?? '')
 	const languageDetection = detectLanguage(
 		normalized.text,
@@ -313,8 +324,6 @@ export function parseFileBuffer(
 	const languageRules = LANGUAGE_RULES[languageDetection.id]
 	const angleBracketsEnabled =
 		options.enableAngleBracketScan ?? languageRules.angleBrackets
-	const hugeLineThreshold =
-		options.hugeLineThreshold ?? DEFAULT_HUGE_LINE_THRESHOLD
 
 	const lineStarts: number[] = [0]
 	const lineInfo: LineInfo[] = []
@@ -369,9 +378,6 @@ export function parseFileBuffer(
 	let invalidSurrogateCount = 0
 	let controlCharacterCount = 0
 
-	let maxLineLength = 0
-	let maxLineIndex = 0
-
 	const content = normalized.text
 	const length = content.length
 
@@ -392,11 +398,6 @@ export function parseFileBuffer(
 		}
 
 		lineInfo.push(info)
-
-		if (lengthValue > maxLineLength) {
-			maxLineLength = lengthValue
-			maxLineIndex = index
-		}
 
 		if (hasContent) {
 			contentLines++
@@ -607,11 +608,6 @@ export function parseFileBuffer(
 		issues: unicodeIssues
 	}
 
-	const hugeLine =
-		maxLineLength >= hugeLineThreshold
-			? { index: maxLineIndex, length: maxLineLength }
-			: undefined
-
 	return {
 		text: content,
 		characterCount: length,
@@ -631,7 +627,96 @@ export function parseFileBuffer(
 			depthByIndex: bracketDepth
 		},
 		language: languageDetection,
-		hugeLine
+		contentKind: 'text',
+		textHeuristic: detection
+	}
+}
+
+const createBinaryFallbackResult = (
+	text: string,
+	detection?: TextHeuristicDecision
+): ParseResult => {
+	const previewLength = Math.min(BINARY_FALLBACK_DISPLAY_LIMIT, text.length)
+
+	return {
+		text,
+		characterCount: 0,
+		lineCount: 0,
+		lineStarts: [],
+		lineInfo: [
+			{
+				index: 0,
+				start: 0,
+				length: previewLength,
+				indentSpaces: 0,
+				indentTabs: 0,
+				trailingWhitespace: 0,
+				hasContent: previewLength > 0
+			}
+		],
+		newline: {
+			kind: 'none',
+			kinds: { none: 0, lf: 0, cr: 0, crlf: 0 },
+			normalized: false
+		},
+		unicode: {
+			hasNull: false,
+			invalidSurrogateCount: 0,
+			controlCharacterCount: 0,
+			issues: []
+		},
+		binary: {
+			suspicious: true,
+			reason: detection?.reason
+				? formatBinaryDetectionReason(detection)
+				: 'binary-fallback'
+		},
+		indentation: {
+			style: 'none',
+			width: 0,
+			spaceLines: 0,
+			tabLines: 0,
+			mixedLines: 0,
+			blankLines: 0,
+			trailingWhitespaceLines: 0,
+			totalTrailingWhitespace: 0
+		},
+		strings: [],
+		brackets: {
+			pairs: [],
+			unmatchedOpens: [],
+			unmatchedCloses: [],
+			maxDepth: 0,
+			depthByIndex: {}
+		},
+		language: {
+			id: 'unknown',
+			source: 'fallback',
+			displayName: 'Plain Text',
+			rules: LANGUAGE_RULES.plaintext
+		},
+		contentKind: 'binary',
+		textHeuristic: detection
+	}
+}
+
+const formatBinaryDetectionReason = (
+	detection: TextHeuristicDecision
+): string | undefined => {
+	if (!detection.reason) return undefined
+	const reason = detection.reason
+	const fallbackKind = reason.kind
+	switch (reason.kind) {
+		case 'binary-extension':
+			return `binary-extension:${reason.extension}`
+		case 'magic-number':
+			return `magic-number:${reason.signature}`
+		case 'null-bytes':
+			return `null-bytes:${reason.ratio.toFixed(4)}`
+		case 'invalid-utf8':
+			return 'invalid-utf8'
+		default:
+			return fallbackKind
 	}
 }
 
