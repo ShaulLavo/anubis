@@ -99,12 +99,11 @@ export const record = async (
 	return newRecord
 }
 
-export const getHistory = async (
-	filter?: { name?: string; since?: number }
-): Promise<PerfRecord[]> => {
-	const data = await loadData()
-
-	let records = data.records
+export const getHistory = async (filter?: {
+	name?: string
+	since?: number
+}): Promise<PerfRecord[]> => {
+	let { records } = await loadData()
 
 	if (filter?.name) {
 		records = records.filter(r => r.name === filter.name)
@@ -129,9 +128,10 @@ const percentile = (sorted: number[], p: number): number => {
 	return sorted[Math.max(0, index)]!
 }
 
-export const getSummary = async (
-	filter?: { name?: string; since?: number }
-): Promise<PerfSummary[]> => {
+export const getSummary = async (filter?: {
+	name?: string
+	since?: number
+}): Promise<PerfSummary[]> => {
 	const records = await getHistory(filter)
 
 	const grouped = new Map<string, number[]>()
@@ -175,4 +175,3 @@ export const exportData = async (): Promise<PerfRecord[]> => {
 	const data = await loadData()
 	return [...data.records]
 }
-

@@ -8,13 +8,13 @@ import { trackOperation } from '~/perf'
 import { createPieceTableSnapshot } from '~/utils/pieceTable'
 import { DEFAULT_SOURCE } from '../config/constants'
 import { createFsMutations } from '../fsMutations'
-import { collectFileHandles } from '../runtime/fileHandles'
-import { buildTree, fileHandleCache, primeFsCache } from '../runtime/fsRuntime'
+import { buildTree } from '../runtime/fsRuntime'
 import {
 	getFileSize,
 	readFilePreviewBytes,
 	readFileText
 } from '../runtime/streaming'
+import { restoreHandleCache } from '../runtime/handleCache'
 import { findNode } from '../runtime/tree'
 import { createFsState } from '../state/fsState'
 import type { FsSource } from '../types'
@@ -42,29 +42,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 	let selectRequestId = 0
 	const MAX_FILE_SIZE_BYTES = 1024 * 1024 * 100 // 100 MB
 
-	const isValidHandle = (
-		handle: unknown
-	): handle is FileSystemDirectoryHandle => {
-		if (!handle || typeof handle !== 'object') return false
-		// Memory handles lose their methods after IndexedDB serialization
-		const h = handle as { entries?: unknown; [Symbol.asyncIterator]?: unknown }
-		return (
-			typeof h.entries === 'function' ||
-			typeof h[Symbol.asyncIterator] === 'function'
-		)
-	}
-
-	const restoreHandleCache = () => {
-		if (!state.tree) return
-
-		if (state.tree.kind === 'dir' && isValidHandle(state.tree.handle)) {
-			primeFsCache(state.activeSource ?? DEFAULT_SOURCE, state.tree.handle)
-		}
-
-		fileHandleCache.clear()
-		collectFileHandles(state.tree)
-	}
-
 	const refresh = async (
 		source: FsSource = state.activeSource ?? DEFAULT_SOURCE
 	) => {
@@ -73,25 +50,17 @@ export function FsProvider(props: { children: JSX.Element }) {
 		clearPieceTables()
 
 		try {
-			await trackOperation(
-				'fs:refresh',
-				async ({ timeAsync, timeSync }) => {
-					const built = await timeAsync('build-tree', () => buildTree(source))
+			const built = await buildTree(source)
 
-					timeSync('apply-state', () => {
-						batch(() => {
-							setTree(built)
-							setActiveSource(source)
-							setExpanded(expanded => ({
-								...expanded,
-								[built.path]: expanded[built.path] ?? true
-							}))
-							setError(undefined)
-						})
-					})
-				},
-				{ metadata: { source } }
-			)
+			batch(() => {
+				setTree(built)
+				setActiveSource(source)
+				setExpanded(expanded => ({
+					...expanded,
+					[built.path]: expanded[built.path] ?? true
+				}))
+				setError(undefined)
+			})
 		} catch (error) {
 			setError(
 				error instanceof Error ? error.message : 'Failed to load filesystem'
@@ -262,7 +231,10 @@ export function FsProvider(props: { children: JSX.Element }) {
 
 	onMount(() => {
 		void hydration.then(() => {
-			restoreHandleCache()
+			restoreHandleCache({
+				tree: state.tree,
+				activeSource: state.activeSource
+			})
 			return refresh(state.activeSource ?? DEFAULT_SOURCE)
 		})
 	})

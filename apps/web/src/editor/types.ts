@@ -45,4 +45,12 @@ export type LinesProps = {
 	activeLineIndex: Accessor<number | null>
 }
 
+export type LineGuttersProps = {
+	rows: Accessor<VirtualItem[]>
+	entries: Accessor<LineEntry[]>
+	lineHeight: Accessor<number>
+	onRowClick: (entry: LineEntry) => void
+	activeLineIndex: Accessor<number | null>
+}
+
 export type TextFileEditorProps = EditorProps

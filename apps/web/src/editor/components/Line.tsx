@@ -2,7 +2,6 @@
 import { COLUMN_CHARS_PER_ITEM } from '../consts'
 import { calculateColumnFromClick, measureCharWidth } from '../utils'
 import type { LineProps } from '../types'
-import { LineGutter } from './LineGutter'
 
 export const Line = (props: LineProps) => {
 	let rowElement: HTMLDivElement | null = null
@@ -52,22 +51,14 @@ export const Line = (props: LineProps) => {
 				queueMicrotask(measure)
 			}}
 			class="absolute left-0 right-0 "
+			classList={{ 'bg-zinc-900/90': props.isActive }}
 			style={{
 				transform: `translateY(${props.virtualRow.start}px)`,
 				top: 0,
 				height: `${props.virtualRow.size || props.lineHeight}px`
 			}}
 		>
-			<div
-				class="flex items-start gap-4 px-3 text-zinc-100"
-				classList={{ 'bg-zinc-900/60': props.isActive }}
-				onMouseDown={handleClick}
-			>
-				<LineGutter
-					lineNumber={props.entry.index + 1}
-					lineHeight={props.virtualRow.size || props.lineHeight}
-					isActive={props.isActive}
-				/>
+			<div class="flex items-start text-zinc-100" onMouseDown={handleClick}>
 				<div
 					ref={el => {
 						textContentElement = el
