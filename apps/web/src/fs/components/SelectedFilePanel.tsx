@@ -1,7 +1,8 @@
 import type { JSX } from 'solid-js'
-import { Accessor, For, createMemo, createSignal } from 'solid-js'
+import { Accessor, For, Match, Switch, createMemo, createSignal } from 'solid-js'
 import { useFs } from '../../fs/context/FsContext'
 import { Editor } from '../../editor'
+import { BinaryFileViewer } from '../../components/BinaryFileViewer'
 
 const FONT_OPTIONS = [
 	{
@@ -25,6 +26,8 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	const [state] = useFs()
 	const [fontSize, setFontSize] = createSignal(DEFAULT_FONT_SIZE)
 	const [fontFamily, setFontFamily] = createSignal(DEFAULT_FONT_FAMILY)
+
+	const isBinary = () => state.selectedFileStats?.contentKind === 'binary'
 
 	const handleFontSizeInput: JSX.EventHandlerUnion<
 		HTMLInputElement,
@@ -92,13 +95,33 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 				</button>
 			</div>
 
-			<Editor
-				isFileSelected={props.isFileSelected}
-				stats={() => state.selectedFileStats}
-				fontSize={fontSize}
-				fontFamily={fontFamily}
-				previewBytes={() => state.selectedFilePreviewBytes}
-			/>
+			<Switch
+				fallback={
+					<Editor
+						isFileSelected={props.isFileSelected}
+						stats={() => state.selectedFileStats}
+						fontSize={fontSize}
+						fontFamily={fontFamily}
+						previewBytes={() => state.selectedFilePreviewBytes}
+					/>
+				}
+			>
+				<Match when={!props.isFileSelected()}>
+					<p class="mt-2 text-sm text-zinc-500">
+						Select a file to view its contents. Click folders to toggle
+						visibility.
+					</p>
+				</Match>
+
+				<Match when={isBinary()}>
+					<BinaryFileViewer
+						data={() => state.selectedFilePreviewBytes}
+						stats={() => state.selectedFileStats}
+						fontSize={fontSize}
+						fontFamily={fontFamily}
+					/>
+				</Match>
+			</Switch>
 		</div>
 	)
 }

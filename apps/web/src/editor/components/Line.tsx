@@ -50,8 +50,7 @@ export const Line = (props: LineProps) => {
 				rowElement = el
 				queueMicrotask(measure)
 			}}
-			class="absolute left-0 right-0 "
-			classList={{ 'bg-zinc-900/90': props.isActive }}
+			class="absolute left-0 right-0"
 			style={{
 				transform: `translateY(${props.virtualRow.start}px)`,
 				top: 0,

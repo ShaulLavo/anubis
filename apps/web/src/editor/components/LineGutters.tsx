@@ -33,19 +33,23 @@ export const LineGutters = (props: LineGuttersProps) => {
 				return (
 					<div
 						data-index={virtualRow.index}
-						class="absolute left-0 right-0 flex items-center justify-end"
+						class="absolute left-0 right-0"
 						style={{
 							transform: `translateY(${virtualRow.start}px)`,
 							top: 0,
 							height: `${height}px`
 						}}
-						onMouseDown={event => handleRowMouseDown(event, entry)}
 					>
-						<LineGutter
-							lineNumber={entry.index + 1}
-							lineHeight={height}
-							isActive={isActive}
-						/>
+						<div
+							class="relative flex h-full items-center justify-end"
+							onMouseDown={event => handleRowMouseDown(event, entry)}
+						>
+							<LineGutter
+								lineNumber={entry.index + 1}
+								lineHeight={height}
+								isActive={isActive}
+							/>
+						</div>
 					</div>
 				)
 			})}
