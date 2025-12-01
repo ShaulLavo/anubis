@@ -79,7 +79,7 @@ export function createTextEditorInput(
 				current ?? createPieceTableSnapshot(options.pieceTableText())
 			const totalLength = getPieceTableLength(baseSnapshot)
 
-			if (offset < 0 || offset >= totalLength) {
+			if (offset >= totalLength) {
 				return baseSnapshot
 			}
 
@@ -140,6 +140,7 @@ export function createTextEditorInput(
 			event.preventDefault()
 			const offset = options.cursorState().position.offset
 			applyDelete(offset, 1)
+			options.scrollCursorIntoView()
 			return
 		}
 
@@ -221,4 +222,3 @@ export function createTextEditorInput(
 		focusInput
 	}
 }
-

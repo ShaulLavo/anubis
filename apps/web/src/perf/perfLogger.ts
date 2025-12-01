@@ -205,9 +205,19 @@ export const logRecentOperations = async (
 	}
 }
 
+declare global {
+	interface Window {
+		perfLogger?: {
+			logSummary: typeof logSummary
+			logRecentOperations: typeof logRecentOperations
+			setLogLevel: typeof setLogLevel
+		}
+	}
+}
+
 // Expose for dev console usage
 if (typeof window !== 'undefined') {
-	;(window as unknown as Record<string, unknown>).perfLogger = {
+	window.perfLogger = {
 		logSummary,
 		logRecentOperations,
 		setLogLevel

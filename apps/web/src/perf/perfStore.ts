@@ -25,6 +25,11 @@ export type PerfSummary = {
 	p95Duration: number
 }
 
+export type PerfFilter = {
+	name?: string
+	since?: number
+}
+
 type PerfStoreData = {
 	records: PerfRecord[]
 	version: number
@@ -99,10 +104,7 @@ export const record = async (
 	return newRecord
 }
 
-export const getHistory = async (filter?: {
-	name?: string
-	since?: number
-}): Promise<PerfRecord[]> => {
+export const getHistory = async (filter?: PerfFilter): Promise<PerfRecord[]> => {
 	let { records } = await loadData()
 
 	if (filter?.name) {
@@ -128,10 +130,7 @@ const percentile = (sorted: number[], p: number): number => {
 	return sorted[Math.max(0, index)]!
 }
 
-export const getSummary = async (filter?: {
-	name?: string
-	since?: number
-}): Promise<PerfSummary[]> => {
+export const getSummary = async (filter?: PerfFilter): Promise<PerfSummary[]> => {
 	const records = await getHistory(filter)
 
 	const grouped = new Map<string, number[]>()

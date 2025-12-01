@@ -32,13 +32,6 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 		scrollElement: () => scrollElement
 	})
 
-	// createEffect(() => {
-	// 	// TODO DO WE NEED THIS?
-	// 	if (!props.isFileSelected()) {
-	// 		scrollElement = null
-	// 	}
-	// })
-
 	createEffect(
 		on(
 			() => state.lastKnownFilePath,
