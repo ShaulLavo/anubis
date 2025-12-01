@@ -129,15 +129,17 @@ export function FsProvider(props: { children: JSX.Element }) {
 		}
 
 		const requestId = ++selectRequestId
+		const source = state.activeSource ?? DEFAULT_SOURCE
+		const perfMetadata: Record<string, unknown> = { path, source }
 
 		await trackOperation(
 			'fs:selectPath',
 			async ({ timeSync, timeAsync }) => {
-				const source = state.activeSource ?? DEFAULT_SOURCE
 
 				const fileSize = await timeAsync('get-file-size', () =>
 					getFileSize(source, path)
 				)
+				perfMetadata.fileSize = fileSize
 				if (requestId !== selectRequestId) return
 
 				let selectedFileContentValue = ''
@@ -226,7 +228,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 				})
 			},
 			{
-				metadata: { path, source: state.activeSource ?? DEFAULT_SOURCE }
+				metadata: perfMetadata
 			}
 		).catch(error => {
 			if (requestId !== selectRequestId) return

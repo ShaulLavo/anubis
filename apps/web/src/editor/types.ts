@@ -17,7 +17,7 @@ export type LineEntry = {
 	text: string
 }
 
-export type VirtualizedRowProps = {
+export type LineProps = {
 	rowVirtualizer: Virtualizer<HTMLDivElement, HTMLDivElement>
 	virtualRow: VirtualItem
 	entry: LineEntry
@@ -31,7 +31,7 @@ export type VirtualizedRowProps = {
 	isActive: boolean
 }
 
-export type VirtualizedRowsProps = {
+export type LinesProps = {
 	rows: Accessor<VirtualItem[]>
 	columns: Accessor<VirtualItem[]>
 	entries: Accessor<LineEntry[]>

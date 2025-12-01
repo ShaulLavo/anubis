@@ -1,6 +1,6 @@
 /* eslint-disable solid/prefer-for */
 import { createVirtualizer } from '@tanstack/solid-virtual'
-import { Show, createEffect, createMemo } from 'solid-js'
+import { Show, createEffect, createMemo, on } from 'solid-js'
 import { useFs } from '../../fs/context/FsContext'
 import {
 	createPieceTableSnapshot,
@@ -8,7 +8,7 @@ import {
 	getPieceTableLength,
 	insertIntoPieceTable
 } from '~/utils/pieceTable'
-import { VirtualizedRows } from './components'
+import { Lines } from './Lines'
 import { Cursor } from './Cursor'
 import {
 	COLUMN_CHARS_PER_ITEM,
@@ -67,6 +67,9 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 		measureCharWidth(props.fontSize(), props.fontFamily())
 	)
 
+	const cursorLineIndex = createMemo(() => cursorState().position.line)
+	const cursorColumnIndex = createMemo(() => cursorState().position.column)
+
 	let scrollElement: HTMLDivElement | null = null
 	let inputElement: HTMLTextAreaElement | null = null
 
@@ -112,14 +115,17 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 	})
 
 	// Reset scroll when switching files
-	createEffect(() => {
-		// eslint-disable-next-line @typescript-eslint/no-unused-expressions
-		state.lastKnownFilePath
-		if (scrollElement) {
-			scrollElement.scrollTop = 0
-			scrollElement.scrollLeft = 0
-		}
-	})
+	createEffect(
+		on(
+			() => state.lastKnownFilePath,
+			() => {
+				if (scrollElement) {
+					scrollElement.scrollTop = 0
+					scrollElement.scrollLeft = 0
+				}
+			}
+		)
+	)
 
 	const virtualItems = () => rowVirtualizer.getVirtualItems()
 	const totalSize = () => rowVirtualizer.getTotalSize()
@@ -127,6 +133,18 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 	const columnTotalSize = () => columnVirtualizer.getTotalSize()
 	const lineHeightEstimate = createMemo(() =>
 		estimateLineHeight(props.fontSize())
+	)
+
+	const inputX = createMemo(
+		() =>
+			LINE_NUMBER_WIDTH +
+			CONTENT_GAP +
+			EDITOR_PADDING_LEFT +
+			cursorColumnIndex() * charWidth()
+	)
+
+	const inputY = createMemo(
+		() => cursorLineIndex() * lineHeightEstimate()
 	)
 
 	// Scroll sync for keyboard navigation only (not mouse clicks)
@@ -177,6 +195,12 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 			}
 		}
 	}
+
+	createEffect(() => {
+		if (props.isFileSelected()) {
+			focusInput()
+		}
+	})
 
 	const applyInsert = (value: string) => {
 		if (!value) return
@@ -347,7 +371,13 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 					ref={element => {
 						inputElement = element
 					}}
-					class="absolute left-0 top-0 h-0 w-0 opacity-0"
+					class="absolute opacity-0"
+					style={{
+						left: `${inputX()}px`,
+						top: `${inputY()}px`,
+						width: `${charWidth()}px`,
+						height: `${lineHeightEstimate()}px`
+					}}
 					autocomplete="off"
 					autocorrect="off"
 					spellcheck={false}
@@ -372,7 +402,7 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 						visibleLineEnd={visibleLineRange().end}
 						getLineY={getLineY}
 					/>
-					<VirtualizedRows
+					<Lines
 						rows={virtualItems}
 						columns={columnItems}
 						entries={lineEntries}

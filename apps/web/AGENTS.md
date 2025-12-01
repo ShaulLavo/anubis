@@ -19,6 +19,11 @@
 - Keep modules focused; colocate feature-specific code under `src/fs`, `src/terminal`, or `src/components/fs`.
 - Follow the shared ESLint config; fix all reported issues before committing.
 
+## Logging
+- Use the consola-based logger from `~/logger` (`logger` instance) for all runtime logging.
+- Prefer tagged loggers via `logger.withTag('feature')` instead of raw `console.*`.
+- Avoid `console.log`, `console.error`, and other `console.*` calls in app code; reserve direct console usage only for very short-lived debugging.*** End Patch ***!
+
 ## Testing Guidelines
 - When adding tests, prefer Vitest colocated next to source files (e.g. `ComponentName.test.tsx`).
 - Write tests for new business logic in `src/fs`, `src/utils`, and `src/terminal`.
@@ -29,4 +34,3 @@
 - Keep changesets focused and small; separate refactors from behavioral changes when possible.
 - For PRs, include: purpose, high-level changes, any breaking behavior, and screenshots or recordings for UI-impacting work.
 - Link related issues or tasks and mention any follow-ups (tech debt, TODOs).
-

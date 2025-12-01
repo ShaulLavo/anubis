@@ -1,47 +1,10 @@
 /* eslint-disable solid/prefer-for */
 import { COLUMN_CHARS_PER_ITEM } from '../consts'
-import { measureCharWidth } from '../utils'
-import type {
-	LineEntry,
-	VirtualizedRowProps,
-	VirtualizedRowsProps
-} from '../types'
+import { calculateColumnFromClick, measureCharWidth } from '../utils'
+import type { LineProps } from '../types'
+import { LineGutter } from './LineGutter'
 
-interface GutterProps {
-	lineNumber: number
-	lineHeight: number
-	isActive: boolean
-}
-
-const Gutter = (props: GutterProps) => {
-	return (
-		<span
-			class="w-10 shrink-0 select-none text-right text-[11px] font-semibold tracking-[0.08em] tabular-nums flex items-center justify-end"
-			classList={{
-				'text-white': props.isActive,
-				'text-zinc-500': !props.isActive
-			}}
-			style={{ height: `${props.lineHeight}px` }}
-		>
-			{props.lineNumber}
-		</span>
-	)
-}
-
-/**
- * Calculate the column from a click X position within the text area
- */
-const calculateColumnFromClick = (
-	clickX: number,
-	charWidth: number,
-	maxColumn: number
-): number => {
-	// Round to nearest character (not floor) for better UX
-	const column = Math.round(clickX / charWidth)
-	return Math.max(0, Math.min(column, maxColumn))
-}
-
-export const VirtualizedRow = (props: VirtualizedRowProps) => {
+export const Line = (props: LineProps) => {
 	let rowElement: HTMLDivElement | null = null
 	let textContentElement: HTMLDivElement | null = null
 
@@ -50,7 +13,6 @@ export const VirtualizedRow = (props: VirtualizedRowProps) => {
 	}
 
 	const handleClick = (event: MouseEvent) => {
-		// Only treat as a caret move on a plain left-click with no modifiers
 		if (
 			event.button !== 0 ||
 			event.shiftKey ||
@@ -62,17 +24,14 @@ export const VirtualizedRow = (props: VirtualizedRowProps) => {
 
 		const selection = window.getSelection()
 		if (selection && !selection.isCollapsed) {
-			// User has text selected, don't move cursor
 			return
 		}
 
-		// Calculate precise click position
 		if (textContentElement) {
 			const rect = textContentElement.getBoundingClientRect()
 			const clickX = event.clientX - rect.left
 			const charWidth = measureCharWidth(props.fontSize, props.fontFamily)
 
-			// Calculate column from click position
 			const column = calculateColumnFromClick(
 				clickX,
 				charWidth,
@@ -81,7 +40,6 @@ export const VirtualizedRow = (props: VirtualizedRowProps) => {
 
 			props.onPreciseClick(props.entry.index, column)
 		} else {
-			// Fallback to old behavior
 			props.onRowClick(props.entry)
 		}
 	}
@@ -105,7 +63,7 @@ export const VirtualizedRow = (props: VirtualizedRowProps) => {
 				classList={{ 'bg-zinc-900/60': props.isActive }}
 				onMouseDown={handleClick}
 			>
-				<Gutter
+				<LineGutter
 					lineNumber={props.entry.index + 1}
 					lineHeight={props.virtualRow.size || props.lineHeight}
 					isActive={props.isActive}
@@ -141,32 +99,5 @@ export const VirtualizedRow = (props: VirtualizedRowProps) => {
 				</div>
 			</div>
 		</div>
-	)
-}
-
-export const VirtualizedRows = (props: VirtualizedRowsProps) => {
-	return (
-		<>
-			{props.rows().map(virtualRow => {
-				const entry: LineEntry | undefined = props.entries()[virtualRow.index]
-				if (!entry) return null
-
-				return (
-					<VirtualizedRow
-						rowVirtualizer={props.rowVirtualizer}
-						virtualRow={virtualRow}
-						entry={entry}
-						columns={props.columns()}
-						totalColumnWidth={props.totalColumnWidth()}
-						lineHeight={props.lineHeight()}
-						fontSize={props.fontSize()}
-						fontFamily={props.fontFamily()}
-						onRowClick={props.onRowClick}
-						onPreciseClick={props.onPreciseClick}
-						isActive={props.activeLineIndex() === entry.index}
-					/>
-				)
-			})}
-		</>
 	)
 }
