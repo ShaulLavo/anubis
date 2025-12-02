@@ -1,8 +1,7 @@
 import type { FsDirTreeNode } from '@repo/fs'
 import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsSource } from '../types'
-import { collectFileHandles } from './fileHandles'
-import { fileHandleCache, primeFsCache } from './fsRuntime'
+import { primeFsCache } from './fsRuntime'
 
 const isValidDirectoryHandle = (
 	handle: unknown
@@ -32,8 +31,4 @@ export const restoreHandleCache = ({
 	if (tree.kind === 'dir' && isValidDirectoryHandle(tree.handle)) {
 		primeFsCache(source, tree.handle)
 	}
-
-	fileHandleCache.clear()
-	collectFileHandles(tree)
 }
-

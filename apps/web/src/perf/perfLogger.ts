@@ -94,17 +94,14 @@ const formatBreakdownTable = (
 	].join('\n')
 }
 
+const logLevelMethods: Record<LogLevel, (msg: string) => void> = {
+	debug: msg => perfLogger.debug(msg),
+	info: msg => perfLogger.info(msg),
+	warn: msg => perfLogger.warn(msg)
+}
+
 const logWithLevel = (level: LogLevel, message: string): void => {
-	switch (level) {
-		case 'warn':
-			perfLogger.warn(message)
-			break
-		case 'info':
-			perfLogger.info(message)
-			break
-		default:
-			perfLogger.debug(message)
-	}
+	logLevelMethods[level](message)
 }
 
 export const logOperation = (
