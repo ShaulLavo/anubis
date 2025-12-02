@@ -116,6 +116,7 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 						visibleLineStart={layout.visibleLineRange().start}
 						visibleLineEnd={layout.visibleLineRange().end}
 						getLineY={layout.getLineY}
+						cursorMode={props.cursorMode}
 					/>
 					<div class="flex h-full">
 						<div

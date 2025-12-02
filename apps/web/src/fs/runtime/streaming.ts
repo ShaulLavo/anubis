@@ -99,7 +99,7 @@ export async function getFileSize(
 export async function readFilePreviewBytes(
 	source: FsSource,
 	path: string,
-	maxBytes = 8192
+	maxBytes = Infinity
 ): Promise<Uint8Array> {
 	const ctx = await ensureFs(source)
 	const file = ctx.file(path, 'r')

@@ -1,8 +1,17 @@
 import type { JSX } from 'solid-js'
-import { Accessor, For, Match, Switch, createMemo, createSignal } from 'solid-js'
+import {
+	Accessor,
+	For,
+	Match,
+	Switch,
+	createMemo,
+	createSignal
+} from 'solid-js'
 import { useFs } from '../../fs/context/FsContext'
 import { Editor } from '../../editor'
+import type { CursorMode } from '../../editor/types'
 import { BinaryFileViewer } from '../../components/BinaryFileViewer'
+import { makePersisted } from '@solid-primitives/storage'
 
 const FONT_OPTIONS = [
 	{
@@ -26,6 +35,11 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	const [state] = useFs()
 	const [fontSize, setFontSize] = createSignal(DEFAULT_FONT_SIZE)
 	const [fontFamily, setFontFamily] = createSignal(DEFAULT_FONT_FAMILY)
+	const [cursorMode, setCursorMode] = makePersisted(
+		// eslint-disable-next-line solid/reactivity
+		createSignal<CursorMode>('regular'),
+		{ name: 'editor-cursor-mode' }
+	)
 
 	const isBinary = () => state.selectedFileStats?.contentKind === 'binary'
 
@@ -42,6 +56,14 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		setFontFamily(DEFAULT_FONT_FAMILY)
 	}
 
+	const toggleCursorMode = () => {
+		setCursorMode(mode => (mode === 'regular' ? 'terminal' : 'regular'))
+	}
+
+	const cursorModeLabel = createMemo(() =>
+		cursorMode() === 'terminal' ? 'Terminal' : 'Regular'
+	)
+
 	const currentFileLabel = createMemo(() => {
 		const path = props.currentPath
 		if (!path) return 'No file selected'
@@ -49,7 +71,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	})
 
 	return (
-		<div class="flex h-full flex-col font-mono">
+		<div class="flex h-full flex-col font-mono overflow-hidden">
 			<p class="text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500">
 				{currentFileLabel()}
 			</p>
@@ -93,6 +115,15 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 				>
 					Reset
 				</button>
+
+				<button
+					type="button"
+					class="rounded border border-zinc-700/70 bg-zinc-800 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-100 hover:bg-zinc-700"
+					onMouseDown={toggleCursorMode}
+					aria-pressed={cursorMode() === 'terminal'}
+				>
+					Cursor: {cursorModeLabel()}
+				</button>
 			</div>
 
 			<Switch
@@ -102,6 +133,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 						stats={() => state.selectedFileStats}
 						fontSize={fontSize}
 						fontFamily={fontFamily}
+						cursorMode={cursorMode}
 						previewBytes={() => state.selectedFilePreviewBytes}
 					/>
 				}
@@ -117,6 +149,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 					<BinaryFileViewer
 						data={() => state.selectedFilePreviewBytes}
 						stats={() => state.selectedFileStats}
+						fileSize={() => state.selectedFileSize}
 						fontSize={fontSize}
 						fontFamily={fontFamily}
 					/>

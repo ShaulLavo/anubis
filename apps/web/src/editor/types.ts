@@ -2,11 +2,14 @@ import type { VirtualItem, Virtualizer } from '@tanstack/virtual-core'
 import type { Accessor } from 'solid-js'
 import type { ParseResult } from '~/utils/parse'
 
+export type CursorMode = 'regular' | 'terminal'
+
 export type EditorProps = {
 	isFileSelected: Accessor<boolean>
 	stats: Accessor<ParseResult | undefined>
 	fontSize: Accessor<number>
 	fontFamily: Accessor<string>
+	cursorMode: Accessor<CursorMode>
 	previewBytes?: Accessor<Uint8Array | undefined>
 }
 
