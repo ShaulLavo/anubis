@@ -1,14 +1,13 @@
 import {
 	buildFsTree,
 	createFs,
+	FsDirTreeNode,
 	getRootDirectory,
-	type FsContext as VfsContext,
-	type FsTreeNode,
-	FsDirTreeNode
+	type FsContext as VfsContext
 } from '@repo/fs'
 import { trackOperation } from '~/perf'
-import type { FsSource } from '../types'
 import { OPFS_ROOT_NAME } from '../config/constants'
+import type { FsSource } from '../types'
 import { collectFileHandles } from './fileHandles'
 
 const fsCache: Partial<Record<FsSource, VfsContext>> = {}
@@ -49,7 +48,11 @@ export async function buildTree(source: FsSource): Promise<FsDirTreeNode> {
 		async ({ timeAsync, timeSync }) => {
 			const ctx = await timeAsync('ensure-fs', () => ensureFs(source))
 			const root = await timeAsync('build-fs-tree', () =>
-				buildFsTree(ctx, { path: '', name: OPFS_ROOT_NAME }, { withHandles: true })
+				buildFsTree(
+					ctx,
+					{ path: '', name: OPFS_ROOT_NAME },
+					{ withHandles: true }
+				)
 			)
 
 			timeSync('collect-file-handles', () => {
@@ -64,10 +67,10 @@ export async function buildTree(source: FsSource): Promise<FsDirTreeNode> {
 }
 
 export {
-	streamFileText,
-	readFileText,
-	safeReadFileText,
 	createFileTextStream,
 	getFileSize,
-	readFilePreviewBytes
+	readFilePreviewBytes,
+	readFileText,
+	safeReadFileText,
+	streamFileText
 } from './streaming'

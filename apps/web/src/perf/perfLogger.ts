@@ -95,12 +95,15 @@ const formatBreakdownTable = (
 }
 
 const logWithLevel = (level: LogLevel, message: string): void => {
-	if (level === 'warn') {
-		perfLogger.warn(message)
-	} else if (level === 'info') {
-		perfLogger.info(message)
-	} else {
-		perfLogger.debug(message)
+	switch (level) {
+		case 'warn':
+			perfLogger.warn(message)
+			break
+		case 'info':
+			perfLogger.info(message)
+			break
+		default:
+			perfLogger.debug(message)
 	}
 }
 

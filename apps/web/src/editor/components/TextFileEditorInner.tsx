@@ -10,7 +10,7 @@ import {
 	createTextEditorInput,
 	createTextEditorLayout
 } from '../hooks'
-import type { TextFileEditorProps } from '../types'
+import type { LineEntry, TextFileEditorProps } from '../types'
 
 export const TextFileEditorInner = (props: TextFileEditorProps) => {
 	const [state, { updateSelectedFilePieceTable }] = useFs()
@@ -22,6 +22,9 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 
 	let scrollElement: HTMLDivElement = null!
 	let inputElement: HTMLTextAreaElement = null!
+
+	const isEditable = () =>
+		props.isFileSelected() && !state.selectedFileLoading && !state.loading
 
 	const layout = createTextEditorLayout({
 		lineEntries,
@@ -66,6 +69,36 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 		scrollCursorIntoView
 	})
 
+	const handleInput = (event: InputEvent) => {
+		if (!isEditable()) return
+		input.handleInput(event)
+	}
+
+	const handleKeyDown = (event: KeyboardEvent) => {
+		if (!isEditable()) return
+		input.handleKeyDown(event)
+	}
+
+	const handleKeyUp = (event: KeyboardEvent) => {
+		if (!isEditable()) return
+		input.handleKeyUp(event)
+	}
+
+	const handleRowClick = (entry: LineEntry) => {
+		if (!isEditable()) return
+		input.handleRowClick(entry)
+	}
+
+	const handlePreciseClick = (lineIndex: number, column: number) => {
+		if (!isEditable()) return
+		input.handlePreciseClick(lineIndex, column)
+	}
+
+	const focusInput = () => {
+		if (!isEditable()) return
+		input.focusInput()
+	}
+
 	return (
 		<Show
 			when={layout.hasLineEntries()}
@@ -82,7 +115,7 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 					'font-size': `${props.fontSize()}px`,
 					'font-family': props.fontFamily()
 				}}
-				onClick={() => input.focusInput()}
+				onClick={() => focusInput()}
 			>
 				<textarea
 					ref={inputElement}
@@ -96,9 +129,10 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 					autocomplete="off"
 					autocorrect="off"
 					spellcheck={false}
-					onInput={input.handleInput}
-					onKeyDown={input.handleKeyDown}
-					onKeyUp={input.handleKeyUp}
+					disabled={!isEditable()}
+					onInput={handleInput}
+					onKeyDown={handleKeyDown}
+					onKeyUp={handleKeyUp}
 				/>
 				<div
 					style={{
@@ -106,18 +140,20 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 						position: 'relative'
 					}}
 				>
-					<Cursor
-						cursorState={cursorState}
-						fontSize={props.fontSize()}
-						fontFamily={props.fontFamily()}
-						charWidth={layout.charWidth()}
-						lineNumberWidth={LINE_NUMBER_WIDTH + CONTENT_GAP}
-						paddingLeft={EDITOR_PADDING_LEFT}
-						visibleLineStart={layout.visibleLineRange().start}
-						visibleLineEnd={layout.visibleLineRange().end}
-						getLineY={layout.getLineY}
-						cursorMode={props.cursorMode}
-					/>
+					<Show when={isEditable()}>
+						<Cursor
+							cursorState={cursorState}
+							fontSize={props.fontSize()}
+							fontFamily={props.fontFamily()}
+							charWidth={layout.charWidth()}
+							lineNumberWidth={LINE_NUMBER_WIDTH + CONTENT_GAP}
+							paddingLeft={EDITOR_PADDING_LEFT}
+							visibleLineStart={layout.visibleLineRange().start}
+							visibleLineEnd={layout.visibleLineRange().end}
+							getLineY={layout.getLineY}
+							cursorMode={props.cursorMode}
+						/>
+					</Show>
 					<div class="flex h-full">
 						<div
 							class="sticky left-0 z-10 bg-zinc-950"
@@ -135,7 +171,7 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 									rows={layout.virtualItems}
 									entries={lineEntries}
 									lineHeight={layout.lineHeight}
-									onRowClick={input.handleRowClick}
+									onRowClick={handleRowClick}
 									activeLineIndex={layout.activeLineIndex}
 								/>
 							</div>
@@ -150,8 +186,8 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 								lineHeight={layout.lineHeight}
 								fontSize={props.fontSize}
 								fontFamily={props.fontFamily}
-								onRowClick={input.handleRowClick}
-								onPreciseClick={input.handlePreciseClick}
+								onRowClick={handleRowClick}
+								onPreciseClick={handlePreciseClick}
 								activeLineIndex={layout.activeLineIndex}
 							/>
 						</div>
