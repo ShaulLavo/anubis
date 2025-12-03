@@ -3,7 +3,14 @@
 	"compilerOptions": {
 		"module": "ESNext",
 		"moduleResolution": "Bundler",
-		"outDir": "dist"
+		"outDir": "dist",
+		"baseUrl": ".",
+		"paths": {
+			"~/perf/*": ["../../apps/web/src/perf/*"],
+			"~/utils/*": ["../../apps/web/src/utils/*"],
+			"~/logger": ["../../apps/web/src/logger"],
+			"~/env": ["../../apps/web/src/env"]
+		}
 	},
 	"include": ["src"],
 	"exclude": ["node_modules", "dist"]

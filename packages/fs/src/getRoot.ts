@@ -107,10 +107,7 @@ export async function getLocalRoot(): Promise<FileSystemDirectoryHandle> {
 
 async function restoreHandle<T>(key: string): Promise<T | undefined> {
 	try {
-		const start = performance.now()
-		const value = (await localforage.getItem<T>(key)) ?? undefined
-		console.log('Elapsed:', performance.now() - start)
-		return value
+		return (await localforage.getItem<T>(key)) ?? undefined
 	} catch {
 		return undefined
 	}
