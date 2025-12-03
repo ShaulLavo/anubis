@@ -8,17 +8,17 @@ import {
 
 export type FsType = 'opfs' | 'local' | 'memory'
 
-type DirectoryPicker = (
-	options?: { mode?: 'read' | 'readwrite' }
-) => Promise<FileSystemDirectoryHandle>
+type DirectoryPicker = (options?: {
+	mode?: 'read' | 'readwrite'
+}) => Promise<FileSystemDirectoryHandle>
 type DirectoryPickerWindow = Window & { showDirectoryPicker: DirectoryPicker }
 type PermissionCapableDirectoryHandle = FileSystemDirectoryHandle & {
-	requestPermission?: (
-		descriptor: { mode?: 'read' | 'readwrite' }
-	) => Promise<PermissionState>
-	queryPermission?: (
-		descriptor: { mode?: 'read' | 'readwrite' }
-	) => Promise<PermissionState>
+	requestPermission?: (descriptor: {
+		mode?: 'read' | 'readwrite'
+	}) => Promise<PermissionState>
+	queryPermission?: (descriptor: {
+		mode?: 'read' | 'readwrite'
+	}) => Promise<PermissionState>
 }
 
 const LOCAL_ROOT_KEY = 'fs-local-root-handle'
@@ -72,7 +72,8 @@ export async function getLocalRoot(): Promise<FileSystemDirectoryHandle> {
 	const pickerWindow = window as DirectoryPickerWindow
 
 	const resolveHandle = async () => {
-		const persisted = await restoreHandle<FileSystemDirectoryHandle>(LOCAL_ROOT_KEY)
+		const persisted =
+			await restoreHandle<FileSystemDirectoryHandle>(LOCAL_ROOT_KEY)
 
 		if (persisted) {
 			const permission = await queryHandlePermission(persisted, 'readwrite')
@@ -104,9 +105,7 @@ export async function getLocalRoot(): Promise<FileSystemDirectoryHandle> {
 	return localRootPromise
 }
 
-async function restoreHandle<T>(
-	key: string
-): Promise<T | undefined> {
+async function restoreHandle<T>(key: string): Promise<T | undefined> {
 	try {
 		return (await localforage.getItem<T>(key)) ?? undefined
 	} catch {
