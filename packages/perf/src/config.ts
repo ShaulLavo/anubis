@@ -1,5 +1,3 @@
-export let PERF_TRACKING_ENABLED = true
+import { perfEnv } from './env'
 
-export const setPerfTrackingEnabled = (enabled: boolean) => {
-	PERF_TRACKING_ENABLED = enabled
-}
+export const PERF_TRACKING_ENABLED = perfEnv.perfTrackingEnabled

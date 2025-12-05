@@ -3,11 +3,12 @@ import type {
 	ScopedCommandBinding
 } from './types'
 
-type StoredBinding<TContext> = ScopedCommandBinding<TContext>
-
 export function createCommandRegistry<TContext>() {
 	const commands = new Map<string, CommandDescriptor<TContext>>()
-	const scopeBindings = new Map<string, Map<string, StoredBinding<TContext>>>()
+	const scopeBindings = new Map<
+		string,
+		Map<string, ScopedCommandBinding<TContext>>
+	>()
 
 	function registerCommand(descriptor: CommandDescriptor<TContext>) {
 		if (commands.has(descriptor.id)) {
@@ -17,7 +18,7 @@ export function createCommandRegistry<TContext>() {
 		return () => commands.delete(descriptor.id)
 	}
 
-	function bindCommand(binding: StoredBinding<TContext>) {
+	function bindCommand(binding: ScopedCommandBinding<TContext>) {
 		const scope = scopeBindings.get(binding.scope) ?? new Map()
 		scope.set(binding.bindingId, binding)
 		scopeBindings.set(binding.scope, scope)
@@ -35,8 +36,8 @@ export function createCommandRegistry<TContext>() {
 		const matches: Array<{
 			scope: string
 			command: CommandDescriptor<TContext>
-			bindingWhen?: StoredBinding<TContext>['when']
-			bindingIsEnabled?: StoredBinding<TContext>['isEnabled']
+			bindingWhen?: ScopedCommandBinding<TContext>['when']
+			bindingIsEnabled?: ScopedCommandBinding<TContext>['isEnabled']
 		}> = []
 		for (const scope of scopes) {
 			const scoped = scopeBindings.get(scope)

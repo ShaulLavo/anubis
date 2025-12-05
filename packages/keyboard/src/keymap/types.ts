@@ -42,7 +42,7 @@ export type CommandPredicateContext<TContext> = {
 	scope: string
 	event: KeyboardEvent
 	binding: KeybindingSnapshot
-	app: TContext
+	app: TContext | undefined
 }
 
 export type CommandPredicate<TContext> = (
@@ -56,15 +56,24 @@ export type CommandDescriptor<TContext> = {
 	isEnabled?: CommandPredicate<TContext>
 }
 
-export type CommandBindingDescriptor<TContext> = {
+type CommandBindingBase<TContext> = {
 	scope: string
 	commandId: string
-	bindingId?: string
-	shortcut?: string | ShortcutSequence
-	shortcutOptions?: ShortcutSequenceMatcherOptions
 	when?: CommandPredicate<TContext>
 	isEnabled?: CommandPredicate<TContext>
 }
+
+export type CommandBindingDescriptor<TContext> =
+	| (CommandBindingBase<TContext> & {
+			bindingId: string
+			shortcut?: never
+			shortcutOptions?: never
+	  })
+	| (CommandBindingBase<TContext> & {
+			bindingId?: never
+			shortcut: string | ShortcutSequence
+			shortcutOptions?: ShortcutSequenceMatcherOptions
+	  })
 
 export type ScopedCommandBinding<TContext> = {
 	scope: string
@@ -75,6 +84,6 @@ export type ScopedCommandBinding<TContext> = {
 }
 
 export type KeymapControllerOptions<TContext> = {
-	contextResolver?: () => TContext
+	contextResolver?: () => TContext | undefined
 	initialScopes?: string[]
 }

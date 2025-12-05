@@ -46,9 +46,7 @@ export function createKeymapController<TContext = unknown>(
 		binding: KeybindingSnapshot,
 		event: KeyboardEvent
 	) {
-		const app = options.contextResolver
-			? options.contextResolver()
-			: (undefined as TContext)
+		const app: TContext | undefined = options.contextResolver?.()
 		return {
 			scope,
 			event,
@@ -123,11 +121,7 @@ export function createKeymapController<TContext = unknown>(
 			}
 
 			for (const candidate of candidates) {
-				const context = contextFor(
-					candidate.scope,
-					match.binding,
-					event
-				)
+				const context = contextFor(candidate.scope, match.binding, event)
 
 				if (candidate.bindingWhen && !candidate.bindingWhen(context)) {
 					continue

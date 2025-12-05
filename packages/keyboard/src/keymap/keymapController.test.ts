@@ -55,7 +55,7 @@ describe('createKeymapController', () => {
 
 		controller.registerCommand({
 			id: 'terminalComment',
-			when: ctx => ctx.app.focus === 'terminal',
+			when: ctx => ctx.app?.focus === 'terminal',
 			run: () => {
 				throw new Error('should not run')
 			}
@@ -183,7 +183,7 @@ describe('createKeymapController', () => {
 			scope: 'global',
 			commandId: 'toggle',
 			shortcut: 'meta+/',
-			when: ctx => ctx.app.allow
+			when: ctx => !!ctx.app?.allow
 		})
 
 		expect(controller.handleKeydown(eventFor('/', { metaKey: true }))).toBe(

@@ -92,10 +92,7 @@ export const Fs = () => {
 			<div class="flex flex-1 min-h-0">
 				<div
 					class="w-72 min-h-0 overflow-auto border-r border-zinc-800/70 bg-zinc-950/60 px-3 py-2"
-					ref={el => {
-						setTreePanel(el)
-						onCleanup(() => setTreePanel(undefined))
-					}}
+					ref={setTreePanel}
 				>
 					<TreeView tree={() => state.tree} loading={() => state.loading} />
 				</div>

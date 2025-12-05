@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { setPerfTrackingEnabled } from '@repo/perf'
 
 const envSchema = z.object({
 	VITE_API_ORIGIN: z.url().optional(),
@@ -21,5 +20,3 @@ export const env = {
 
 export const IS_DEV = env.isDev
 export const BUILD_MODE = env.mode
-
-setPerfTrackingEnabled(env.perfTracking)

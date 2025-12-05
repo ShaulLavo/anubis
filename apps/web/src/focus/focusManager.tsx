@@ -7,6 +7,7 @@ import {
 	type ParentComponent
 } from 'solid-js'
 import { IS_DEV } from '~/env'
+import { logger } from '~/logger'
 
 export type FocusArea = 'global' | 'terminal' | 'editor' | 'fileTree'
 
@@ -27,6 +28,7 @@ type FocusManagerContext = {
 }
 
 const FocusContext = createContext<FocusManagerContext>()
+const focusLogger = logger.withTag('focus')
 
 export const FocusProvider: ParentComponent = props => {
 	const [activeArea, setActiveArea] = createSignal<FocusArea>('global')
@@ -35,7 +37,7 @@ export const FocusProvider: ParentComponent = props => {
 
 	const log = (next: FocusArea, reason: string) => {
 		if (!IS_DEV) return
-		console.info(`[focus] active area -> ${next} (${reason})`)
+		focusLogger.info(`[focus] active area -> ${next} (${reason})`)
 	}
 
 	const applyActiveArea = (next: FocusArea, reason: string) => {
