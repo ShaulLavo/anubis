@@ -3,8 +3,18 @@
 	"version": "0.0.0",
 	"private": true,
 	"exports": {
-		".": "./src/index.ts",
-		"./lib": "./src/lib/index.tsx",
+		".": {
+			"types": "./dist/lib/index.d.ts",
+			"import": "./dist/lib/index.jsx",
+			"require": "./dist/lib/index.cjs",
+			"default": "./dist/lib/index.jsx"
+		},
+		"./lib": {
+			"types": "./dist/lib/index.d.ts",
+			"import": "./dist/lib/index.jsx",
+			"require": "./dist/lib/index.cjs",
+			"default": "./dist/lib/index.jsx"
+		},
 		"./vs": {
 			"types": "./dist/vs/index.d.ts",
 			"import": "./dist/vs/index.js",
@@ -22,7 +32,7 @@
 		"prebuild": "bun ./scripts/fetch-packs.ts",
 		"lint": "eslint . --max-warnings 0",
 		"check-types": "tsc --noEmit",
-		"build": "bun ./src/build/index.ts",
+		"build": "bun ./scripts/build.ts",
 		"fetch-packs": "bun ./scripts/fetch-packs.ts"
 	},
 	"dependencies": {
@@ -30,12 +40,11 @@
 	},
 	"devDependencies": {
 		"@repo/eslint-config": "*",
-		"@repo/logger": "*",
 		"@repo/typescript-config": "*",
 		"@types/node": "^24.10.1",
 		"cheerio": "^1.0.0-rc.12",
-		"svgo": "^3.3.2",
 		"eslint": "^9.39.1",
+		"svgo": "^3.3.2",
 		"typescript": "5.9.2",
 		"zod": "^4.1.13"
 	}

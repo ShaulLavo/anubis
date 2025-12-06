@@ -124,11 +124,7 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 		charWidth: layout.charWidth,
 		tabSize: tabSize,
 		lineHeight: layout.lineHeight,
-		cursorActions,
-		getLineIndexFromY: (y: number) => {
-			const lineHeight = layout.lineHeight()
-			return Math.floor(y / lineHeight)
-		}
+		cursorActions
 	})
 
 	const handleLineMouseDown = (

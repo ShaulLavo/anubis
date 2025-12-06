@@ -5,7 +5,7 @@ import { Resizable, ResizableHandle, ResizablePanel } from '@repo/ui/resizable'
 import { StatusBar } from './components/StatusBar'
 import { Terminal } from './components/Terminal'
 import { Fs } from './fs/components/Fs'
-import { dualStorage } from './utils/DualStorage'
+import { dualStorage } from './utils/dualStorage'
 
 const Main: Component = () => {
 	const [verticalPanelSize, setVerticalPanelSize] = makePersisted(

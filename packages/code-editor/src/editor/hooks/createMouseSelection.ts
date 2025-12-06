@@ -12,7 +12,6 @@ export type MouseSelectionOptions = {
 	tabSize: Accessor<number>
 	lineHeight: Accessor<number>
 	cursorActions: CursorActions
-	getLineIndexFromY: (y: number) => number
 }
 
 export type MouseSelectionHandlers = {

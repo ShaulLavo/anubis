@@ -129,7 +129,19 @@ export function createTextEditorInput(
 		return true
 	}
 
-	function performDelete(key: 'Backspace' | 'Delete') {
+	function performDelete(
+		key: 'Backspace' | 'Delete',
+		ctrlOrMeta = false,
+		_shiftKey = false
+	) {
+		if (ctrlOrMeta && !options.cursorActions.hasSelection()) {
+			if (key === 'Backspace') {
+				options.cursorActions.moveCursor('left', true, true)
+			} else {
+				options.cursorActions.moveCursor('right', true, true)
+			}
+		}
+
 		if (deleteSelection()) {
 			options.scrollCursorIntoView()
 			return
@@ -273,7 +285,8 @@ export function createTextEditorInput(
 			id: 'editor.deleteKey',
 			run: context => {
 				const key = context.event.key === 'Backspace' ? 'Backspace' : 'Delete'
-				performDelete(key)
+				const ctrlOrMeta = context.event.ctrlKey || context.event.metaKey
+				performDelete(key, ctrlOrMeta, context.event.shiftKey)
 			}
 		},
 		[{ shortcut: 'delete' }]
@@ -347,9 +360,11 @@ export function createTextEditorInput(
 		[{ shortcut: 'pagedown' }]
 	)
 
-	const deleteKeyRepeat = createKeyRepeat<RepeatableDeleteKey>(() => {
-		performDelete('Backspace')
-	})
+	const deleteKeyRepeat = createKeyRepeat<RepeatableDeleteKey>(
+		(key, ctrlOrMeta, shiftKey) => {
+			performDelete(key, ctrlOrMeta, shiftKey)
+		}
+	)
 
 	const keyRepeat = createKeyRepeat<ArrowKey>((key, ctrlOrMeta, shiftKey) => {
 		switch (key) {
@@ -376,7 +391,7 @@ export function createTextEditorInput(
 		if (event.key === 'Backspace') {
 			event.preventDefault()
 			if (!event.repeat && !deleteKeyRepeat.isActive('Backspace')) {
-				deleteKeyRepeat.start('Backspace', false, false)
+				deleteKeyRepeat.start('Backspace', ctrlOrMeta, shiftKey)
 			}
 			return
 		}
@@ -390,15 +405,6 @@ export function createTextEditorInput(
 			event.preventDefault()
 			if (!event.repeat && !keyRepeat.isActive(event.key as ArrowKey)) {
 				keyRepeat.start(event.key as ArrowKey, ctrlOrMeta, shiftKey)
-			}
-			return
-		}
-
-		if (ctrlOrMeta && event.key === 'c') {
-			event.preventDefault()
-			const selectedText = options.cursorActions.getSelectedText()
-			if (selectedText) {
-				void clipboard.writeText(selectedText)
 			}
 			return
 		}

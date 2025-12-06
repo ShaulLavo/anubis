@@ -1,11 +1,7 @@
 import type { JSX, ValidComponent } from 'solid-js'
 import { splitProps } from 'solid-js'
 
-import type {
-	DynamicProps,
-	HandleProps,
-	RootProps
-} from '@corvu/resizable'
+import type { DynamicProps, HandleProps, RootProps } from '@corvu/resizable'
 import ResizablePrimitive from '@corvu/resizable'
 
 import { cn } from './lib/utils'
@@ -50,7 +46,7 @@ const ResizableHandle = <T extends ValidComponent = 'button'>(
 	return (
 		<ResizablePrimitive.Handle
 			class={cn(
-				'group relative flex basis-3 shrink-0 cursor-col-resize items-center justify-center px-0.75 transition-colors data-[orientation=vertical]:h-px data-[orientation=vertical]:w-full data-[orientation=vertical]:cursor-row-resize data-[orientation=vertical]:px-0 data-[orientation=vertical]:py-0.75',
+				'group relative flex basis-0 shrink-0 cursor-col-resize items-center justify-center px-1 -mx-1 transition-colors data-[orientation=vertical]:h-auto data-[orientation=vertical]:w-full data-[orientation=vertical]:cursor-row-resize data-[orientation=vertical]:px-0 data-[orientation=vertical]:py-1 data-[orientation=vertical]:-my-1',
 				local.class
 			)}
 			{...others}
@@ -58,7 +54,7 @@ const ResizableHandle = <T extends ValidComponent = 'button'>(
 			{local.children ?? (
 				<div
 					class={cn(
-						'size-full rounded-sm bg-zinc-800/70 transition-colors group-data-active:bg-zinc-700 group-data-dragging:bg-zinc-600',
+						'pointer-events-none absolute inset-0 rounded-sm bg-zinc-800/90 opacity-0 transition group-hover:opacity-100 group-data-active:opacity-100 group-data-dragging:opacity-100 z-30',
 						local.indicatorClass
 					)}
 				/>

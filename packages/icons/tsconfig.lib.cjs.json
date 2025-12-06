@@ -2,12 +2,12 @@
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"outDir": "dist/lib/cjs",
-		"rootDir": "src/lib",
+		"rootDir": "scripts/runtime",
 		"module": "CommonJS",
 		"moduleResolution": "Node10",
 		"declaration": false,
 		"declarationMap": false,
 		"sourceMap": false
 	},
-	"include": ["src/lib/index.tsx"]
+	"include": ["scripts/runtime/index.tsx"]
 }
