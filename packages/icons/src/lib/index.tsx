@@ -35,8 +35,11 @@ export function IconTemplate(iconSrc: IconTree, props: IconProps): JSX.Element {
 	const mergedProps = mergeProps(iconSrc.a, props) as IconBaseProps
 	const [_, svgProps] = splitProps(mergedProps, ['src'])
 	const [content, setContent] = createSignal<string>('')
+	const escapeHtml = (str: string) =>
+		str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
 	const rawContent = createMemo(() =>
-		props.title ? `${iconSrc.c}<title>${props.title}</title>` : iconSrc.c
+		props.title ? `${iconSrc.c}<title>${escapeHtml(props.title)}</title>` : iconSrc.c
 	)
 
 	createEffect(() => setContent(rawContent()))
