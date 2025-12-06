@@ -10,39 +10,38 @@ export const Line = (props: LineProps) => {
 		props.rowVirtualizer.measureElement(rowElement)
 	}
 
-	const handleClick = (event: MouseEvent) => {
-		if (
-			event.button !== 0 ||
-			event.shiftKey ||
-			event.ctrlKey ||
-			event.metaKey
-		) {
+	const handleMouseDown = (event: MouseEvent) => {
+		if (event.button !== 0) {
 			return
 		}
 
-		const selection = window.getSelection()
-		if (selection && !selection.isCollapsed) {
+		// Calculate column from click position
+		let column = props.entry.text.length
+		if (textContentElement) {
+			const rect = textContentElement.getBoundingClientRect()
+			const clickX = event.clientX - rect.left
+
+			column = calculateColumnFromClick(
+				props.entry.text,
+				clickX,
+				props.charWidth,
+				props.tabSize
+			)
+		}
+
+		// If custom mouse handler is provided, use it (for drag selection, double-click, etc.)
+		if (props.onMouseDown) {
+			props.onMouseDown(event, props.entry.index, column, textContentElement)
 			return
 		}
 
-		if (!textContentElement) {
-			props.onRowClick(props.entry)
+		// Fallback to simple click handling
+		if (event.shiftKey || event.ctrlKey || event.metaKey) {
 			return
 		}
 
-		const rect = textContentElement.getBoundingClientRect()
-		const clickX = event.clientX - rect.left
-
-		const column = calculateColumnFromClick(
-			props.entry.text,
-			clickX,
-			props.charWidth,
-			props.tabSize
-		)
-
-		props.onPreciseClick(props.entry.index, column)
+		props.onPreciseClick(props.entry.index, column, event.shiftKey)
 	}
-
 	return (
 		<div
 			data-index={props.virtualRow.index}
@@ -56,7 +55,7 @@ export const Line = (props: LineProps) => {
 				top: 0,
 				height: `${props.virtualRow.size || props.lineHeight}px`
 			}}
-			onMouseDown={handleClick}
+			onMouseDown={handleMouseDown}
 		>
 			<div
 				ref={el => {
@@ -66,7 +65,7 @@ export const Line = (props: LineProps) => {
 				style={{
 					width: `${props.contentWidth}px`,
 					height: `${props.virtualRow.size || props.lineHeight}px`,
-					'tab-size': `${Math.max(1, props.tabSize)}`
+					'tab-size': Math.max(1, props.tabSize)
 				}}
 			>
 				{props.entry.text}

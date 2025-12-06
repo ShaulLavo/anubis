@@ -3,23 +3,28 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit"
   },
-  "dependencies": {
-    "@repo/utils": "*",
-    "@tanstack/solid-virtual": "^3.13.12",
-    "@tanstack/virtual-core": "^3.13.12",
-    "solid-js": "^1.9.5"
+	"dependencies": {
+		"@repo/keyboard": "*",
+		"@repo/logger": "*",
+		"@repo/utils": "*",
+		"@tanstack/solid-virtual": "^3.13.12",
+		"@tanstack/virtual-core": "^3.13.12",
+		"solid-js": "^1.9.5"
   },
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/node": "^24.10.1",
     "eslint": "^9.39.1",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "tailwindcss": "^4.1.17",
+    "@tailwindcss/vite": "^4.1.17"
   }
 }

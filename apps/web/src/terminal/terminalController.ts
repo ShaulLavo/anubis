@@ -5,7 +5,7 @@ import { handleCommand } from './commands'
 
 const promptLabel = 'guest@vibe:~$ '
 
-export const createTerminalController = (container: HTMLDivElement) => {
+export const createTerminalController = async (container: HTMLDivElement) => {
 	let disposed = false
 
 	const term = new Xterm({
@@ -42,22 +42,28 @@ export const createTerminalController = (container: HTMLDivElement) => {
 		}
 	}
 
-	const handleResize = () => fitAddon.fit()
+	const fit = () => {
+		if (!disposed) fitAddon.fit()
+	}
+	const handleResize = () => fit()
 
 	term.open(container)
-	fitAddon.fit()
+	fit()
 	term.focus()
 
 	echoAddon.println('Welcome to vibe shell')
 	echoAddon.println('Type `help` to see available commands.')
 	window.addEventListener('resize', handleResize)
-	void startPromptLoop()
+	await startPromptLoop()
 
-	return () => {
-		disposed = true
-		window.removeEventListener('resize', handleResize)
-		echoAddon.abortRead('terminal disposed')
-		echoAddon.dispose()
-		term.dispose()
+	return {
+		fit,
+		dispose: () => {
+			disposed = true
+			window.removeEventListener('resize', handleResize)
+			echoAddon.abortRead('terminal disposed')
+			echoAddon.dispose()
+			term.dispose()
+		}
 	}
 }
