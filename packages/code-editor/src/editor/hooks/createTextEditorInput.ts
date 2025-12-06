@@ -394,6 +394,15 @@ export function createTextEditorInput(
 			return
 		}
 
+		if (ctrlOrMeta && event.key === 'c') {
+			event.preventDefault()
+			const selectedText = options.cursorActions.getSelectedText()
+			if (selectedText) {
+				void clipboard.writeText(selectedText)
+			}
+			return
+		}
+
 		if (keymap.handleKeydown(event)) {
 			return
 		}
