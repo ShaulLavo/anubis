@@ -1,7 +1,9 @@
-import { releaseProxy, wrap, type Remote } from 'comlink'
 import type { FsDirTreeNode } from '@repo/fs'
+import { ComlinkPool } from '../../workers/comlinkPool'
+import { PrefetchQueue } from './prefetchQueue'
 import type {
 	TreePrefetchWorkerApi,
+	TreePrefetchWorkerCallbacks,
 	TreePrefetchWorkerInitPayload
 } from './treePrefetchWorkerTypes'
 
@@ -10,39 +12,80 @@ const createWorkerInstance = () =>
 		type: 'module'
 	})
 
+const supportsWorkers =
+	typeof window !== 'undefined' && typeof Worker !== 'undefined'
+const MAX_PREFETCH_WORKERS = 4
+
+const resolveWorkerCount = () => {
+	if (typeof navigator === 'undefined') {
+		return 1
+	}
+
+	const hardware = navigator.hardwareConcurrency ?? 2
+	return Math.max(1, Math.min(MAX_PREFETCH_WORKERS, hardware))
+}
+
 export type TreePrefetchClient = {
 	init(payload: TreePrefetchWorkerInitPayload): Promise<void>
-	loadDirectory(path: string): Promise<FsDirTreeNode | undefined>
+	seedTree(tree: FsDirTreeNode): Promise<void>
+	ingestSubtree(node: FsDirTreeNode): Promise<void>
+	markDirLoaded(path: string): Promise<void>
 	dispose(): Promise<void>
 }
 
-export const createTreePrefetchClient = (): TreePrefetchClient => {
-	let worker: Worker | undefined
-	let remote: Remote<TreePrefetchWorkerApi> | undefined
+const createNoopTreePrefetchClient = (): TreePrefetchClient => ({
+	async init() {},
+	async seedTree() {},
+	async ingestSubtree() {},
+	async markDirLoaded() {},
+	async dispose() {}
+})
 
-	const ensureRemote = async () => {
-		if (remote) return remote
-		worker = createWorkerInstance()
-		remote = wrap<TreePrefetchWorkerApi>(worker)
-		return remote
+export const createTreePrefetchClient = (
+	callbacks: TreePrefetchWorkerCallbacks
+): TreePrefetchClient => {
+	if (!supportsWorkers) {
+		return createNoopTreePrefetchClient()
 	}
+
+	const workerCount = resolveWorkerCount()
+	const pool = new ComlinkPool<TreePrefetchWorkerApi>(
+		workerCount,
+		createWorkerInstance
+	)
+	const queue = new PrefetchQueue({
+		workerCount,
+		callbacks,
+		loadDirectory: target => pool.api.loadDirectory(target)
+	})
+	let destroyed = false
+	let initialized = false
 
 	return {
 		async init(payload) {
-			const client = await ensureRemote()
-			await client.init(payload)
+			if (destroyed) return
+			await queue.resetForSource(payload.source)
+			await pool.broadcast(remote => remote.init(payload))
+			initialized = true
 		},
-		async loadDirectory(path) {
-			const client = await ensureRemote()
-			return client.loadDirectory(path)
+		async seedTree(tree) {
+			if (destroyed || !initialized) return
+			await queue.seedTree(tree)
+		},
+		async ingestSubtree(node) {
+			if (destroyed || !initialized) return
+			queue.enqueueSubtree(node)
+		},
+		async markDirLoaded(path) {
+			if (destroyed || !initialized) return
+			queue.markDirLoaded(path)
 		},
 		async dispose() {
-			if (!remote) return
-			await remote.dispose()
-			releaseProxy(remote)
-			remote = undefined
-			worker?.terminate()
-			worker = undefined
+			if (destroyed) return
+			destroyed = true
+			await queue.dispose()
+			await pool.broadcast(remote => remote.dispose())
+			await pool.destroy()
 		}
 	}
 }

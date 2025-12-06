@@ -2,7 +2,8 @@ import { createSignal } from 'solid-js'
 
 export const createPrefetchIndicators = () => {
 	const [backgroundPrefetching, setBackgroundPrefetching] = createSignal(false)
-	const [backgroundLoadedCount, setBackgroundLoadedCount] = createSignal(0)
+	const [backgroundIndexedFileCount, setBackgroundIndexedFileCount] =
+		createSignal(0)
 	const [lastPrefetchedPath, setLastPrefetchedPath] = createSignal<
 		string | undefined
 	>(undefined)
@@ -13,8 +14,8 @@ export const createPrefetchIndicators = () => {
 	return {
 		backgroundPrefetching,
 		setBackgroundPrefetching,
-		backgroundLoadedCount,
-		setBackgroundLoadedCount,
+		backgroundIndexedFileCount,
+		setBackgroundIndexedFileCount,
 		lastPrefetchedPath,
 		setLastPrefetchedPath,
 		prefetchError,

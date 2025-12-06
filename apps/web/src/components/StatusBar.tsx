@@ -75,19 +75,19 @@ export const StatusBar = () => {
 			}
 		}
 
-		const loadedCount = state.backgroundLoadedCount
+		const indexedFileCount = state.backgroundIndexedFileCount
 
 		if (state.backgroundPrefetching) {
 			return {
-				label: `Indexed ${loadedCount} dirs`,
+				label: `Indexed ${indexedFileCount} files`,
 				class: 'border-blue-500/40 bg-blue-500/10 text-blue-100',
 				showSpinner: true
 			}
 		}
 
-		if (loadedCount > 0) {
+		if (indexedFileCount > 0) {
 			return {
-				label: `Indexed ${loadedCount} dirs`,
+				label: `Indexed ${indexedFileCount} files`,
 				class: 'border-zinc-700/60 bg-zinc-900 text-zinc-200/80',
 				showSpinner: false
 			}
