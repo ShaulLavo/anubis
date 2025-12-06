@@ -13,7 +13,7 @@ type InputProps = {
 	onKeyDown: JSX.EventHandlerUnion<HTMLTextAreaElement, KeyboardEvent>
 	onKeyUp: JSX.EventHandlerUnion<HTMLTextAreaElement, KeyboardEvent>
 }
-// TODO inout becomes slow on massive files 200,000 K lines vert notice able
+// TODO input becomes slow on massive files 200,000K lines very noticeable
 export const Input = (props: InputProps) => (
 	<textarea
 		ref={props.inputRef}
