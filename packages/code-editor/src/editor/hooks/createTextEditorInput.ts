@@ -216,6 +216,14 @@ export function createTextEditorInput(
 			return
 		}
 
+		if (event.key === 'Tab') {
+			event.preventDefault()
+			// Replace any active selection before inserting the tab character
+			deleteSelection()
+			applyInsert('\t')
+			return
+		}
+
 		if (
 			event.key === 'ArrowLeft' ||
 			event.key === 'ArrowRight' ||
