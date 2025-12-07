@@ -50,9 +50,8 @@ export function useCursorActions(
 
 	const ensureEntries = () => options.lineEntries()
 
-	const getShiftAnchor = (shiftKey: boolean, state: CursorState): number => {
-		return shiftKey ? getSelectionAnchor(state) : state.position.offset
-	}
+	const getShiftAnchor = (shiftKey: boolean, state: CursorState): number =>
+		shiftKey ? getSelectionAnchor(state) : state.position.offset
 
 	return {
 		setCursor: (position: CursorPosition) => {

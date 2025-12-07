@@ -214,17 +214,20 @@ export const useHistoryStore = (
 		})
 	}
 
-	const canUndo = () => {
+	const canUndoMemo = createMemo(() => {
 		const path = filePath()
 		if (!path) return false
 		return getHistoryState(path).undoStack.length > 0
-	}
+	})
 
-	const canRedo = () => {
+	const canRedoMemo = createMemo(() => {
 		const path = filePath()
 		if (!path) return false
 		return getHistoryState(path).redoStack.length > 0
-	}
+	})
+
+	const canUndo = () => canUndoMemo()
+	const canRedo = () => canRedoMemo()
 
 	const clear = () => {
 		const path = filePath()
@@ -241,4 +244,10 @@ export const useHistoryStore = (
 		canRedo,
 		clear
 	}
+}
+
+export const deleteHistoryStateForPath = (path: string) => {
+	if (!historyStore.has(path)) return
+	historyStore.delete(path)
+	historyLogger.debug('deleted history state', { path })
 }

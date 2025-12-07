@@ -10,10 +10,7 @@ const consola = createConsola({
 } as Partial<ConsolaOptions> & { fancy: boolean })
 
 const DEFAULT_LEVEL = 4
-
-if (typeof consola.level === 'number') {
-	consola.level = DEFAULT_LEVEL
-}
+consola.level = DEFAULT_LEVEL
 
 export { consola }
 export type { ConsolaInstance }

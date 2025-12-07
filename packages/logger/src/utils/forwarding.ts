@@ -58,7 +58,7 @@ const createForwardingProxy = (
 			) {
 				return (...args: unknown[]) => {
 					if (!isLoggerEnabled(tag)) {
-						return undefined
+						return receiver
 					}
 
 					if (logForwarder) {

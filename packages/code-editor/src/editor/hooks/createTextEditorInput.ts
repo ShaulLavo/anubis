@@ -195,11 +195,7 @@ export function createTextEditorInput(
 		})
 	}
 
-	function performDelete(
-		key: 'Backspace' | 'Delete',
-		ctrlOrMeta = false,
-		_shiftKey = false
-	) {
+	function performDelete(key: 'Backspace' | 'Delete', ctrlOrMeta = false) {
 		if (ctrlOrMeta && !cursor.actions.hasSelection()) {
 			if (key === 'Backspace') {
 				cursor.actions.moveCursor('left', true, true)
@@ -226,9 +222,6 @@ export function createTextEditorInput(
 				cursorOffsetAfter: offset,
 				mergeMode: 'delete'
 			})
-		}
-		if (_shiftKey) {
-			//noop
 		}
 	}
 
@@ -394,7 +387,7 @@ export function createTextEditorInput(
 				if (!options.isEditable()) return
 				const key = context.event.key === 'Backspace' ? 'Backspace' : 'Delete'
 				const ctrlOrMeta = context.event.ctrlKey || context.event.metaKey
-				performDelete(key, ctrlOrMeta, context.event.shiftKey)
+				performDelete(key, ctrlOrMeta)
 			}
 		},
 		[{ shortcut: 'delete' }]
@@ -455,8 +448,8 @@ export function createTextEditorInput(
 	)
 
 	const deleteKeyRepeat = createKeyRepeat<RepeatableDeleteKey>(
-		(key, ctrlOrMeta, shiftKey) => {
-			performDelete(key, ctrlOrMeta, shiftKey)
+		(key, ctrlOrMeta) => {
+			performDelete(key, ctrlOrMeta)
 		}
 	)
 
