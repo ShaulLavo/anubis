@@ -1,4 +1,4 @@
-import { createEffect, onCleanup, type Accessor } from 'solid-js'
+import { createEffect, createMemo, onCleanup, type Accessor } from 'solid-js'
 import type { PieceTableSnapshot } from '@repo/utils'
 import {
 	createPieceTableSnapshot,
@@ -268,19 +268,20 @@ export function createTextEditorInput(
 		}
 	}
 
-	createEffect(() => {
+	const activeScopes = createMemo(() => {
 		const extraScopes = options.activeScopes?.() ?? []
 		const editable = options.isEditable()
 		const baseScopes = editable
 			? [KEYMAP_SCOPE_NAVIGATION, KEYMAP_SCOPE_EDITING]
 			: [KEYMAP_SCOPE_NAVIGATION]
 
-		const scopes =
-			extraScopes.length > 0
-				? Array.from(new Set([...baseScopes, ...extraScopes]))
-				: baseScopes
+		return extraScopes.length > 0
+			? Array.from(new Set([...baseScopes, ...extraScopes]))
+			: baseScopes
+	})
 
-		keymap.setActiveScopes(scopes)
+	createEffect(() => {
+		keymap.setActiveScopes(activeScopes())
 	})
 
 	onCleanup(() => {

@@ -1,9 +1,6 @@
 import {
 	JSX,
-	createEffect,
 	createMemo,
-	createSignal,
-	onCleanup,
 	splitProps
 } from 'solid-js'
 import { isServer, mergeProps, ssr } from 'solid-js/web'
@@ -34,19 +31,12 @@ export const CustomIcon = (props: IconBaseProps) =>
 export function IconTemplate(iconSrc: IconTree, props: IconProps): JSX.Element {
 	const mergedProps = mergeProps(iconSrc.a, props) as IconBaseProps
 	const [_, svgProps] = splitProps(mergedProps, ['src'])
-	const [content, setContent] = createSignal<string>('')
 	const escapeHtml = (str: string) =>
 		str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 	const rawContent = createMemo(() =>
 		props.title ? `${iconSrc.c}<title>${escapeHtml(props.title)}</title>` : iconSrc.c
 	)
-
-	createEffect(() => setContent(rawContent()))
-
-	onCleanup(() => {
-		setContent('')
-	})
 
 	return (
 		<svg
@@ -62,7 +52,7 @@ export function IconTemplate(iconSrc: IconTree, props: IconProps): JSX.Element {
 			height={props.size || '1em'}
 			width={props.size || '1em'}
 			xmlns="http://www.w3.org/2000/svg"
-			innerHTML={content()}
+			innerHTML={rawContent()}
 		>
 			{isServer ? (ssr(rawContent()) as unknown as JSX.Element) : null}
 		</svg>
