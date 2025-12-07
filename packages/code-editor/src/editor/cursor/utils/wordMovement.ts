@@ -2,8 +2,8 @@ import type { LineEntry } from '../../types'
 import type { CursorPosition } from '../types'
 import { offsetToPosition } from './position'
 
-const isWordChar = (char: string): boolean => {
-	return /[\w]/.test(char)
+export const isWordChar = (char: string): boolean => {
+	return /[\p{L}\p{N}_]/u.test(char)
 }
 
 export const findWordBoundaryLeft = (text: string, offset: number): number => {

@@ -16,10 +16,7 @@ import type { TextFileEditorProps } from '../types'
 
 export const TextFileEditorInner = (props: TextFileEditorProps) => {
 	const cursor = useCursor()
-	const cursorState = () => cursor.state
-	const cursorActions = cursor.actions
-	const lineEntries = cursor.lineEntries
-	const pieceTableText = cursor.documentText
+
 	const tabSize = () => props.tabSize?.() ?? DEFAULT_TAB_SIZE
 
 	let scrollElement: HTMLDivElement = null!
@@ -28,26 +25,12 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 	const isEditable = () => props.document.isEditable()
 
 	const layout = createTextEditorLayout({
-		lineEntries,
-		cursorState,
 		fontSize: () => props.fontSize(),
 		fontFamily: () => props.fontFamily(),
 		isFileSelected: () => props.isFileSelected(),
 		tabSize,
 		scrollElement: () => scrollElement
 	})
-
-	createEffect(
-		on(
-			() => props.document.filePath(),
-			() => {
-				if (scrollElement) {
-					scrollElement.scrollTop = 0
-					scrollElement.scrollLeft = 0
-				}
-			}
-		)
-	)
 
 	const cursorScroll = createCursorScrollSync({
 		scrollElement: () => scrollElement,
@@ -57,16 +40,13 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 	})
 
 	const scrollCursorIntoView = () => {
-		const pos = cursorState().position
+		const pos = cursor.state.position
 		cursorScroll.scrollToCursor(pos.line, pos.column)
 	}
 
 	const input = createTextEditorInput({
-		cursorState,
-		cursorActions,
 		visibleLineRange: layout.visibleLineRange,
 		updatePieceTable: updater => props.document.updatePieceTable(updater),
-		pieceTableText,
 		isFileSelected: () => props.isFileSelected(),
 		isEditable,
 		getInputElement: () => inputElement,
@@ -74,14 +54,11 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 		activeScopes: () => props.activeScopes?.() ?? ['editor', 'global']
 	})
 
-	// Mouse selection for drag, double-click (word), triple-click (line)
 	const mouseSelection = createMouseSelection({
 		scrollElement: () => scrollElement,
-		lineEntries,
 		charWidth: layout.charWidth,
 		tabSize: tabSize,
 		lineHeight: layout.lineHeight,
-		cursorActions
 	})
 
 	const handleLineMouseDown = (
@@ -95,6 +72,17 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 		input.focusInput()
 	}
 
+	createEffect(
+		on(
+			() => props.document.filePath(),
+			() => {
+				if (scrollElement) {
+					scrollElement.scrollTop = 0
+					scrollElement.scrollLeft = 0
+				}
+			}
+		)
+	)
 	onMount(() => {
 		if (!scrollElement) return
 		const unregister = props.registerEditorArea?.(() => scrollElement)
@@ -118,7 +106,7 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 				style={{
 					'font-size': `${props.fontSize()}px`,
 					'font-family': props.fontFamily(),
-					'user-select': 'none' // Disable browser text selection
+					'user-select': 'none'
 				}}
 				onClick={() => input.focusInput()}
 			>
@@ -139,8 +127,6 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 					}}
 				>
 					<SelectionLayer
-						selections={() => cursorState().selections}
-						lineEntries={lineEntries}
 						virtualItems={layout.virtualItems}
 						lineHeight={layout.lineHeight}
 						lineNumberWidth={LINE_NUMBER_WIDTH}
@@ -152,7 +138,6 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 					/>
 					<Show when={isEditable()}>
 						<Cursor
-							cursorState={cursorState}
 							fontSize={props.fontSize()}
 							fontFamily={props.fontFamily()}
 							charWidth={layout.charWidth()}
@@ -168,7 +153,6 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 					<div class="flex h-full">
 						<LineGutters
 							rows={layout.virtualItems}
-							entries={lineEntries}
 							lineHeight={layout.lineHeight}
 							onRowClick={input.handleRowClick}
 							activeLineIndex={layout.activeLineIndex}
@@ -176,7 +160,6 @@ export const TextFileEditorInner = (props: TextFileEditorProps) => {
 
 						<Lines
 							rows={layout.virtualItems}
-							entries={lineEntries}
 							contentWidth={layout.contentWidth}
 							rowVirtualizer={layout.rowVirtualizer}
 							lineHeight={layout.lineHeight}

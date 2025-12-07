@@ -12,8 +12,7 @@ import {
 	type KeybindingOptions
 } from '@repo/keyboard'
 import type { LineEntry } from '../types'
-import type { CursorState, CursorActions } from '../cursor'
-import { getSelectionBounds, hasSelection } from '../cursor'
+import { useCursor, getSelectionBounds, hasSelection } from '../cursor'
 import { clipboard } from '../utils/clipboard'
 import { createKeyRepeat } from './createKeyRepeat'
 
@@ -33,15 +32,12 @@ type ShortcutConfig = {
 const KEYMAP_SCOPE = 'editor' as const
 
 export type TextEditorInputOptions = {
-	cursorState: Accessor<CursorState>
-	cursorActions: CursorActions
 	visibleLineRange: Accessor<VisibleLineRange>
 	updatePieceTable: (
 		updater: (
 			current: PieceTableSnapshot | undefined
 		) => PieceTableSnapshot | undefined
 	) => void
-	pieceTableText: () => string
 	isFileSelected: Accessor<boolean>
 	isEditable: Accessor<boolean>
 	getInputElement: () => HTMLTextAreaElement | null
@@ -66,6 +62,7 @@ export type TextEditorInputHandlers = {
 export function createTextEditorInput(
 	options: TextEditorInputOptions
 ): TextEditorInputHandlers {
+	const cursor = useCursor()
 	const focusInput = () => {
 		if (!options.isEditable()) return
 		const element = options.getInputElement()
@@ -85,13 +82,13 @@ export function createTextEditorInput(
 
 	const applyInsert = (value: string) => {
 		if (!value) return
-		const offset = options.cursorState().position.offset
+		const offset = cursor.state.position.offset
 		options.updatePieceTable(current => {
 			const baseSnapshot =
-				current ?? createPieceTableSnapshot(options.pieceTableText())
+				current ?? createPieceTableSnapshot(cursor.documentText())
 			return insertIntoPieceTable(baseSnapshot, offset, value)
 		})
-		options.cursorActions.setCursorOffset(offset + value.length)
+		cursor.actions.setCursorOffset(offset + value.length)
 		options.scrollCursorIntoView()
 	}
 
@@ -99,7 +96,7 @@ export function createTextEditorInput(
 		if (length <= 0 || offset < 0) return
 		options.updatePieceTable(current => {
 			const baseSnapshot =
-				current ?? createPieceTableSnapshot(options.pieceTableText())
+				current ?? createPieceTableSnapshot(cursor.documentText())
 			const totalLength = getPieceTableLength(baseSnapshot)
 
 			if (offset >= totalLength) {
@@ -118,7 +115,7 @@ export function createTextEditorInput(
 
 	const deleteSelection = (): boolean => {
 		if (!options.isEditable()) return false
-		const state = options.cursorState()
+		const state = cursor.state
 		if (!hasSelection(state)) return false
 
 		const selection = state.selections[0]
@@ -128,7 +125,7 @@ export function createTextEditorInput(
 		const length = end - start
 
 		applyDelete(start, length)
-		options.cursorActions.setCursorOffset(start)
+		cursor.actions.setCursorOffset(start)
 		return true
 	}
 
@@ -137,11 +134,11 @@ export function createTextEditorInput(
 		ctrlOrMeta = false,
 		_shiftKey = false
 	) {
-		if (ctrlOrMeta && !options.cursorActions.hasSelection()) {
+		if (ctrlOrMeta && !cursor.actions.hasSelection()) {
 			if (key === 'Backspace') {
-				options.cursorActions.moveCursor('left', true, true)
+				cursor.actions.moveCursor('left', true, true)
 			} else {
-				options.cursorActions.moveCursor('right', true, true)
+				cursor.actions.moveCursor('right', true, true)
 			}
 		}
 
@@ -150,12 +147,12 @@ export function createTextEditorInput(
 			return
 		}
 
-		const offset = options.cursorState().position.offset
+		const offset = cursor.state.position.offset
 
 		if (key === 'Backspace') {
 			if (offset === 0) return
 			applyDelete(offset - 1, 1)
-			options.cursorActions.setCursorOffset(offset - 1)
+			cursor.actions.setCursorOffset(offset - 1)
 		} else {
 			applyDelete(offset, 1)
 		}
@@ -224,7 +221,7 @@ export function createTextEditorInput(
 		{
 			id: 'editor.selectAll',
 			run: () => {
-				options.cursorActions.selectAll()
+				cursor.actions.selectAll()
 			}
 		},
 		[{ shortcut: 'primary+a' }]
@@ -234,7 +231,7 @@ export function createTextEditorInput(
 		{
 			id: 'editor.copySelection',
 			run: () => {
-				const selectedText = options.cursorActions.getSelectedText()
+				const selectedText = cursor.actions.getSelectedText()
 				if (selectedText) {
 					void clipboard.writeText(selectedText)
 				}
@@ -247,7 +244,7 @@ export function createTextEditorInput(
 		{
 			id: 'editor.cutSelection',
 			run: () => {
-				const selectedText = options.cursorActions.getSelectedText()
+				const selectedText = cursor.actions.getSelectedText()
 				if (selectedText) {
 					void clipboard.writeText(selectedText)
 				}
@@ -301,7 +298,7 @@ export function createTextEditorInput(
 			id: 'editor.cursor.home',
 			run: context => {
 				const ctrlOrMeta = context.event.ctrlKey || context.event.metaKey
-				options.cursorActions.moveCursorHome(
+				cursor.actions.moveCursorHome(
 					ctrlOrMeta,
 					context.event.shiftKey
 				)
@@ -319,7 +316,7 @@ export function createTextEditorInput(
 			id: 'editor.cursor.end',
 			run: context => {
 				const ctrlOrMeta = context.event.ctrlKey || context.event.metaKey
-				options.cursorActions.moveCursorEnd(
+				cursor.actions.moveCursorEnd(
 					ctrlOrMeta,
 					context.event.shiftKey
 				)
@@ -338,7 +335,7 @@ export function createTextEditorInput(
 			run: context => {
 				const range = options.visibleLineRange()
 				const visibleLines = range.end - range.start
-				options.cursorActions.moveCursorByLines(
+				cursor.actions.moveCursorByLines(
 					-visibleLines,
 					context.event.shiftKey
 				)
@@ -354,7 +351,7 @@ export function createTextEditorInput(
 			run: context => {
 				const range = options.visibleLineRange()
 				const visibleLines = range.end - range.start
-				options.cursorActions.moveCursorByLines(
+				cursor.actions.moveCursorByLines(
 					visibleLines,
 					context.event.shiftKey
 				)
@@ -373,16 +370,16 @@ export function createTextEditorInput(
 	const keyRepeat = createKeyRepeat<ArrowKey>((key, ctrlOrMeta, shiftKey) => {
 		switch (key) {
 			case 'ArrowLeft':
-				options.cursorActions.moveCursor('left', ctrlOrMeta, shiftKey)
+				cursor.actions.moveCursor('left', ctrlOrMeta, shiftKey)
 				break
 			case 'ArrowRight':
-				options.cursorActions.moveCursor('right', ctrlOrMeta, shiftKey)
+				cursor.actions.moveCursor('right', ctrlOrMeta, shiftKey)
 				break
 			case 'ArrowUp':
-				options.cursorActions.moveCursor('up', false, shiftKey)
+				cursor.actions.moveCursor('up', false, shiftKey)
 				break
 			case 'ArrowDown':
-				options.cursorActions.moveCursor('down', false, shiftKey)
+				cursor.actions.moveCursor('down', false, shiftKey)
 				break
 		}
 		options.scrollCursorIntoView()
@@ -439,7 +436,7 @@ export function createTextEditorInput(
 
 	const handleRowClick = (entry: LineEntry) => {
 		if (!options.isEditable()) return
-		options.cursorActions.setCursorFromClick(entry.index, entry.text.length)
+		cursor.actions.setCursorFromClick(entry.index, entry.text.length)
 		focusInput()
 	}
 
@@ -449,7 +446,7 @@ export function createTextEditorInput(
 		shiftKey = false
 	) => {
 		if (!options.isEditable()) return
-		options.cursorActions.setCursorFromClick(lineIndex, column, shiftKey)
+		cursor.actions.setCursorFromClick(lineIndex, column, shiftKey)
 		focusInput()
 	}
 

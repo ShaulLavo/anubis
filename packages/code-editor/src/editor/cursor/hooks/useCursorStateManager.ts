@@ -63,12 +63,31 @@ export function useCursorStateManager(
 			() => options.documentLength(),
 			length => {
 				const state = currentState()
+				const updates: Partial<CursorState> = {}
+
 				if (state.position.offset > length) {
 					const newPosition = offsetToPosition(length, options.lineEntries())
-					updateCurrentState(() => ({
-						position: newPosition,
-						preferredColumn: newPosition.column
-					}))
+					updates.position = newPosition
+					updates.preferredColumn = newPosition.column
+				}
+
+				const clampedSelections = state.selections.map(selection => ({
+					anchor: Math.min(selection.anchor, length),
+					focus: Math.min(selection.focus, length)
+				}))
+				const hasSelectionChanges = clampedSelections.some((selection, index) => {
+					const original = state.selections[index]
+					return (
+						original.anchor !== selection.anchor ||
+						original.focus !== selection.focus
+					)
+				})
+				if (hasSelectionChanges) {
+					updates.selections = clampedSelections
+				}
+
+				if (Object.keys(updates).length > 0) {
+					updateCurrentState(() => updates)
 				}
 			}
 		)

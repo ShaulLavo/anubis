@@ -7,7 +7,7 @@ import { useWhitespaceMarkers } from '../hooks/useWhitespaceMarkers'
 import { WhitespaceMarkers } from './WhitespaceMarkers'
 
 export const SelectionLayer = (props: SelectionLayerProps) => {
-	const selectionBounds = useSelectionBounds(() => props.selections())
+	const selectionBounds = useSelectionBounds()
 	const selectionRects = useSelectionRects(props, selectionBounds)
 	const whitespaceMarkers = useWhitespaceMarkers(props, selectionBounds)
 

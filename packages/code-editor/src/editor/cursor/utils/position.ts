@@ -19,21 +19,21 @@ export const offsetToPosition = (
 
 	let low = 0
 	let high = lastEntryIndex
-	let lineIndex = 0
+	let foundEntryIndex = 0
 
 	while (low <= high) {
 		const mid = (low + high) >> 1
 		const entry = lineEntries[mid]!
 
 		if (entry.start <= lookupOffset) {
-			lineIndex = mid
+			foundEntryIndex = mid
 			low = mid + 1
 		} else {
 			high = mid - 1
 		}
 	}
 
-	const entry = lineEntries[lineIndex]!
+	const entry = lineEntries[foundEntryIndex]!
 	const relativeOffset = Math.max(0, lookupOffset - entry.start)
 	const column = Math.min(relativeOffset, entry.text.length)
 

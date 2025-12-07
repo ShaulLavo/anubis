@@ -1,11 +1,7 @@
 import type { Accessor } from 'solid-js'
 import type { VirtualItem } from '@tanstack/virtual-core'
-import type { SelectionRange } from '../cursor'
-import type { LineEntry } from '../'
 
 export type SelectionLayerProps = {
-	selections: Accessor<SelectionRange[]>
-	lineEntries: Accessor<LineEntry[]>
 	virtualItems: Accessor<VirtualItem[]>
 	lineHeight: Accessor<number>
 	lineNumberWidth: number
@@ -31,7 +27,4 @@ export type WhitespaceMarker = {
 	align: 'left' | 'center'
 }
 
-export type SelectionBounds = {
-	start: number
-	end: number
-}
+export type { SelectionBounds } from '../cursor/types'

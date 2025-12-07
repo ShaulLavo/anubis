@@ -4,17 +4,19 @@ import type {
 	SelectionBounds,
 	SelectionLayerProps,
 	WhitespaceMarker
-} from './types'
+} from '../types'
+import { useCursor } from '../../cursor'
 
 export const useWhitespaceMarkers = (
 	props: SelectionLayerProps,
 	selectionBounds: Accessor<SelectionBounds | null>
-) =>
-	createMemo<WhitespaceMarker[]>(() => {
+) => {
+	const cursor = useCursor()
+	return createMemo<WhitespaceMarker[]>(() => {
 		const bounds = selectionBounds()
 		if (!bounds) return []
 
-		const entries = props.lineEntries()
+		const entries = cursor.lineEntries()
 		const virtualItems = props.virtualItems()
 		const lineHeight = props.lineHeight()
 
@@ -70,3 +72,4 @@ export const useWhitespaceMarkers = (
 
 		return markers
 	})
+}

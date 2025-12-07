@@ -4,17 +4,19 @@ import type {
 	SelectionBounds,
 	SelectionLayerProps,
 	SelectionRect
-} from './types'
+} from '../types'
+import { useCursor } from '../../cursor'
 
 export const useSelectionRects = (
 	props: SelectionLayerProps,
 	selectionBounds: Accessor<SelectionBounds | null>
-) =>
-	createMemo<SelectionRect[]>(() => {
+) => {
+	const cursor = useCursor()
+	return createMemo<SelectionRect[]>(() => {
 		const bounds = selectionBounds()
 		if (!bounds) return []
 
-		const entries = props.lineEntries()
+		const entries = cursor.lineEntries()
 		const virtualItems = props.virtualItems()
 		const lineHeight = props.lineHeight()
 		const charWidth = props.charWidth()
@@ -60,3 +62,4 @@ export const useSelectionRects = (
 
 		return rects
 	})
+}

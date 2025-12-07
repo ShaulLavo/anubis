@@ -24,7 +24,7 @@ import {
 	moveToDocStart,
 	moveToDocEnd
 } from '../utils/movement'
-import { moveByWord } from '../utils/wordMovement'
+import { moveByWord, isWordChar } from '../utils/wordMovement'
 import type { CursorActions } from '../context/types'
 
 type UseCursorActionsOptions = {
@@ -173,13 +173,23 @@ export function useCursorActions(
 
 			const state = options.currentState()
 			const anchor = getShiftAnchor(shiftKey, state)
+			const clampedLineIndex = Math.max(
+				0,
+				Math.min(lineIndex, entries.length - 1)
+			)
+			const entry = entries[clampedLineIndex]!
 
-			const offset = positionToOffset(lineIndex, column, entries)
-			const position = createCursorPosition(offset, lineIndex, column)
+			const clampedColumn = Math.max(0, Math.min(column, entry.text.length))
+			const offset = positionToOffset(clampedLineIndex, clampedColumn, entries)
+			const position = createCursorPosition(
+				offset,
+				clampedLineIndex,
+				clampedColumn
+			)
 
 			options.updateCurrentState(() => ({
 				position,
-				preferredColumn: column,
+				preferredColumn: clampedColumn,
 				selections: shiftKey ? [createSelectionRange(anchor, offset)] : []
 			}))
 		},
@@ -229,19 +239,18 @@ export function useCursorActions(
 			const text = options.documentText()
 			const entries = ensureEntries()
 
-			const wordChars = /[\w]/
 			let start = offset
 			let end = offset
 
 			while (start > 0) {
 				const char = text[start - 1]
-				if (!char || !wordChars.test(char)) break
+				if (!char || !isWordChar(char)) break
 				start--
 			}
 
 			while (end < text.length) {
 				const char = text[end]
-				if (!char || !wordChars.test(char)) break
+				if (!char || !isWordChar(char)) break
 				end++
 			}
 
