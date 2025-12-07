@@ -23,9 +23,6 @@ const LOGGER_DEFINITIONS = {
 	},
 	codeEditor: {
 		scopes: ['code-editor']
-	},
-	perf: {
-		scopes: ['perf']
 	}
 } as const satisfies Record<string, LoggerDefinition>
 

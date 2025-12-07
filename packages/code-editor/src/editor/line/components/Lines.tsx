@@ -8,7 +8,8 @@ export const Lines = (props: LinesProps) => {
 	return (
 		<div class="relative flex-1">
 			{props.rows().map(virtualRow => {
-				const entry: LineEntry | undefined = cursor.lineEntries()[virtualRow.index]
+				const entry: LineEntry | undefined =
+					cursor.lineEntries()[virtualRow.index]
 				if (!entry) return null
 
 				return (
@@ -20,6 +21,7 @@ export const Lines = (props: LinesProps) => {
 						contentWidth={props.contentWidth()}
 						charWidth={props.charWidth()}
 						tabSize={props.tabSize()}
+						isEditable={props.isEditable}
 						onRowClick={props.onRowClick}
 						onPreciseClick={props.onPreciseClick}
 						onMouseDown={props.onMouseDown}

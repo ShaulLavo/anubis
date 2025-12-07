@@ -179,6 +179,7 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 							lineHeight={layout.lineHeight}
 							charWidth={layout.charWidth}
 							tabSize={tabSize}
+							isEditable={isEditable}
 							onRowClick={input.handleRowClick}
 							onPreciseClick={input.handlePreciseClick}
 							onMouseDown={handleLineMouseDown}

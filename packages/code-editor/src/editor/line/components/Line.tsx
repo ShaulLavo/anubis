@@ -49,6 +49,9 @@ export const Line = (props: LineProps) => {
 				queueMicrotask(measure)
 			}}
 			class="absolute left-0 right-0 flex items-start text-zinc-100"
+			classList={{
+				'cursor-text': props.isEditable()
+			}}
 			style={{
 				transform: `translateY(${props.virtualRow.start}px)`,
 				top: 0,

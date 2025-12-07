@@ -52,8 +52,13 @@ export type LineProps = {
 	contentWidth: number
 	charWidth: number
 	tabSize: number
+	isEditable: Accessor<boolean>
 	onRowClick: (entry: LineEntry) => void
-	onPreciseClick: (lineIndex: number, column: number, shiftKey?: boolean) => void
+	onPreciseClick: (
+		lineIndex: number,
+		column: number,
+		shiftKey?: boolean
+	) => void
 	onMouseDown?: (
 		event: MouseEvent,
 		lineIndex: number,
@@ -71,8 +76,13 @@ export type LinesProps = {
 	lineHeight: Accessor<number>
 	charWidth: Accessor<number>
 	tabSize: Accessor<number>
+	isEditable: Accessor<boolean>
 	onRowClick: (entry: LineEntry) => void
-	onPreciseClick: (lineIndex: number, column: number, shiftKey?: boolean) => void
+	onPreciseClick: (
+		lineIndex: number,
+		column: number,
+		shiftKey?: boolean
+	) => void
 	onMouseDown?: (
 		event: MouseEvent,
 		lineIndex: number,

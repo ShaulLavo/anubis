@@ -6,8 +6,6 @@ type LogLevel = 'debug' | 'info' | 'warn'
 
 let currentLogLevel: LogLevel = 'debug'
 
-const perfLogger = loggers.perf
-
 export const setLogLevel = (level: LogLevel): void => {
 	currentLogLevel = level
 }
@@ -105,7 +103,7 @@ const formatBreakdownTable = (
 	].join('\n')
 }
 
-const getTargetLogger = (logger?: Logger): Logger => logger ?? perfLogger
+const getTargetLogger = (logger?: Logger): Logger | null => logger ?? null
 
 const logWithLevel = (logger: Logger, level: LogLevel, message: string): void => {
 	if (level === 'debug') {
@@ -127,6 +125,7 @@ export const logOperation = (
 	if (!shouldLog(level)) return
 
 	const targetLogger = getTargetLogger(logger)
+	if (!targetLogger) return
 	const metaStr = record.metadata
 		? `\n${Object.entries(record.metadata)
 				.map(([k, v]) => `${k}: ${v}`)
@@ -162,6 +161,7 @@ export const logOperationSimple = (
 	if (!shouldLog(level)) return
 
 	const targetLogger = getTargetLogger(logger)
+	if (!targetLogger) return
 	const metaStr = metadata
 		? ` | ${Object.entries(metadata)
 				.map(([k, v]) => `${k}: ${v}`)
@@ -200,27 +200,31 @@ const formatSummaryTable = (summaries: PerfSummary[]): string => {
 	return [divider, headerRow, divider, ...dataRows, divider].join('\n')
 }
 
-export const logSummary = async (filter?: {
-	name?: string
-	since?: number
-}): Promise<void> => {
+export const logSummary = async (
+	filter?: {
+		name?: string
+		since?: number
+	},
+	logger: Logger = loggers.app
+): Promise<void> => {
 	const summaries = await getSummary(filter)
 
-	perfLogger.info('📊 Performance Summary')
-	perfLogger.info(formatSummaryTable(summaries))
+	logger.info('📊 Performance Summary')
+	logger.info(formatSummaryTable(summaries))
 }
 
 export const logRecentOperations = async (
 	name: string,
-	limit = 10
+	limit = 10,
+	logger: Logger = loggers.app
 ): Promise<void> => {
 	const records = await getRecentForOperation(name, limit)
 
-	perfLogger.info(`📈 Recent "${name}" operations (${records.length})`)
+	logger.info(`📈 Recent "${name}" operations (${records.length})`)
 
 	for (const record of records) {
 		const time = new Date(record.timestamp).toLocaleTimeString()
-		perfLogger.debug(`${time} ${formatDuration(record.duration)}`)
+		logger.debug(`${time} ${formatDuration(record.duration)}`)
 	}
 }
 
