@@ -7,35 +7,53 @@ type LoggerToggleEntry =
 
 type LoggerToggleTree = Record<string, LoggerToggleEntry>
 
-const flattenTree = (
+const flattenNode = (
+	currentKey: string,
+	node: LoggerToggleEntry,
+	acc: Map<string, boolean>
+) => {
+	if (
+		typeof node === 'undefined' ||
+		node === null ||
+		(typeof node !== 'boolean' && typeof node !== 'object')
+	) {
+		return
+	}
+
+	if (typeof node === 'boolean') {
+		acc.set(currentKey, node)
+		return
+	}
+
+	const selfValue = typeof node.$self === 'boolean' ? node.$self : false
+	acc.set(currentKey, selfValue)
+
+	for (const [childKey, childValue] of Object.entries(node)) {
+		if (childKey === '$self') continue
+		const nextKey = `${currentKey}:${childKey}`
+		flattenNode(nextKey, childValue as LoggerToggleEntry, acc)
+	}
+}
+
+const flattenTreeToMap = (
 	tree: LoggerToggleTree,
 	prefix = ''
-): Record<string, boolean> => {
-	const result: Record<string, boolean> = {}
+): Map<string, boolean> => {
+	const result = new Map<string, boolean>()
 
-	for (const [key, value] of Object.entries(tree)) {
+	for (const [key, value] of Object.entries(tree ?? {})) {
+		if (typeof value === 'undefined') continue
 		const fullKey = prefix ? `${prefix}:${key}` : key
-
-		if (typeof value === 'boolean') {
-			result[fullKey] = value
-		} else {
-			result[fullKey] = value.$self ?? false
-			for (const [childKey, childValue] of Object.entries(value)) {
-				if (childKey === '$self') continue
-				if (typeof childValue === 'boolean') {
-					result[`${fullKey}:${childKey}`] = childValue
-				} else if (childValue !== undefined) {
-					Object.assign(
-						result,
-						flattenTree({ [childKey]: childValue }, fullKey)
-					)
-				}
-			}
-		}
+		flattenNode(fullKey, value, result)
 	}
 
 	return result
 }
 
-export { flattenTree }
+const flattenTree = (
+	tree: LoggerToggleTree,
+	prefix = ''
+): Record<string, boolean> => Object.fromEntries(flattenTreeToMap(tree, prefix))
+
+export { flattenTree, flattenTreeToMap }
 export type { LoggerToggleEntry, LoggerToggleTree }

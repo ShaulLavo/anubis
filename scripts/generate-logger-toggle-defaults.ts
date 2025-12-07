@@ -9,6 +9,11 @@ import {
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import * as ts from 'typescript'
+import {
+	flattenTreeToMap,
+	type LoggerToggleEntry,
+	type LoggerToggleTree
+} from '../packages/logger/src/utils/flattenToggleTree'
 import { buildTag } from '../packages/logger/src/utils/tags'
 import { LOGGER_DEFINITIONS } from '../packages/logger/src/utils/loggerDefinitions'
 
@@ -18,13 +23,6 @@ type ImportBinding = {
 }
 
 type ExportMap = Map<string, string>
-
-type RawToggleNode =
-	| boolean
-	| {
-			$self?: boolean
-			[key: string]: RawToggleNode | undefined
-	  }
 
 type TreeBuilderNode = {
 	self?: boolean
@@ -41,6 +39,7 @@ type FileTagParser = {
 		expr: ts.Expression | undefined,
 		aliasTags: Map<string, string>
 	) => string | undefined
+	loggersAliases: Set<string>
 }
 
 type ResolveCandidate = {
@@ -135,7 +134,7 @@ function loadPreviousStates(): Promise<Map<string, boolean>> {
 	return import(moduleUrl)
 		.then(mod => {
 			if (mod.LOGGER_TOGGLE_TREE) {
-				return flattenTree(mod.LOGGER_TOGGLE_TREE)
+				return flattenTreeToMap(mod.LOGGER_TOGGLE_TREE)
 			}
 			if (mod.LOGGER_TOGGLE_DEFAULTS) {
 				return new Map(Object.entries(mod.LOGGER_TOGGLE_DEFAULTS))
@@ -143,47 +142,6 @@ function loadPreviousStates(): Promise<Map<string, boolean>> {
 			return new Map()
 		})
 		.catch(() => new Map())
-}
-
-function flattenTree(
-	tree: Record<string, RawToggleNode>
-): Map<string, boolean> {
-	const result = new Map<string, boolean>()
-
-	for (const [key, value] of Object.entries(tree ?? {})) {
-		if (typeof value === 'undefined') continue
-		flattenNode(key, value, result)
-	}
-
-	return result
-}
-
-function flattenNode(
-	currentKey: string,
-	node: RawToggleNode,
-	acc: Map<string, boolean>
-) {
-	if (
-		typeof node === 'undefined' ||
-		node === null ||
-		(typeof node !== 'boolean' && typeof node !== 'object')
-	) {
-		return
-	}
-
-	if (typeof node === 'boolean') {
-		acc.set(currentKey, node)
-		return
-	}
-
-	const selfValue = typeof node.$self === 'boolean' ? node.$self : false
-	acc.set(currentKey, selfValue)
-
-	for (const [childKey, childValue] of Object.entries(node)) {
-		if (childKey === '$self') continue
-		const nextKey = `${currentKey}:${childKey}`
-		flattenNode(nextKey, childValue as RawToggleNode, acc)
-	}
 }
 
 function collectCandidateFiles(root: string): string[] {
@@ -214,21 +172,41 @@ function collectCandidateFiles(root: string): string[] {
 
 function collectTagsFromFile(filePath: string, content: string): Set<string> {
 	const tags = new Set<string>()
-	const { sourceFile, resolveExpressionTag } = parseFileForTags(
+	const { sourceFile, resolveExpressionTag, loggersAliases } = parseFileForTags(
 		filePath,
 		content
 	)
 	const aliasTags = new Map<string, string>()
+	const loggerLikeBindings = new Set<string>(loggersAliases)
 
 	const registerAlias = (name: string, tag: string | undefined) => {
 		if (!tag) return
 		aliasTags.set(name, tag)
 	}
 
+	const trackLoggerAlias = (
+		name: string,
+		initializer: ts.Expression | undefined
+	) => {
+		if (isLoggersReference(initializer, loggerLikeBindings)) {
+			loggerLikeBindings.add(name)
+		}
+	}
+
 	const visit = (node: ts.Node) => {
-		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-			const tag = resolveExpressionTag(node.initializer, aliasTags)
-			registerAlias(node.name.text, tag)
+		if (ts.isVariableDeclaration(node)) {
+			if (ts.isIdentifier(node.name)) {
+				const tag = resolveExpressionTag(node.initializer, aliasTags)
+				registerAlias(node.name.text, tag)
+				trackLoggerAlias(node.name.text, node.initializer)
+			} else if (ts.isObjectBindingPattern(node.name)) {
+				registerLoggersDestructuring(
+					node.name,
+					node.initializer,
+					loggerLikeBindings,
+					registerAlias
+				)
+			}
 		} else if (
 			ts.isCallExpression(node) &&
 			ts.isPropertyAccessExpression(node.expression) &&
@@ -337,7 +315,62 @@ function parseFileForTags(filePath: string, content: string): FileTagParser {
 		return undefined
 	}
 
-	return { sourceFile, resolveIdentifierTag, resolveExpressionTag }
+	return {
+		sourceFile,
+		resolveIdentifierTag,
+		resolveExpressionTag,
+		loggersAliases
+	}
+}
+
+function registerLoggersDestructuring(
+	pattern: ts.ObjectBindingPattern,
+	initializer: ts.Expression | undefined,
+	loggerLikeNames: Set<string>,
+	onBinding: (bindingName: string, tag: string | undefined) => void
+): void {
+	if (!isLoggersReference(initializer, loggerLikeNames)) return
+
+	for (const element of pattern.elements) {
+		if (element.dotDotDotToken) continue
+		if (!ts.isIdentifier(element.name)) continue
+
+		const sourceKey = getBindingElementSourceKey(element)
+		if (!sourceKey) continue
+
+		const tag = loggerBaseTags.get(sourceKey)
+		onBinding(element.name.text, tag)
+	}
+}
+
+function getBindingElementSourceKey(
+	element: ts.BindingElement
+): string | undefined {
+	const source = element.propertyName ?? element.name
+	if (ts.isIdentifier(source)) {
+		return source.text
+	}
+	if (ts.isStringLiteralLike(source) || ts.isNumericLiteral(source)) {
+		return source.text
+	}
+	return undefined
+}
+
+function isLoggersReference(
+	expr: ts.Expression | undefined,
+	loggerLikeNames: Set<string>
+): boolean {
+	if (!expr) return false
+	if (ts.isParenthesizedExpression(expr)) {
+		return isLoggersReference(expr.expression, loggerLikeNames)
+	}
+	if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr)) {
+		return isLoggersReference(expr.expression, loggerLikeNames)
+	}
+	if (ts.isNonNullExpression(expr)) {
+		return isLoggersReference(expr.expression, loggerLikeNames)
+	}
+	return ts.isIdentifier(expr) && loggerLikeNames.has(expr.text)
 }
 
 function createSourceFile(filePath: string, content: string): ts.SourceFile {
@@ -782,9 +815,14 @@ function getExportedTags(filePath: string): ExportMap {
 	exportStack.add(normalized)
 
 	const content = readFileSync(normalized, 'utf8')
-	const { sourceFile, resolveIdentifierTag, resolveExpressionTag } =
-		parseFileForTags(normalized, content)
+	const {
+		sourceFile,
+		resolveIdentifierTag,
+		resolveExpressionTag,
+		loggersAliases
+	} = parseFileForTags(normalized, content)
 	const localAliasTags = new Map<string, string>()
+	const loggerLikeBindings = new Set<string>(loggersAliases)
 	const exportsMap: ExportMap = new Map()
 	const resolveIdentifier = (name: string): string | undefined =>
 		resolveIdentifierTag(name, localAliasTags)
@@ -802,20 +840,32 @@ function getExportedTags(filePath: string): ExportMap {
 			const isExported = statement.modifiers?.some(
 				modifier => modifier.kind === ts.SyntaxKind.ExportKeyword
 			)
-			for (const declaration of statement.declarationList.declarations) {
-				if (!ts.isIdentifier(declaration.name)) continue
-				const tag = resolveExpression(declaration.initializer)
-				assignAlias(declaration.name.text, tag)
+			const handleBinding = (name: string, tag: string | undefined) => {
+				assignAlias(name, tag)
 				if (isExported && tag) {
-					exportsMap.set(declaration.name.text, tag)
+					exportsMap.set(name, tag)
+				}
+			}
+			for (const declaration of statement.declarationList.declarations) {
+				if (ts.isIdentifier(declaration.name)) {
+					const tag = resolveExpression(declaration.initializer)
+					handleBinding(declaration.name.text, tag)
+					if (isLoggersReference(declaration.initializer, loggerLikeBindings)) {
+						loggerLikeBindings.add(declaration.name.text)
+					}
+				} else if (ts.isObjectBindingPattern(declaration.name)) {
+					registerLoggersDestructuring(
+						declaration.name,
+						declaration.initializer,
+						loggerLikeBindings,
+						handleBinding
+					)
 				}
 			}
 		} else if (ts.isExportAssignment(statement)) {
-			if (statement.expression && ts.isIdentifier(statement.expression)) {
-				const tag = resolveIdentifier(statement.expression.text)
-				if (tag) {
-					exportsMap.set('default', tag)
-				}
+			const tag = resolveExpression(statement.expression)
+			if (tag) {
+				exportsMap.set('default', tag)
 			}
 		} else if (ts.isExportDeclaration(statement)) {
 			if (statement.moduleSpecifier) {
@@ -899,11 +949,11 @@ function buildTree(
 
 function convertTreeToObject(
 	tree: Map<string, TreeBuilderNode>
-): Record<string, RawToggleNode> {
+): LoggerToggleTree {
 	const entries = Array.from(tree.entries()).sort((a, b) =>
 		a[0].localeCompare(b[0])
 	)
-	const result: Record<string, RawToggleNode> = {}
+	const result: LoggerToggleTree = {}
 
 	for (const [key, node] of entries) {
 		result[key] = serializeNode(node)
@@ -912,7 +962,7 @@ function convertTreeToObject(
 	return result
 }
 
-function serializeNode(node: TreeBuilderNode): RawToggleNode {
+function serializeNode(node: TreeBuilderNode): LoggerToggleEntry {
 	if (node.children.size === 0) {
 		return node.self ?? false
 	}
@@ -921,7 +971,7 @@ function serializeNode(node: TreeBuilderNode): RawToggleNode {
 		a[0].localeCompare(b[0])
 	)
 
-	const payload: Record<string, RawToggleNode> = {}
+	const payload: Record<string, LoggerToggleEntry> = {}
 	payload.$self = node.self ?? false
 
 	for (const [key, child] of childEntries) {
@@ -931,7 +981,7 @@ function serializeNode(node: TreeBuilderNode): RawToggleNode {
 	return payload
 }
 
-function buildFileContents(treeObject: Record<string, RawToggleNode>): string {
+function buildFileContents(treeObject: LoggerToggleTree): string {
 	const header =
 		'// This file is auto-generated by scripts/generate-logger-toggle-defaults.ts.\n' +
 		'// Run `bun run generate:logger-toggles` to refresh it.\n\n'
@@ -952,10 +1002,7 @@ function buildFileContents(treeObject: Record<string, RawToggleNode>): string {
 	return `${header}${importBlock}${treeConst}${defaultsConst}${exportsBlock}`
 }
 
-function serializeObject(
-	value: Record<string, unknown> | boolean,
-	depth: number
-): string {
+function serializeObject(value: LoggerToggleEntry, depth: number): string {
 	if (typeof value === 'boolean') {
 		return value ? 'true' : 'false'
 	}
@@ -975,7 +1022,7 @@ function serializeObject(
 	const lines = entries.map(([key, child]) => {
 		const formattedKey = isValidIdentifier(key) ? key : `'${key}'`
 		return `${indent}${formattedKey}: ${serializeObject(
-			child as Record<string, unknown> | boolean,
+			child as LoggerToggleEntry,
 			depth + 1
 		)}`
 	})
