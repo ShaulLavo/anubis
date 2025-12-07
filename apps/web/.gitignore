@@ -1,4 +1,7 @@
 dist
+/public/tree-sitter/*.wasm
+!/public/tree-sitter/.gitkeep
+/public/*.wasm
 .wrangler
 .output
 .vercel

@@ -8,7 +8,9 @@
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview",
-    "lint": "eslint . --max-warnings 0"
+    "lint": "eslint . --max-warnings 0",
+    "copy-tree-sitter-assets": "bun scripts/install-tree-sitter-assets.ts",
+    "postinstall": "bun run copy-tree-sitter-assets"
   },
   "license": "MIT",
   "devDependencies": {
@@ -55,6 +57,9 @@
     "shell-quote": "^1.8.2",
     "solid-js": "^1.9.5",
     "tailwindcss": "^4.1.17",
+    "tree-sitter-javascript": "^0.25.0",
+    "tree-sitter-typescript": "^0.23.2",
+    "web-tree-sitter": "^0.25.10",
     "zod": "^4.1.13"
   }
 }
