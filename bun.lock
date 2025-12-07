@@ -87,6 +87,7 @@
         "@repo/icons": "*",
         "@repo/keyboard": "*",
         "@repo/logger": "*",
+        "@repo/perf": "*",
         "@repo/utils": "*",
         "@solid-primitives/map": "^0.7.2",
         "@tanstack/solid-virtual": "^3.13.12",

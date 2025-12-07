@@ -23,12 +23,31 @@ type RawToggleNode =
 	| boolean
 	| {
 			$self?: boolean
-			[key: string]: RawToggleNode
+			[key: string]: RawToggleNode | undefined
 	  }
 
 type TreeBuilderNode = {
 	self?: boolean
 	children: Map<string, TreeBuilderNode>
+}
+
+type FileTagParser = {
+	sourceFile: ts.SourceFile
+	resolveIdentifierTag: (
+		name: string,
+		aliasTags: Map<string, string>
+	) => string | undefined
+	resolveExpressionTag: (
+		expr: ts.Expression | undefined,
+		aliasTags: Map<string, string>
+	) => string | undefined
+}
+
+type ResolveCandidate = {
+	path: string
+	options?: {
+		extraExtensions?: string[]
+	}
 }
 
 const TS_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts'])
@@ -61,6 +80,7 @@ const exportCache = new Map<string, ExportMap>()
 const exportStack = new Set<string>()
 const moduleResolutionCache = new Map<string, string | undefined>()
 const fileContentCache = new Map<string, string>()
+const packageJsonCache = new Map<string, Record<string, unknown> | null>()
 
 const previousStates = await loadPreviousStates()
 const discoveredTags = new Set<string>()
@@ -176,8 +196,41 @@ function collectCandidateFiles(root: string): string[] {
 
 function collectTagsFromFile(filePath: string, content: string): Set<string> {
 	const tags = new Set<string>()
-	const sourceFile = createSourceFile(filePath, content)
+	const { sourceFile, resolveExpressionTag } = parseFileForTags(filePath, content)
+	const aliasTags = new Map<string, string>()
 
+	const registerAlias = (name: string, tag: string | undefined) => {
+		if (!tag) return
+		aliasTags.set(name, tag)
+	}
+
+	const visit = (node: ts.Node) => {
+		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+			const tag = resolveExpressionTag(node.initializer, aliasTags)
+			registerAlias(node.name.text, tag)
+		} else if (
+			ts.isCallExpression(node) &&
+			ts.isPropertyAccessExpression(node.expression) &&
+			node.expression.name.text === 'withTag'
+		) {
+			const fullTag = resolveExpressionTag(node, aliasTags)
+			if (fullTag) {
+				tags.add(fullTag)
+			}
+		}
+
+		ts.forEachChild(node, visit)
+	}
+
+	visit(sourceFile)
+	return tags
+}
+
+function parseFileForTags(
+	filePath: string,
+	content: string
+): FileTagParser {
+	const sourceFile = createSourceFile(filePath, content)
 	const importBindings = new Map<string, ImportBinding>()
 	const loggersAliases = new Set<string>()
 
@@ -200,9 +253,10 @@ function collectTagsFromFile(filePath: string, content: string): Set<string> {
 		}
 	}
 
-	const aliasTags = new Map<string, string>()
-
-	const resolveIdentifierTag = (name: string): string | undefined => {
+	const resolveIdentifierTag = (
+		name: string,
+		aliasTags: Map<string, string>
+	): string | undefined => {
 		if (aliasTags.has(name)) {
 			return aliasTags.get(name)
 		}
@@ -221,15 +275,18 @@ function collectTagsFromFile(filePath: string, content: string): Set<string> {
 		return tag
 	}
 
-	const resolveExpressionTag = (expr?: ts.Expression): string | undefined => {
+	const resolveExpressionTag = (
+		expr: ts.Expression | undefined,
+		aliasTags: Map<string, string>
+	): string | undefined => {
 		if (!expr) return undefined
 
 		if (ts.isIdentifier(expr)) {
-			return resolveIdentifierTag(expr.text)
+			return resolveIdentifierTag(expr.text, aliasTags)
 		}
 
 		if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr)) {
-			return resolveExpressionTag(expr.expression)
+			return resolveExpressionTag(expr.expression, aliasTags)
 		}
 
 		if (ts.isPropertyAccessExpression(expr)) {
@@ -239,7 +296,7 @@ function collectTagsFromFile(filePath: string, content: string): Set<string> {
 			) {
 				return loggerBaseTags.get(expr.name.text)
 			}
-			return resolveExpressionTag(expr.expression)
+			return resolveExpressionTag(expr.expression, aliasTags)
 		}
 
 		if (
@@ -247,7 +304,7 @@ function collectTagsFromFile(filePath: string, content: string): Set<string> {
 			ts.isPropertyAccessExpression(expr.expression) &&
 			expr.expression.name.text === 'withTag'
 		) {
-			const baseTag = resolveExpressionTag(expr.expression.expression)
+			const baseTag = resolveExpressionTag(expr.expression.expression, aliasTags)
 			if (!baseTag) return undefined
 			const arg = expr.arguments[0]
 			if (!arg || !ts.isStringLiteralLike(arg)) return undefined
@@ -259,37 +316,11 @@ function collectTagsFromFile(filePath: string, content: string): Set<string> {
 		return undefined
 	}
 
-	const registerAlias = (name: string, tag: string | undefined) => {
-		if (!tag) return
-		aliasTags.set(name, tag)
-	}
-
-	const visit = (node: ts.Node) => {
-		if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-			const tag = resolveExpressionTag(node.initializer)
-			registerAlias(node.name.text, tag)
-		} else if (
-			ts.isCallExpression(node) &&
-			ts.isPropertyAccessExpression(node.expression) &&
-			node.expression.name.text === 'withTag'
-		) {
-			const fullTag = resolveExpressionTag(node)
-			if (fullTag) {
-				tags.add(fullTag)
-			}
-		}
-
-		ts.forEachChild(node, visit)
-	}
-
-	visit(sourceFile)
-	return tags
+	return { sourceFile, resolveIdentifierTag, resolveExpressionTag }
 }
 
 function createSourceFile(filePath: string, content: string): ts.SourceFile {
-	const scriptKind = filePath.endsWith('.tsx')
-		? ts.ScriptKind.TSX
-		: ts.ScriptKind.TS
+	const scriptKind = resolveScriptKind(filePath)
 	return ts.createSourceFile(
 		filePath,
 		content,
@@ -297,6 +328,23 @@ function createSourceFile(filePath: string, content: string): ts.SourceFile {
 		true,
 		scriptKind
 	)
+}
+
+function resolveScriptKind(filePath: string): ts.ScriptKind {
+	if (filePath.endsWith('.tsx')) return ts.ScriptKind.TSX
+	if (filePath.endsWith('.mts')) {
+		const mtsKind = (
+			ts.ScriptKind as typeof ts.ScriptKind & { MTS?: ts.ScriptKind }
+		).MTS
+		return mtsKind ?? ts.ScriptKind.TS
+	}
+	if (filePath.endsWith('.cts')) {
+		const ctsKind = (
+			ts.ScriptKind as typeof ts.ScriptKind & { CTS?: ts.ScriptKind }
+		).CTS
+		return ctsKind ?? ts.ScriptKind.TS
+	}
+	return ts.ScriptKind.TS
 }
 
 function resolveModule(fromFile: string, specifier: string): string | undefined {
@@ -316,9 +364,15 @@ function resolveModule(fromFile: string, specifier: string): string | undefined 
 			resolved = resolveWithExtensions(target)
 		}
 	} else if (specifier.startsWith('@repo/')) {
-		const packageName = specifier.slice('@repo/'.length)
-		const candidate = path.join(repoRoot, 'packages', packageName, 'src', 'index')
-		resolved = resolveWithExtensions(candidate)
+		const repoSpecifier = specifier.slice('@repo/'.length)
+		const [packageName, ...subpathParts] = repoSpecifier.split('/')
+		const subpath = subpathParts.length > 0 ? subpathParts.join('/') : undefined
+		resolved = resolveRepoPackageModule(packageName, subpath)
+		if (!resolved) {
+			console.warn(
+				`[logger-toggle] Unable to resolve ${specifier} (package ${packageName})`
+			)
+		}
 	} else {
 		const absoluteCandidate = path.join(repoRoot, specifier)
 		resolved = resolveWithExtensions(absoluteCandidate)
@@ -328,12 +382,25 @@ function resolveModule(fromFile: string, specifier: string): string | undefined 
 	return resolved
 }
 
-function resolveWithExtensions(basePath: string): string | undefined {
+function resolveWithExtensions(
+	basePath: string,
+	options: { extraExtensions?: string[] } = {}
+): string | undefined {
 	if (existsSync(basePath) && statSync(basePath).isFile()) {
 		return path.normalize(basePath)
 	}
 
-	for (const ext of JS_EXTENSIONS) {
+	const extensionOrder: string[] = []
+	const seenExtensions = new Set<string>()
+	const allExtensions = [...(options.extraExtensions ?? []), ...JS_EXTENSIONS]
+	for (const ext of allExtensions) {
+		if (!ext) continue
+		if (seenExtensions.has(ext)) continue
+		seenExtensions.add(ext)
+		extensionOrder.push(ext)
+	}
+
+	for (const ext of extensionOrder) {
 		const candidate = `${basePath}${ext}`
 		if (existsSync(candidate) && statSync(candidate).isFile()) {
 			return path.normalize(candidate)
@@ -341,7 +408,7 @@ function resolveWithExtensions(basePath: string): string | undefined {
 	}
 
 	if (existsSync(basePath) && statSync(basePath).isDirectory()) {
-		for (const ext of JS_EXTENSIONS) {
+		for (const ext of extensionOrder) {
 			const candidate = path.join(basePath, `index${ext}`)
 			if (existsSync(candidate) && statSync(candidate).isFile()) {
 				return path.normalize(candidate)
@@ -361,6 +428,344 @@ function findSrcRoot(filePath: string): string | undefined {
 	return undefined
 }
 
+function resolveRepoPackageModule(
+	packageName: string,
+	subpath?: string
+): string | undefined {
+	if (!packageName) return undefined
+	const packageRoot = path.join(repoRoot, 'packages', packageName)
+	if (!existsSync(packageRoot) || !statSync(packageRoot).isDirectory()) {
+		return undefined
+	}
+
+	switch (packageName) {
+		case 'eslint-config':
+			return resolveEslintConfigPackage(packageRoot, subpath)
+		case 'icons':
+			return resolveIconsPackage(packageRoot, subpath)
+		case 'typescript-config':
+			return resolveTypeScriptConfigPackage(packageRoot, subpath)
+		case 'ui':
+			return resolveUiPackage(packageRoot, subpath)
+		default:
+			return resolveGenericRepoPackage(packageRoot, subpath)
+	}
+}
+
+function resolveGenericRepoPackage(
+	packageRoot: string,
+	subpath?: string
+): string | undefined {
+	const packageJson = readPackageJson(packageRoot)
+	const candidates = buildGenericRepoPackageCandidates(
+		packageRoot,
+		packageJson,
+		subpath
+	)
+	return tryResolveCandidates(candidates)
+}
+
+function resolveEslintConfigPackage(
+	packageRoot: string,
+	subpath?: string
+): string | undefined {
+	const packageJson = readPackageJson(packageRoot)
+	const candidates: ResolveCandidate[] = []
+	if (subpath) {
+		candidates.push({ path: path.join(packageRoot, subpath) })
+	} else {
+		candidates.push({ path: packageRoot })
+		candidates.push({ path: path.join(packageRoot, 'base') })
+		candidates.push({ path: path.join(packageRoot, 'solid') })
+	}
+	candidates.push(
+		...buildGenericRepoPackageCandidates(
+			packageRoot,
+			packageJson,
+			subpath
+		)
+	)
+	return tryResolveCandidates(candidates)
+}
+
+function resolveIconsPackage(
+	packageRoot: string,
+	subpath?: string
+): string | undefined {
+	const packageJson = readPackageJson(packageRoot)
+	const candidates: ResolveCandidate[] = []
+	candidates.push({ path: path.join(packageRoot, 'dist', 'lib', 'index') })
+	if (subpath) {
+		candidates.push({ path: path.join(packageRoot, subpath) })
+		candidates.push({ path: path.join(packageRoot, 'dist', subpath) })
+		candidates.push({ path: path.join(packageRoot, 'dist', 'lib', subpath) })
+	}
+	if (packageJson && typeof packageJson.main === 'string') {
+		candidates.push({ path: path.join(packageRoot, packageJson.main) })
+	}
+	candidates.push(
+		...buildGenericRepoPackageCandidates(
+			packageRoot,
+			packageJson,
+			subpath
+		)
+	)
+	return tryResolveCandidates(candidates)
+}
+
+function resolveTypeScriptConfigPackage(
+	packageRoot: string,
+	subpath?: string
+): string | undefined {
+	const packageJson = readPackageJson(packageRoot)
+	const candidates: ResolveCandidate[] = []
+	const extraExtensions = ['.json']
+	if (subpath) {
+		candidates.push({
+			path: path.join(packageRoot, subpath),
+			options: { extraExtensions }
+		})
+	} else {
+		candidates.push({
+			path: packageRoot,
+			options: { extraExtensions }
+		})
+	}
+	const exportKeys = new Set<string>()
+	if (subpath) {
+		exportKeys.add(`./${subpath}`)
+		if (!subpath.endsWith('.json')) {
+			exportKeys.add(`./${subpath}.json`)
+		}
+	} else if (
+		packageJson &&
+		typeof packageJson.exports === 'object' &&
+		packageJson.exports
+	) {
+		for (const key of Object.keys(
+			packageJson.exports as Record<string, unknown>
+		)) {
+			exportKeys.add(key)
+		}
+	}
+	for (const key of exportKeys) {
+		for (const target of extractExportPaths(packageJson?.exports, key)) {
+			candidates.push({
+				path: path.join(packageRoot, target),
+				options: { extraExtensions }
+			})
+		}
+	}
+	if (packageJson && typeof packageJson.main === 'string') {
+		candidates.push({
+			path: path.join(packageRoot, packageJson.main),
+			options: { extraExtensions }
+		})
+	}
+	candidates.push(
+		...buildGenericRepoPackageCandidates(
+			packageRoot,
+			packageJson,
+			subpath,
+			{
+				extraExtensions,
+				exportKeys: Array.from(exportKeys)
+			}
+		)
+	)
+	return tryResolveCandidates(candidates)
+}
+
+function resolveUiPackage(
+	packageRoot: string,
+	subpath?: string
+): string | undefined {
+	const packageJson = readPackageJson(packageRoot)
+	const candidates: ResolveCandidate[] = []
+	if (subpath) {
+		candidates.push({ path: path.join(packageRoot, subpath) })
+		candidates.push({ path: path.join(packageRoot, 'src', subpath) })
+		if (subpath === 'utils') {
+			candidates.push({ path: path.join(packageRoot, 'src', 'utils') })
+		}
+	} else {
+		candidates.push({ path: path.join(packageRoot, 'src', 'utils') })
+	}
+	candidates.push(
+		...buildGenericRepoPackageCandidates(
+			packageRoot,
+			packageJson,
+			subpath
+		)
+	)
+	return tryResolveCandidates(candidates)
+}
+
+function tryResolveCandidates(
+	candidates: ResolveCandidate[]
+): string | undefined {
+	for (const candidate of candidates) {
+		const resolved = resolveWithExtensions(
+			candidate.path,
+			candidate.options
+		)
+		if (resolved) {
+			return resolved
+		}
+	}
+	return undefined
+}
+
+function buildGenericRepoPackageCandidates(
+	packageRoot: string,
+	packageJson: Record<string, unknown> | undefined,
+	subpath?: string,
+	options?: { extraExtensions?: string[]; exportKeys?: string[] }
+): ResolveCandidate[] {
+	const candidates: ResolveCandidate[] = []
+	const candidateOptions =
+		options?.extraExtensions && options.extraExtensions.length > 0
+			? { extraExtensions: options.extraExtensions }
+			: undefined
+	const exportKeys =
+		options?.exportKeys && options.exportKeys.length > 0
+			? options.exportKeys
+			: subpath
+				? [`./${subpath}`]
+				: ['.']
+
+	const pushCandidate = (candidatePath: string) => {
+		if (candidateOptions) {
+			candidates.push({ path: candidatePath, options: candidateOptions })
+		} else {
+			candidates.push({ path: candidatePath })
+		}
+	}
+
+	if (subpath) {
+		pushCandidate(path.join(packageRoot, subpath))
+	}
+
+	if (packageJson) {
+		for (const key of exportKeys) {
+			for (const target of extractExportPaths(packageJson.exports, key)) {
+				pushCandidate(path.join(packageRoot, target))
+			}
+		}
+		if (typeof packageJson.main === 'string') {
+			pushCandidate(path.join(packageRoot, packageJson.main))
+		}
+	}
+
+	if (!subpath) {
+		pushCandidate(path.join(packageRoot, 'src', 'index'))
+		pushCandidate(path.join(packageRoot, 'index'))
+		pushCandidate(path.join(packageRoot, 'dist', 'index'))
+		pushCandidate(path.join(packageRoot, 'dist', 'lib', 'index'))
+	}
+
+	return candidates
+}
+
+function readPackageJson(
+	packageRoot: string
+): Record<string, unknown> | undefined {
+	if (packageJsonCache.has(packageRoot)) {
+		const cached = packageJsonCache.get(packageRoot)
+		return cached ?? undefined
+	}
+	const packageJsonPath = path.join(packageRoot, 'package.json')
+	if (!existsSync(packageJsonPath)) {
+		packageJsonCache.set(packageRoot, null)
+		return undefined
+	}
+	try {
+		const content = readFileSync(packageJsonPath, 'utf8')
+		const parsed = JSON.parse(content) as Record<string, unknown>
+		packageJsonCache.set(packageRoot, parsed)
+		return parsed
+	} catch {
+		packageJsonCache.set(packageRoot, null)
+		return undefined
+	}
+}
+
+function extractExportPaths(
+	exportsField: unknown,
+	exportKey: string
+): string[] {
+	if (!exportsField) return []
+	if (typeof exportsField === 'string') {
+		return exportKey === '.' ? [exportsField] : []
+	}
+	if (typeof exportsField !== 'object') {
+		return []
+	}
+
+	const exportObject = exportsField as Record<string, unknown>
+	if (exportKey in exportObject) {
+		return flattenExportEntry(exportObject[exportKey])
+	}
+
+	const wildcardMatches: string[] = []
+	for (const [key, value] of Object.entries(exportObject)) {
+		wildcardMatches.push(...resolveWildcardExportPaths(key, value, exportKey))
+	}
+	return Array.from(new Set(wildcardMatches))
+}
+
+function flattenExportEntry(entry: unknown): string[] {
+	if (typeof entry === 'string') {
+		return [entry]
+	}
+	if (Array.isArray(entry)) {
+		return entry.flatMap(value => flattenExportEntry(value))
+	}
+	if (entry && typeof entry === 'object') {
+		return Object.values(entry).flatMap(value => flattenExportEntry(value))
+	}
+	return []
+}
+
+function resolveWildcardExportPaths(
+	key: string,
+	entry: unknown,
+	exportKey: string
+): string[] {
+	const starIndex = key.indexOf('*')
+	if (starIndex === -1) return []
+	const prefix = key.slice(0, starIndex)
+	const suffix = key.slice(starIndex + 1)
+	if (!exportKey.startsWith(prefix) || !exportKey.endsWith(suffix)) {
+		return []
+	}
+	const replacement = exportKey.slice(
+		prefix.length,
+		exportKey.length - suffix.length
+	)
+	return flattenExportEntryWithWildcard(entry, replacement)
+}
+
+function flattenExportEntryWithWildcard(
+	entry: unknown,
+	replacement: string
+): string[] {
+	if (typeof entry === 'string') {
+		return [entry.split('*').join(replacement)]
+	}
+	if (Array.isArray(entry)) {
+		return entry.flatMap(value =>
+			flattenExportEntryWithWildcard(value, replacement)
+		)
+	}
+	if (entry && typeof entry === 'object') {
+		return Object.values(entry).flatMap(value =>
+			flattenExportEntryWithWildcard(value, replacement)
+		)
+	}
+	return []
+}
+
 function getExportedTags(filePath: string): ExportMap {
 	const normalized = path.normalize(filePath)
 	const cached = exportCache.get(normalized)
@@ -373,88 +778,17 @@ function getExportedTags(filePath: string): ExportMap {
 	exportStack.add(normalized)
 
 	const content = readFileSync(normalized, 'utf8')
-	const sourceFile = createSourceFile(normalized, content)
-
-	const importBindings = new Map<string, ImportBinding>()
-	const loggersAliases = new Set<string>()
+	const { sourceFile, resolveIdentifierTag, resolveExpressionTag } = parseFileForTags(
+		normalized,
+		content
+	)
 	const localAliasTags = new Map<string, string>()
 	const exportsMap: ExportMap = new Map()
-
-	for (const statement of sourceFile.statements) {
-		if (!ts.isImportDeclaration(statement)) continue
-		if (!statement.importClause?.namedBindings) continue
-		if (!ts.isNamedImports(statement.importClause.namedBindings)) continue
-
-		const moduleSpecifier = statement.moduleSpecifier
-		if (!ts.isStringLiteralLike(moduleSpecifier)) continue
-		const moduleName = moduleSpecifier.text
-
-		for (const element of statement.importClause.namedBindings.elements) {
-			const importName = element.propertyName?.text ?? element.name.text
-			const localName = element.name.text
-			importBindings.set(localName, { moduleSpecifier: moduleName, importName })
-			if (moduleName === '@repo/logger' && importName === 'loggers') {
-				loggersAliases.add(localName)
-			}
-		}
-	}
-
-	const resolveIdentifierTag = (name: string): string | undefined => {
-		if (localAliasTags.has(name)) {
-			return localAliasTags.get(name)
-		}
-
-		const binding = importBindings.get(name)
-		if (!binding) return undefined
-
-		const modulePath = resolveModule(normalized, binding.moduleSpecifier)
-		if (!modulePath) return undefined
-
-		const exportMap = getExportedTags(modulePath)
-		const tag = exportMap.get(binding.importName)
-		if (tag) {
-			localAliasTags.set(name, tag)
-		}
-		return tag
-	}
-
-	const resolveExpressionTag = (expr?: ts.Expression): string | undefined => {
-		if (!expr) return undefined
-
-		if (ts.isIdentifier(expr)) {
-			return resolveIdentifierTag(expr.text)
-		}
-
-		if (ts.isAsExpression(expr) || ts.isTypeAssertionExpression(expr)) {
-			return resolveExpressionTag(expr.expression)
-		}
-
-		if (ts.isPropertyAccessExpression(expr)) {
-			if (
-				ts.isIdentifier(expr.expression) &&
-				loggersAliases.has(expr.expression.text)
-			) {
-				return loggerBaseTags.get(expr.name.text)
-			}
-			return resolveExpressionTag(expr.expression)
-		}
-
-		if (
-			ts.isCallExpression(expr) &&
-			ts.isPropertyAccessExpression(expr.expression) &&
-			expr.expression.name.text === 'withTag'
-		) {
-			const baseTag = resolveExpressionTag(expr.expression.expression)
-			if (!baseTag) return undefined
-			const arg = expr.arguments[0]
-			if (!arg || !ts.isStringLiteralLike(arg)) return undefined
-			const child = arg.text.trim()
-			if (!child) return undefined
-			return `${baseTag}:${child}`
-		}
-
-		return undefined
-	}
+	const resolveIdentifier = (name: string): string | undefined =>
+		resolveIdentifierTag(name, localAliasTags)
+	const resolveExpression = (
+		expr: ts.Expression | undefined
+	): string | undefined => resolveExpressionTag(expr, localAliasTags)
 
 	const assignAlias = (name: string, tag: string | undefined) => {
 		if (!tag) return
@@ -468,7 +802,7 @@ function getExportedTags(filePath: string): ExportMap {
 			)
 			for (const declaration of statement.declarationList.declarations) {
 				if (!ts.isIdentifier(declaration.name)) continue
-				const tag = resolveExpressionTag(declaration.initializer)
+				const tag = resolveExpression(declaration.initializer)
 				assignAlias(declaration.name.text, tag)
 				if (isExported && tag) {
 					exportsMap.set(declaration.name.text, tag)
@@ -476,7 +810,7 @@ function getExportedTags(filePath: string): ExportMap {
 			}
 		} else if (ts.isExportAssignment(statement)) {
 			if (statement.expression && ts.isIdentifier(statement.expression)) {
-				const tag = resolveIdentifierTag(statement.expression.text)
+				const tag = resolveIdentifier(statement.expression.text)
 				if (tag) {
 					exportsMap.set('default', tag)
 				}

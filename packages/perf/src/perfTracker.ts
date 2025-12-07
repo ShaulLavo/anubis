@@ -1,3 +1,4 @@
+import type { Logger } from '@repo/logger'
 import {
 	createTimingTracker,
 	type TimingControls,
@@ -14,6 +15,7 @@ type TrackOptions = {
 	showBreakdown?: boolean
 	persist?: boolean
 	level?: 'debug' | 'info' | 'warn'
+	logger?: Logger
 }
 
 // Convert timing tracker's internal format to our breakdown format
@@ -84,7 +86,7 @@ export const trackOperation = async <T>(
 		return fn(noopControls)
 	}
 
-	const { metadata, showBreakdown = true, persist = true, level } = options
+	const { metadata, showBreakdown = true, persist = true, level, logger } = options
 
 	const tracker = createTimingTracker()
 	const { timeSync, timeAsync } = tracker
@@ -99,7 +101,7 @@ export const trackOperation = async <T>(
 
 		if (persist) {
 			const perfRecord = await record(name, duration, breakdown, metadata)
-			logOperation(perfRecord, { showBreakdown, level })
+			logOperation(perfRecord, { showBreakdown, level, logger })
 		} else {
 			const perfRecord = createTransientRecord(
 				name,
@@ -107,7 +109,7 @@ export const trackOperation = async <T>(
 				breakdown,
 				metadata
 			)
-			logOperation(perfRecord, { showBreakdown, level })
+			logOperation(perfRecord, { showBreakdown, level, logger })
 		}
 	}
 }
@@ -125,7 +127,7 @@ export const trackSync = <T>(
 		return fn(noopControls)
 	}
 
-	const { metadata, showBreakdown = true, persist = true } = options
+	const { metadata, showBreakdown = true, persist = true, logger } = options
 
 	const tracker = createTimingTracker()
 	const { timeSync, timeAsync } = tracker
@@ -141,7 +143,7 @@ export const trackSync = <T>(
 		if (persist) {
 			// Fire-and-forget for sync operations
 			void record(name, duration, breakdown, metadata).then(perfRecord => {
-				logOperation(perfRecord, { showBreakdown })
+				logOperation(perfRecord, { showBreakdown, logger })
 			})
 		} else {
 			const perfRecord = createTransientRecord(
@@ -150,7 +152,7 @@ export const trackSync = <T>(
 				breakdown,
 				metadata
 			)
-			logOperation(perfRecord, { showBreakdown })
+			logOperation(perfRecord, { showBreakdown, logger })
 		}
 	}
 }
@@ -163,14 +165,14 @@ export const trackSync = <T>(
 export const trackMicro = <T>(
 	name: string,
 	fn: () => T,
-	options: { metadata?: Record<string, unknown>; threshold?: number } = {}
+	options: { metadata?: Record<string, unknown>; threshold?: number; logger?: Logger } = {}
 ): T => {
 	// Skip instrumentation entirely when tracking is disabled
 	if (!PERF_TRACKING_ENABLED) {
 		return fn()
 	}
 
-	const { metadata, threshold = 1 } = options
+	const { metadata, threshold = 1, logger } = options
 	const start = performance.now()
 
 	try {
@@ -179,7 +181,7 @@ export const trackMicro = <T>(
 		const duration = performance.now() - start
 		// Only log if duration exceeds threshold (default 1ms)
 		if (duration >= threshold) {
-			logOperationSimple(name, duration, metadata)
+			logOperationSimple(name, duration, metadata, { logger })
 		}
 	}
 }
@@ -200,11 +202,11 @@ export const createOperationTracker = (
 	trackSync: <T>(fn: (controls: TimingControls) => T, options?: TrackOptions) =>
 		trackSync(operationName, fn, { ...defaultOptions, ...options }),
 
-	trackMicro: <T>(
-		fn: () => T,
-		options?: { metadata?: Record<string, unknown>; threshold?: number }
-	) => trackMicro(operationName, fn, options)
-})
+		trackMicro: <T>(
+			fn: () => T,
+			options?: { metadata?: Record<string, unknown>; threshold?: number; logger?: Logger }
+		) => trackMicro(operationName, fn, options)
+	})
 
 // Re-export store functions for convenience
 export {

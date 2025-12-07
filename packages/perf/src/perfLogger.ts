@@ -1,4 +1,4 @@
-import { loggers } from '@repo/logger'
+import { loggers, type Logger } from '@repo/logger'
 import type { PerfBreakdownEntry, PerfRecord, PerfSummary } from './perfStore'
 import { getSummary, getRecentForOperation } from './perfStore'
 
@@ -105,23 +105,28 @@ const formatBreakdownTable = (
 	].join('\n')
 }
 
-const logLevelMethods: Record<LogLevel, (msg: string) => void> = {
-	debug: msg => perfLogger.debug(msg),
-	info: msg => perfLogger.info(msg),
-	warn: msg => perfLogger.warn(msg)
-}
+const getTargetLogger = (logger?: Logger): Logger => logger ?? perfLogger
 
-const logWithLevel = (level: LogLevel, message: string): void => {
-	logLevelMethods[level](message)
+const logWithLevel = (logger: Logger, level: LogLevel, message: string): void => {
+	if (level === 'debug') {
+		logger.debug(message)
+		return
+	}
+	if (level === 'info') {
+		logger.info(message)
+		return
+	}
+	logger.warn(message)
 }
 
 export const logOperation = (
 	record: PerfRecord,
-	options: { showBreakdown?: boolean; level?: LogLevel } = {}
+	options: { showBreakdown?: boolean; level?: LogLevel; logger?: Logger } = {}
 ): void => {
-	const { showBreakdown = true, level = 'debug' } = options
+	const { showBreakdown = true, level = 'debug', logger } = options
 	if (!shouldLog(level)) return
 
+	const targetLogger = getTargetLogger(logger)
 	const metaStr = record.metadata
 		? `\n${Object.entries(record.metadata)
 				.map(([k, v]) => `${k}: ${v}`)
@@ -144,23 +149,26 @@ export const logOperation = (
 		message = `${message}\n${sizeLine}`
 	}
 
-	logWithLevel(level, message)
+	logWithLevel(targetLogger, level, message)
 }
 
 export const logOperationSimple = (
 	name: string,
 	duration: number,
-	metadata?: Record<string, unknown>
+	metadata?: Record<string, unknown>,
+	options: { logger?: Logger; level?: LogLevel } = {}
 ): void => {
-	if (!shouldLog('debug')) return
+	const { logger, level = 'debug' } = options
+	if (!shouldLog(level)) return
 
+	const targetLogger = getTargetLogger(logger)
 	const metaStr = metadata
 		? ` | ${Object.entries(metadata)
 				.map(([k, v]) => `${k}: ${v}`)
 				.join(', ')}`
 		: ''
 
-	perfLogger.debug(`⏱ ${name} ${formatDuration(duration)}${metaStr}`)
+	logWithLevel(targetLogger, level, `⏱ ${name} ${formatDuration(duration)}${metaStr}`)
 }
 
 const formatSummaryTable = (summaries: PerfSummary[]): string => {

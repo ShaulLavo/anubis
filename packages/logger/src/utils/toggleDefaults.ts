@@ -15,7 +15,8 @@ const LOGGER_TOGGLE_TREE = {
 	'code-editor': {
 		$self: false,
 		clipboard: false,
-		history: false
+		history: false,
+		TextFileEditor: false
 	},
 	desktop: false,
 	fs: false,
@@ -34,6 +35,7 @@ const LOGGER_TOGGLE_DEFAULTS = {
 	'code-editor': false,
 	'code-editor:clipboard': false,
 	'code-editor:history': false,
+	'code-editor:TextFileEditor': true,
 	desktop: false,
 	fs: false,
 	perf: false,
