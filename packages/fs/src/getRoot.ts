@@ -25,7 +25,7 @@ const LOCAL_ROOT_KEY = 'fs-local-root-handle'
 const OPFS_ROOT_KEY = 'fs-opfs-root-handle'
 let localRootPromise: Promise<FileSystemDirectoryHandle> | null = null
 
-type GetRootOptions = {
+export type GetRootOptions = {
 	onAwaitingInteraction?: () => void
 }
 
