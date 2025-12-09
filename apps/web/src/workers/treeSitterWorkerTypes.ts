@@ -17,10 +17,17 @@ export type TreeSitterError = {
 	isMissing: boolean
 }
 
+export type FoldRange = {
+	startLine: number
+	endLine: number
+	type: string
+}
+
 export type TreeSitterParseResult = {
 	captures: TreeSitterCapture[]
 	brackets: BracketInfo[]
 	errors: TreeSitterError[]
+	folds: FoldRange[]
 }
 
 export type TreeSitterWorkerApi = {
@@ -49,4 +56,3 @@ export type TreeSitterEditPayload = {
 	newEndPosition: TreeSitterPoint
 	insertedText: string
 }
-

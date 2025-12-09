@@ -1,6 +1,7 @@
 import {
 	Show,
 	createEffect,
+	createSignal,
 	on,
 	onCleanup,
 	onMount,
@@ -78,6 +79,25 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 		lineHeight: layout.lineHeight
 	})
 
+	const [foldedStarts, setFoldedStarts] = createSignal<Set<number>>(new Set())
+
+	const toggleFold = (startLine: number) => {
+		const foldRanges = props.folds?.()
+		if (!foldRanges?.some(range => range.startLine === startLine && range.endLine > range.startLine)) {
+			return
+		}
+
+		setFoldedStarts(prev => {
+			const next = new Set(prev)
+			if (next.has(startLine)) {
+				next.delete(startLine)
+			} else {
+				next.add(startLine)
+			}
+			return next
+		})
+	}
+
 	const handleLineMouseDown = (
 		event: MouseEvent,
 		lineIndex: number,
@@ -97,6 +117,29 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 					scrollElement.scrollTop = 0
 					scrollElement.scrollLeft = 0
 				}
+			}
+		)
+	)
+	createEffect(
+		on(
+			() => props.document.filePath(),
+			() => setFoldedStarts(new Set())
+		)
+	)
+	createEffect(
+		on(
+			() => props.folds?.(),
+			folds => {
+				setFoldedStarts(prev => {
+					if (!folds?.length) return new Set()
+					const next = new Set<number>()
+					for (const fold of folds) {
+						if (fold.endLine > fold.startLine && prev.has(fold.startLine)) {
+							next.add(fold.startLine)
+						}
+					}
+					return next
+				})
 			}
 		)
 	)
@@ -179,6 +222,9 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 							lineHeight={layout.lineHeight}
 							onRowClick={input.handleRowClick}
 							activeLineIndex={layout.activeLineIndex}
+							folds={props.folds}
+							foldedStarts={foldedStarts}
+							onToggleFold={toggleFold}
 						/>
 
 						<Lines

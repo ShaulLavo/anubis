@@ -33,7 +33,14 @@ type SelectedFilePanelProps = {
 export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	const [
 		state,
-		{ selectPath, updateSelectedFilePieceTable, updateSelectedFileHighlights, updateSelectedFileBrackets, updateSelectedFileErrors }
+		{
+			selectPath,
+			updateSelectedFilePieceTable,
+			updateSelectedFileHighlights,
+			updateSelectedFileFolds,
+			updateSelectedFileBrackets,
+			updateSelectedFileErrors
+		}
 	] = useFs()
 	const focus = useFocusManager()
 	// const [fontSize, setFontSize] = createSignal(DEFAULT_FONT_SIZE)
@@ -93,9 +100,9 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			const parsePromise = sendIncrementalTreeEdit(path, edit)
 			if (!parsePromise) return
 			void parsePromise.then(result => {
-				// Ignore highlights if file changed while computing
 				if (result && path === state.lastKnownFilePath) {
 					updateSelectedFileHighlights(result.captures)
+					updateSelectedFileFolds(result.folds)
 					updateSelectedFileBrackets(result.brackets)
 					updateSelectedFileErrors(result.errors)
 				}
@@ -117,7 +124,6 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		}
 	)
 
-	
 	const editorErrors = createMemo(() => state.selectedFileErrors)
 
 	return (
@@ -144,6 +150,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 						activeScopes={focus.activeScopes}
 						previewBytes={() => state.selectedFilePreviewBytes}
 						highlights={editorHighlights}
+						folds={() => state.selectedFileFolds}
 						brackets={() => state.selectedFileBrackets}
 						errors={editorErrors}
 					/>
