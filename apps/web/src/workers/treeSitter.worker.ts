@@ -5,9 +5,13 @@ import type {
 	TreeSitterEditPayload,
 	TreeSitterCapture
 } from './treeSitterWorkerTypes'
-import jsHighlightsQuerySource from 'tree-sitter-javascript/queries/highlights.scm?raw'
+// Use JSX highlights from npm (no custom version needed)
 import jsJsxHighlightsQuerySource from 'tree-sitter-javascript/queries/highlights-jsx.scm?raw'
-import tsHighlightsQuerySource from 'tree-sitter-typescript/queries/highlights.scm?raw'
+
+// Custom highlights will be loaded from public directory at runtime
+let cachedJsHighlights: string | null = null
+let cachedTsHighlights: string | null = null
+
 
 type CachedTreeEntry = {
 	tree: Tree
@@ -60,11 +64,19 @@ const setCachedEntry = (path: string, entry: CachedTreeEntry) => {
 	astCache.set(path, entry)
 }
 
-const highlightQuerySources = [
-	jsHighlightsQuerySource,
-	jsJsxHighlightsQuerySource,
-	tsHighlightsQuerySource
-].filter(Boolean)
+const loadCustomHighlightSource = async (path: string): Promise<string | null> => {
+	try {
+		const response = await fetch(path)
+		if (!response.ok) {
+			console.warn(`[Tree-sitter worker] failed to load ${path}:`, response.status)
+			return null
+		}
+		return await response.text()
+	} catch (error) {
+		console.warn(`[Tree-sitter worker] error loading ${path}:`, error)
+		return null
+	}
+}
 
 const ensureHighlightQueries = async () => {
 	if (highlightQueries.length > 0) return highlightQueries
@@ -72,8 +84,23 @@ const ensureHighlightQueries = async () => {
 	if (!parser) return []
 	const language = languageInstance ?? parser.language
 	if (!language) return []
+
+	// Load custom highlights from public directory
+	if (cachedJsHighlights === null) {
+		cachedJsHighlights = await loadCustomHighlightSource('/tree-sitter/javascript-highlights.scm') ?? ''
+	}
+	if (cachedTsHighlights === null) {
+		cachedTsHighlights = await loadCustomHighlightSource('/tree-sitter/typescript-highlights.scm') ?? ''
+	}
+
+	const highlightSources = [
+		cachedJsHighlights,
+		jsJsxHighlightsQuerySource,
+		cachedTsHighlights
+	].filter(Boolean)
+
 	const queries: Query[] = []
-	for (const source of highlightQuerySources) {
+	for (const source of highlightSources) {
 		try {
 			queries.push(new Query(language, source))
 		} catch (error) {
@@ -83,6 +110,7 @@ const ensureHighlightQueries = async () => {
 	highlightQueries = queries
 	return highlightQueries
 }
+
 
 const runHighlightQueries = async (
 	tree: Tree | null

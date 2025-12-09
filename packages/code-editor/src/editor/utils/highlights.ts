@@ -8,11 +8,20 @@ const EXACT_SCOPE_CLASS: Record<string, string> = {
 	comment: 'text-zinc-500',
 	'comment.block': 'text-zinc-500',
 	'comment.line': 'text-zinc-500',
+	// Declaration keywords (let, const, var, function, class) - purple/violet for structure
+	'keyword.declaration': 'text-violet-400',
+	// Import/export keywords - magenta/pink for module boundaries
+	'keyword.import': 'text-pink-400',
+	// Type/interface keywords - cyan for type system structure
+	'keyword.type': 'text-cyan-400',
+	// Control flow keywords (if, else, for, return, etc.) - emerald for flow
 	'keyword.control': 'text-emerald-300',
 	'keyword.operator': 'text-emerald-300',
-	'keyword.import': 'text-emerald-300',
+	// Type system
 	'type.builtin': 'text-sky-300',
-	'type.parameter': 'text-sky-300',
+	'type.parameter': 'text-teal-300',
+	'type.definition': 'text-sky-400',
+	// Variables
 	'variable.parameter': 'text-pink-300',
 	'variable.builtin': 'text-orange-300',
 	'punctuation.bracket': 'text-zinc-300'
