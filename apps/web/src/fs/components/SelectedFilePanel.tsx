@@ -1,9 +1,15 @@
-import type { TextEditorDocument } from '@repo/code-editor'
+import type {
+	EditorSyntaxHighlight,
+	TextEditorDocument
+} from '@repo/code-editor'
 import { Editor } from '@repo/code-editor'
 import { Accessor, Match, Switch, createMemo } from 'solid-js'
 import { useFocusManager } from '~/focus/focusManager'
 import { BinaryFileViewer } from '../../components/BinaryFileViewer'
 import { useFs } from '../../fs/context/FsContext'
+import { sendIncrementalTreeEdit } from '../../treeSitter/incrementalEdits'
+import { useTabs } from '../hooks/useTabs'
+import { Tabs } from './Tabs'
 
 const FONT_OPTIONS = [
 	{
@@ -17,6 +23,7 @@ const FONT_OPTIONS = [
 ]
 const DEFAULT_FONT_SIZE = 14
 const DEFAULT_FONT_FAMILY = FONT_OPTIONS[0]?.value ?? 'monospace'
+const MAX_EDITOR_TABS = 1000
 
 type SelectedFilePanelProps = {
 	isFileSelected: Accessor<boolean>
@@ -24,7 +31,10 @@ type SelectedFilePanelProps = {
 }
 
 export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
-	const [state, { updateSelectedFilePieceTable }] = useFs()
+	const [
+		state,
+		{ selectPath, updateSelectedFilePieceTable, updateSelectedFileHighlights, updateSelectedFileBrackets, updateSelectedFileErrors }
+	] = useFs()
 	const focus = useFocusManager()
 	// const [fontSize, setFontSize] = createSignal(DEFAULT_FONT_SIZE)
 	// const [fontFamily, setFontFamily] = createSignal(DEFAULT_FONT_FAMILY)
@@ -57,6 +67,17 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	// 	cursorMode() === 'terminal' ? 'Terminal' : 'Regular'
 	// )
 
+	const tabs = useTabs(() => state.lastKnownFilePath, {
+		maxTabs: MAX_EDITOR_TABS
+	})
+
+	const handleTabSelect = (path: string) => {
+		if (!path || path === state.selectedPath) return
+		void selectPath(path, { forceReload: true })
+	}
+
+	const tabLabel = (path: string) => path.split('/').pop() || path
+
 	const isEditable = () =>
 		props.isFileSelected() && !state.selectedFileLoading && !state.loading
 
@@ -65,20 +86,48 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		content: () => state.selectedFileContent,
 		pieceTable: () => state.selectedFilePieceTable,
 		updatePieceTable: updateSelectedFilePieceTable,
-		isEditable
+		isEditable,
+		applyIncrementalEdit: edit => {
+			if (isBinary()) return
+			const path = state.lastKnownFilePath
+			const parsePromise = sendIncrementalTreeEdit(path, edit)
+			if (!parsePromise) return
+			void parsePromise.then(result => {
+				// Ignore highlights if file changed while computing
+				if (result && path === state.lastKnownFilePath) {
+					updateSelectedFileHighlights(result.captures)
+					updateSelectedFileBrackets(result.brackets)
+					updateSelectedFileErrors(result.errors)
+				}
+			})
+		}
 	}
 
-	const currentFileLabel = createMemo(() => {
-		const path = props.currentPath
-		if (!path) return 'No file selected'
-		return path.split('/').pop() || 'No file selected'
-	})
+	const editorHighlights = createMemo<EditorSyntaxHighlight[] | undefined>(
+		() => {
+			const captures = state.selectedFileHighlights
+			if (!captures || captures.length === 0) {
+				return undefined
+			}
+			return captures.map(capture => ({
+				startIndex: capture.startIndex,
+				endIndex: capture.endIndex,
+				scope: capture.captureName
+			}))
+		}
+	)
+
+	
+	const editorErrors = createMemo(() => state.selectedFileErrors)
 
 	return (
 		<div class="flex h-full flex-col font-mono overflow-hidden">
-			<p class="text-xs font-semibold uppercase tracking-[0.08em] text-zinc-500">
-				{currentFileLabel()}
-			</p>
+			<Tabs
+				values={tabs()}
+				activeValue={state.lastKnownFilePath}
+				onSelect={handleTabSelect}
+				getLabel={tabLabel}
+			/>
 
 			<Switch
 				fallback={
@@ -94,13 +143,16 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 						}
 						activeScopes={focus.activeScopes}
 						previewBytes={() => state.selectedFilePreviewBytes}
+						highlights={editorHighlights}
+						brackets={() => state.selectedFileBrackets}
+						errors={editorErrors}
 					/>
 				}
 			>
 				<Match when={!props.isFileSelected()}>
 					<p class="mt-2 text-sm text-zinc-500">
-						Select a file to view its contents. Click folders to toggle
-						visibility.
+						{/* Select a file to view its contents. Click folders to toggle
+						visibility. */}
 					</p>
 				</Match>
 

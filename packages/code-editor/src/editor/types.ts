@@ -2,9 +2,42 @@ import type { VirtualItem, Virtualizer } from '@tanstack/virtual-core'
 import type { Accessor } from 'solid-js'
 import type { ParseResult } from '@repo/utils/parse'
 import type { PieceTableSnapshot } from '@repo/utils'
-import type { BracketDepthMap as InternalBracketDepthMap } from './utils/bracketDepths'
 
-export type BracketDepthMap = InternalBracketDepthMap
+// Bracket depth map: character index -> nesting depth
+export type BracketDepthMap = Record<number, number>
+
+// Bracket info from tree-sitter AST
+export type BracketInfo = {
+	index: number
+	char: string
+	depth: number
+}
+export type EditorSyntaxHighlight = {
+	startIndex: number
+	endIndex: number
+	scope: string
+}
+export type LineHighlightSegment = {
+	start: number
+	end: number
+	className: string
+	scope: string
+}
+export type EditorPoint = {
+	row: number
+	column: number
+}
+
+export type DocumentIncrementalEdit = {
+	startIndex: number
+	oldEndIndex: number
+	newEndIndex: number
+	startPosition: EditorPoint
+	oldEndPosition: EditorPoint
+	newEndPosition: EditorPoint
+	deletedText: string
+	insertedText: string
+}
 
 export type CursorMode = 'regular' | 'terminal'
 
@@ -22,6 +55,14 @@ export type TextEditorDocument = {
 		) => PieceTableSnapshot | undefined
 	) => void
 	isEditable: Accessor<boolean>
+	applyIncrementalEdit?: (edit: DocumentIncrementalEdit) => void
+}
+
+export type EditorError = {
+	startIndex: number
+	endIndex: number
+	message: string
+	isMissing: boolean
 }
 
 export type EditorProps = {
@@ -35,6 +76,9 @@ export type EditorProps = {
 	registerEditorArea?: EditorAreaRegistration
 	previewBytes?: Accessor<Uint8Array | undefined>
 	activeScopes?: Accessor<string[]>
+	highlights?: Accessor<EditorSyntaxHighlight[] | undefined>
+	brackets?: Accessor<BracketInfo[] | undefined>
+	errors?: Accessor<EditorError[] | undefined>
 }
 
 export type LineEntry = {
@@ -67,6 +111,7 @@ export type LineProps = {
 	) => void
 	isActive: boolean
 	bracketDepths: Accessor<BracketDepthMap | undefined>
+	highlights?: LineHighlightSegment[]
 }
 
 export type LinesProps = {
@@ -91,6 +136,7 @@ export type LinesProps = {
 	) => void
 	activeLineIndex: Accessor<number | null>
 	bracketDepths: Accessor<BracketDepthMap | undefined>
+	getLineHighlights?: (lineIndex: number) => LineHighlightSegment[] | undefined
 }
 
 export type LineGuttersProps = {

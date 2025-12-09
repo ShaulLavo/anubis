@@ -11,11 +11,11 @@ import { makeTreePrefetch } from '../hooks/useTreePrefetch'
 import { useDirectoryLoader } from '../hooks/useDirectoryLoader'
 import { useFileSelection } from '../hooks/useFileSelection'
 import { useFsRefresh } from '../hooks/useFsRefresh'
+import { createFileCacheController } from '../cache/fileCacheController'
 
 export function FsProvider(props: { children: JSX.Element }) {
 	const {
 		state,
-		hydration,
 		setTree,
 		setExpanded,
 		setSelectedPath,
@@ -30,6 +30,9 @@ export function FsProvider(props: { children: JSX.Element }) {
 		clearParseResults,
 		setPieceTable,
 		clearPieceTables,
+		setHighlights,
+		setBrackets,
+		setErrors,
 		setBackgroundPrefetching,
 		setBackgroundIndexedFileCount,
 		setLastPrefetchedPath,
@@ -40,6 +43,15 @@ export function FsProvider(props: { children: JSX.Element }) {
 		registerDeferredMetadata,
 		clearDeferredMetadata
 	} = createFsState()
+
+	const fileCache = createFileCacheController({
+		state,
+		setPieceTable,
+		setFileStats,
+		setHighlights,
+		setBrackets,
+		setErrors
+	})
 
 	const setDirNode = (path: string, node: FsDirTreeNode) => {
 		if (!state.tree) return
@@ -76,16 +88,16 @@ export function FsProvider(props: { children: JSX.Element }) {
 		treePrefetchClient
 	})
 
-	const { selectPath, updateSelectedFilePieceTable } = useFileSelection({
-		state,
-		setSelectedPath,
-		setSelectedFileSize,
-		setSelectedFilePreviewBytes,
+	const { selectPath, updateSelectedFilePieceTable, updateSelectedFileHighlights, updateSelectedFileBrackets, updateSelectedFileErrors } =
+		useFileSelection({
+			state,
+			setSelectedPath,
+			setSelectedFileSize,
+			setSelectedFilePreviewBytes,
 		setSelectedFileContent,
 		setSelectedFileLoading,
 		setError,
-		setPieceTable,
-		setFileStats
+		fileCache
 	})
 
 	const { refresh } = useFsRefresh({
@@ -97,6 +109,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setLoading,
 		clearParseResults,
 		clearPieceTables,
+		clearFileCache: fileCache.clearAll,
 		setBackgroundPrefetching,
 		setBackgroundIndexedFileCount,
 		setLastPrefetchedPath,
@@ -121,13 +134,11 @@ export function FsProvider(props: { children: JSX.Element }) {
 	const setSource = (source: FsSource) => refresh(source)
 
 	onMount(() => {
-		void hydration.then(() => {
-			restoreHandleCache({
-				tree: state.tree,
-				activeSource: state.activeSource
-			})
-			return refresh(state.activeSource ?? DEFAULT_SOURCE)
+		restoreHandleCache({
+			tree: state.tree,
+			activeSource: state.activeSource
 		})
+		void refresh(state.activeSource ?? DEFAULT_SOURCE)
 	})
 
 	createEffect(() => {
@@ -158,7 +169,10 @@ export function FsProvider(props: { children: JSX.Element }) {
 			createDir,
 			createFile,
 			deleteNode,
-			updateSelectedFilePieceTable
+			updateSelectedFilePieceTable,
+			updateSelectedFileHighlights,
+			updateSelectedFileBrackets,
+			updateSelectedFileErrors
 		}
 	]
 

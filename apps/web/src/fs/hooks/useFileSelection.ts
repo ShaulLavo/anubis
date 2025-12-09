@@ -3,7 +3,8 @@ import {
 	createMinimalBinaryParseResult,
 	detectBinaryFromPreview,
 	parseFileBuffer,
-	createPieceTableSnapshot
+	createPieceTableSnapshot,
+	getPieceTableText
 } from '@repo/utils'
 import { loggers } from '@repo/logger'
 import type { PieceTableSnapshot } from '@repo/utils'
@@ -11,12 +12,16 @@ import { trackOperation } from '@repo/perf'
 import {
 	getFileSize,
 	readFilePreviewBytes,
-	readFileText
+	readFileBuffer
 } from '../runtime/streaming'
 import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsState } from '../types'
 import type { FsContextValue, SelectPathOptions } from '../context/FsContext'
 import { findNode } from '../runtime/tree'
+import type { FileCacheController } from '../cache/fileCacheController'
+import { parseBufferWithTreeSitter } from '../../treeSitter/workerClient'
+
+const textDecoder = new TextDecoder()
 
 type UseFileSelectionOptions = {
 	state: FsState
@@ -26,13 +31,7 @@ type UseFileSelectionOptions = {
 	setSelectedFileContent: (content: string) => void
 	setSelectedFileLoading: (value: boolean) => void
 	setError: (message: string | undefined) => void
-	setPieceTable: (path: string, snapshot?: PieceTableSnapshot) => void
-	setFileStats: (
-		path: string,
-		result?:
-			| ReturnType<typeof parseFileBuffer>
-			| ReturnType<typeof createMinimalBinaryParseResult>
-	) => void
+	fileCache: FileCacheController
 }
 
 const MAX_FILE_SIZE_BYTES = Infinity
@@ -45,8 +44,7 @@ export const useFileSelection = ({
 	setSelectedFileContent,
 	setSelectedFileLoading,
 	setError,
-	setPieceTable,
-	setFileStats
+	fileCache
 }: UseFileSelectionOptions) => {
 	let selectRequestId = 0
 
@@ -60,6 +58,10 @@ export const useFileSelection = ({
 		const tree = state.tree
 		if (!tree) return
 		if (state.selectedPath === path && !options?.forceReload) return
+
+		if (options?.forceReload) {
+			fileCache.clearPath(path)
+		}
 
 		const node = findNode(tree, path)
 		if (!node) return
@@ -97,45 +99,82 @@ export const useFileSelection = ({
 
 					if (fileSize > MAX_FILE_SIZE_BYTES) {
 						// Skip processing for large files
-					} else {
+						} else {
 						const previewBytes = await timeAsync('read-preview-bytes', () =>
 							readFilePreviewBytes(source, path)
 						)
 						if (requestId !== selectRequestId) return
 
+						const {
+							pieceTable: existingSnapshot,
+							stats: existingFileStats
+						} = fileCache.get(path)
 						const detection = detectBinaryFromPreview(path, previewBytes)
 						const isBinary = !detection.isText
 
-						if (isBinary) {
+						if (existingSnapshot) {
+							selectedFileContentValue = getPieceTableText(existingSnapshot)
+							fileStatsResult =
+								existingFileStats ??
+								timeSync('parse-file-buffer', () =>
+									parseFileBuffer(selectedFileContentValue, {
+										path,
+										textHeuristic: detection
+									})
+								)
+							pieceTableSnapshot = existingSnapshot
+						} else if (isBinary) {
 							binaryPreviewBytes = previewBytes
-							fileStatsResult = timeSync('binary-file-metadata', () =>
-								createMinimalBinaryParseResult('', detection)
-							)
+							fileStatsResult =
+								existingFileStats ??
+								timeSync('binary-file-metadata', () =>
+									createMinimalBinaryParseResult('', detection)
+								)
 						} else {
-							const text = await timeAsync('read-file-text', () =>
-								readFileText(source, path)
+						const buffer = await timeAsync('read-file-buffer', () =>
+							readFileBuffer(source, path)
+						)
+						if (requestId !== selectRequestId) return
+
+						const textBytes = new Uint8Array(buffer)
+						const text = textDecoder.decode(textBytes)
+						selectedFileContentValue = text
+
+							const parseResultPromise = parseBufferWithTreeSitter(path, buffer)
+								if (parseResultPromise) {
+									void parseResultPromise
+										.then(result => {
+											if (requestId !== selectRequestId) return
+											if (result) {
+												fileCache.set(path, {
+													highlights: result.captures,
+													brackets: result.brackets,
+													errors: result.errors
+												})
+											}
+										})
+										.catch(error => {
+											loggers.fs.error(
+												'[Tree-sitter worker] parse failed',
+												path,
+												error
+											)
+										})
+								}
+
+						fileStatsResult = timeSync('parse-file-buffer', () =>
+							parseFileBuffer(text, {
+								path,
+								textHeuristic: detection
+							})
+						)
+
+						if (fileStatsResult.contentKind === 'text') {
+							pieceTableSnapshot = timeSync('create-piece-table', () =>
+								createPieceTableSnapshot(text)
 							)
-							if (requestId !== selectRequestId) return
-
-							selectedFileContentValue = text
-
-							fileStatsResult = timeSync('parse-file-buffer', () =>
-								parseFileBuffer(text, {
-									path,
-									textHeuristic: detection
-								})
-							)
-
-							if (fileStatsResult.contentKind === 'text') {
-								const existingSnapshot = state.pieceTables[path]
-
-								pieceTableSnapshot =
-									existingSnapshot ??
-									timeSync('create-piece-table', () =>
-										createPieceTableSnapshot(text)
-									)
-							}
 						}
+					}
 					}
 
 					timeSync('apply-selection-state', ({ timeSync }) => {
@@ -151,14 +190,13 @@ export const useFileSelection = ({
 							timeSync('set-selected-file-content', () =>
 								setSelectedFileContent(selectedFileContentValue)
 							)
-							if (pieceTableSnapshot) {
-								timeSync('set-piece-table', () =>
-									setPieceTable(path, pieceTableSnapshot)
-								)
-							}
-							if (fileStatsResult) {
-								timeSync('set-file-stats', () =>
-									setFileStats(path, fileStatsResult)
+							if (pieceTableSnapshot || fileStatsResult || binaryPreviewBytes) {
+								timeSync('set-cache-entry', () =>
+									fileCache.set(path, {
+										pieceTable: pieceTableSnapshot,
+										stats: fileStatsResult,
+										previewBytes: binaryPreviewBytes
+									})
 								)
 							}
 						})
@@ -188,11 +226,35 @@ export const useFileSelection = ({
 			const next = updater(current)
 			if (!next) return
 
-			setPieceTable(path, next)
+			fileCache.set(path, { pieceTable: next })
+		}
+
+	const updateSelectedFileHighlights: FsContextValue[1]['updateSelectedFileHighlights'] =
+		highlights => {
+			const path = state.lastKnownFilePath
+			if (!path) return
+			fileCache.set(path, { highlights })
+		}
+
+	const updateSelectedFileBrackets: FsContextValue[1]['updateSelectedFileBrackets'] =
+		brackets => {
+			const path = state.lastKnownFilePath
+			if (!path) return
+			fileCache.set(path, { brackets })
+		}
+
+	const updateSelectedFileErrors: FsContextValue[1]['updateSelectedFileErrors'] =
+		errors => {
+			const path = state.lastKnownFilePath
+			if (!path) return
+			fileCache.set(path, { errors })
 		}
 
 	return {
 		selectPath,
-		updateSelectedFilePieceTable
+		updateSelectedFilePieceTable,
+		updateSelectedFileHighlights,
+		updateSelectedFileBrackets,
+		updateSelectedFileErrors
 	}
 }

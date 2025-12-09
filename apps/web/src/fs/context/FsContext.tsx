@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'solid-js'
 import type { PieceTableSnapshot } from '@repo/utils'
+import type { TreeSitterCapture, BracketInfo, TreeSitterError } from '../../workers/treeSitterWorkerTypes'
 import type { FsState, FsSource } from '../types'
 
 export type SelectPathOptions = {
@@ -22,6 +23,15 @@ export type FsActions = {
 		updater: (
 			current: PieceTableSnapshot | undefined
 		) => PieceTableSnapshot | undefined
+	) => void
+	updateSelectedFileHighlights: (
+		highlights: TreeSitterCapture[] | undefined
+	) => void
+	updateSelectedFileBrackets: (
+		brackets: BracketInfo[] | undefined
+	) => void
+	updateSelectedFileErrors: (
+		errors: TreeSitterError[] | undefined
 	) => void
 }
 

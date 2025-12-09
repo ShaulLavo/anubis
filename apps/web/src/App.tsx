@@ -1,11 +1,11 @@
-import { type Component, onMount } from 'solid-js'
+import { type Component, onCleanup } from 'solid-js'
 import Main from './Main'
 import { Providers } from './Providers'
-import { pingServerRoutes } from '~/serverRoutesProbe'
+import { disposeTreeSitterWorker } from './treeSitter/workerClient'
 
 const App: Component = () => {
-	onMount(() => {
-		void pingServerRoutes()
+	onCleanup(() => {
+		void disposeTreeSitterWorker()
 	})
 	return (
 		<Providers>

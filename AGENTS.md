@@ -23,6 +23,8 @@
 - Indentation: tabs; keep existing single-quote, no-semicolon style.
 - Components: `PascalCase` (e.g. `MainLayout.tsx`).
 - Functions/variables: `camelCase`; files generally `PascalCase.tsx` for components, `camelCase.ts` for utilities.
+- **Never use `any`**: Avoid TypeScript's `any` type; use proper types, `unknown`, or generics instead.
+- **One hook/component per file**: Each hook and component should have its own file; do not define multiple components or hooks in a single file.
 - Always fix ESLint and formatting issues before opening a PR.
 
 ## Testing Guidelines

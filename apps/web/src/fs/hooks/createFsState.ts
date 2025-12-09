@@ -11,16 +11,15 @@ import { createFileDisplayState } from './createFileDisplayState'
 import { createPrefetchState } from './createPrefetchState'
 import { createFileStatsState } from './createFileStatsState'
 import { createPieceTableState } from './createPieceTableState'
+import { createHighlightState } from './createHighlightState'
+import { createBracketState } from './createBracketState'
+import { createErrorState } from './createErrorState'
 
 export const createFsState = () => {
-	const { tree, setTree, hydration } = createTreeState()
+	const { tree, setTree } = createTreeState()
 	const { expanded, setExpanded } = createExpandedState()
-	const {
-		selectedPath,
-		setSelectedPath,
-		activeSource,
-		setActiveSource
-	} = createSelectionState()
+	const { selectedPath, setSelectedPath, activeSource, setActiveSource } =
+		createSelectionState()
 	const {
 		selectedFileSize,
 		setSelectedFileSize,
@@ -57,6 +56,12 @@ export const createFsState = () => {
 	const { fileStats, setFileStats, clearParseResults } = createFileStatsState()
 	const { pieceTables, setPieceTable, clearPieceTables } =
 		createPieceTableState()
+	const { fileHighlights, setHighlights, clearHighlights } =
+		createHighlightState()
+	const { fileBrackets, setBrackets, clearBrackets } =
+		createBracketState()
+	const { fileErrors, setErrors, clearErrors } =
+		createErrorState()
 
 	const selectedNode = createMemo<FsTreeNode | undefined>(() =>
 		tree ? findNode(tree, selectedPath()) : undefined
@@ -75,6 +80,9 @@ export const createFsState = () => {
 		expanded,
 		fileStats,
 		pieceTables,
+		fileHighlights,
+		fileBrackets,
+		fileErrors,
 		get selectedPath() {
 			return selectedPath()
 		},
@@ -86,7 +94,8 @@ export const createFsState = () => {
 		},
 		get selectedFileContent() {
 			const path = lastKnownFilePath()
-			if (!path) {
+			const currentPath = selectedPath()
+			if (!path || currentPath !== path) {
 				return selectedFileContent()
 			}
 
@@ -141,6 +150,18 @@ export const createFsState = () => {
 			const path = lastKnownFilePath()
 			return path ? pieceTables[path] : undefined
 		},
+		get selectedFileHighlights() {
+			const path = lastKnownFilePath()
+			return path ? fileHighlights[path] : undefined
+		},
+		get selectedFileBrackets() {
+			const path = lastKnownFilePath()
+			return path ? fileBrackets[path] : undefined
+		},
+		get selectedFileErrors() {
+			const path = lastKnownFilePath()
+			return path ? fileErrors[path] : undefined
+		},
 		get selectedNode() {
 			return selectedNode()
 		},
@@ -154,7 +175,6 @@ export const createFsState = () => {
 
 	return {
 		state,
-		hydration,
 		setTree,
 		setExpanded,
 		setSelectedPath,
@@ -177,6 +197,12 @@ export const createFsState = () => {
 		setFileStats,
 		clearParseResults,
 		setPieceTable,
-		clearPieceTables
+		clearPieceTables,
+		setHighlights,
+		clearHighlights,
+		setBrackets,
+		clearBrackets,
+		setErrors,
+		clearErrors
 	}
 }
