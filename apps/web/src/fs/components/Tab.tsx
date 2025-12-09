@@ -14,6 +14,8 @@ export const Tab = (props: TabProps) => {
 	return (
 		<button
 			type="button"
+			role="tab"
+			tabIndex={props.isActive ? 0 : -1}
 			onClick={handleSelect}
 			title={props.title ?? props.value}
 			class={

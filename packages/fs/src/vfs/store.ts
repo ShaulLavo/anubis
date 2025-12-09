@@ -114,17 +114,22 @@ class VfsStoreImpl implements VfsStore {
 		}
 
 		this.#dirty = false
-		const handle = await this.#fileHandle
 		const content = JSON.stringify(this.#data)
 
-		const writable = await handle.createWritable()
-		await writable.write(content)
-		await writable.close()
+		try {
+			const handle = await this.#fileHandle
+			const writable = await handle.createWritable()
+			await writable.write(content)
+			await writable.close()
 
-		this.#flushPromise = null
-
-		if (this.#dirty) {
-			this.#scheduleFlush()
+			if (this.#dirty) {
+				this.#scheduleFlush()
+			}
+		} catch (error) {
+			this.#dirty = true
+			throw error
+		} finally {
+			this.#flushPromise = null
 		}
 	}
 

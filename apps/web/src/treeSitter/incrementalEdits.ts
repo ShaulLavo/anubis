@@ -1,5 +1,6 @@
 import type { DocumentIncrementalEdit } from '@repo/code-editor'
 import { applyTreeSitterEdit } from './workerClient'
+import { logger } from '../logger'
 
 export const sendIncrementalTreeEdit = (
 	path: string | undefined,
@@ -18,7 +19,7 @@ export const sendIncrementalTreeEdit = (
 	})
 	if (!highlightPromise) return undefined
 	return highlightPromise.catch(error => {
-		console.error('[Tree-sitter worker] incremental edit failed', error)
+		logger.withTag('treeSitter').error('[Tree-sitter worker] incremental edit failed', error)
 		return undefined
 	})
 }

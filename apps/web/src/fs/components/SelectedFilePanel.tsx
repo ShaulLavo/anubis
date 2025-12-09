@@ -89,13 +89,12 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		isEditable,
 		applyIncrementalEdit: edit => {
 			if (isBinary()) return
-			const parsePromise = sendIncrementalTreeEdit(
-				state.lastKnownFilePath,
-				edit
-			)
+			const path = state.lastKnownFilePath
+			const parsePromise = sendIncrementalTreeEdit(path, edit)
 			if (!parsePromise) return
 			void parsePromise.then(result => {
-				if (result) {
+				// Ignore highlights if file changed while computing
+				if (result && path === state.lastKnownFilePath) {
 					updateSelectedFileHighlights(result.captures)
 					updateSelectedFileBrackets(result.brackets)
 				}

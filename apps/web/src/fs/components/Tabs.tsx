@@ -14,7 +14,10 @@ export const Tabs: Component<TabsProps> = props => {
 		props.getLabel ? props.getLabel(value) : value
 
 	return (
-		<div class="flex items-center gap-1 overflow-x-auto border-b border-zinc-900/70 bg-zinc-950/40 px-2 py-1.5 text-xs">
+		<div
+			role="tablist"
+			class="flex items-center gap-1 overflow-x-auto border-b border-zinc-900/70 bg-zinc-950/40 px-2 py-1.5 text-xs"
+		>
 			<Show
 				when={props.values.length > 0}
 				fallback={
