@@ -79,6 +79,7 @@ const advanceToLineIndex = (
 	let index = Math.max(0, currentIndex)
 	while (index < lineEntries.length) {
 		const entry = lineEntries[index]
+		if (!entry) break
 		const lineEnd = entry.start + entry.length
 		if (position < lineEnd || index === lineEntries.length - 1) {
 			return index

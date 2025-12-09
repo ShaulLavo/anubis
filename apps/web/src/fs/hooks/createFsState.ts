@@ -12,6 +12,7 @@ import { createPrefetchState } from './createPrefetchState'
 import { createFileStatsState } from './createFileStatsState'
 import { createPieceTableState } from './createPieceTableState'
 import { createHighlightState } from './createHighlightState'
+import { createBracketState } from './createBracketState'
 
 export const createFsState = () => {
 	const { tree, setTree } = createTreeState()
@@ -56,6 +57,8 @@ export const createFsState = () => {
 		createPieceTableState()
 	const { fileHighlights, setHighlights, clearHighlights } =
 		createHighlightState()
+	const { fileBrackets, setBrackets, clearBrackets } =
+		createBracketState()
 
 	const selectedNode = createMemo<FsTreeNode | undefined>(() =>
 		tree ? findNode(tree, selectedPath()) : undefined
@@ -75,6 +78,7 @@ export const createFsState = () => {
 		fileStats,
 		pieceTables,
 		fileHighlights,
+		fileBrackets,
 		get selectedPath() {
 			return selectedPath()
 		},
@@ -146,6 +150,10 @@ export const createFsState = () => {
 			const path = lastKnownFilePath()
 			return path ? fileHighlights[path] : undefined
 		},
+		get selectedFileBrackets() {
+			const path = lastKnownFilePath()
+			return path ? fileBrackets[path] : undefined
+		},
 		get selectedNode() {
 			return selectedNode()
 		},
@@ -183,6 +191,8 @@ export const createFsState = () => {
 		setPieceTable,
 		clearPieceTables,
 		setHighlights,
-		clearHighlights
+		clearHighlights,
+		setBrackets,
+		clearBrackets
 	}
 }

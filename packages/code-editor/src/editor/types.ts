@@ -2,9 +2,16 @@ import type { VirtualItem, Virtualizer } from '@tanstack/virtual-core'
 import type { Accessor } from 'solid-js'
 import type { ParseResult } from '@repo/utils/parse'
 import type { PieceTableSnapshot } from '@repo/utils'
-import type { BracketDepthMap as InternalBracketDepthMap } from './utils/bracketDepths'
 
-export type BracketDepthMap = InternalBracketDepthMap
+// Bracket depth map: character index -> nesting depth
+export type BracketDepthMap = Record<number, number>
+
+// Bracket info from tree-sitter AST
+export type BracketInfo = {
+	index: number
+	char: string
+	depth: number
+}
 export type EditorSyntaxHighlight = {
 	startIndex: number
 	endIndex: number
@@ -63,6 +70,7 @@ export type EditorProps = {
 	previewBytes?: Accessor<Uint8Array | undefined>
 	activeScopes?: Accessor<string[]>
 	highlights?: Accessor<EditorSyntaxHighlight[] | undefined>
+	brackets?: Accessor<BracketInfo[] | undefined>
 }
 
 export type LineEntry = {

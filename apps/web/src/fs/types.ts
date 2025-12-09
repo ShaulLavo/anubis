@@ -1,6 +1,6 @@
 import type { FsDirTreeNode, FsTreeNode } from '@repo/fs'
 import type { ParseResult, PieceTableSnapshot } from '@repo/utils'
-import type { TreeSitterCapture } from '../workers/treeSitterWorkerTypes'
+import type { TreeSitterCapture, BracketInfo } from '../workers/treeSitterWorkerTypes'
 import type { DeferredDirMetadata } from './prefetch/treePrefetchWorkerTypes'
 
 export type FsSource = 'memory' | 'local' | 'opfs'
@@ -29,8 +29,11 @@ export type FsState = {
 	selectedFilePieceTable?: PieceTableSnapshot
 	fileHighlights: Record<string, TreeSitterCapture[] | undefined>
 	selectedFileHighlights?: TreeSitterCapture[]
+	fileBrackets: Record<string, BracketInfo[] | undefined>
+	selectedFileBrackets?: BracketInfo[]
 	selectedNode?: FsTreeNode | undefined
 	lastKnownFileNode?: FsTreeNode | undefined
 	lastKnownFilePath?: string
 	deferredMetadata: Record<string, DeferredDirMetadata>
 }
+

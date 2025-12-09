@@ -12,9 +12,7 @@ export const Lines = (props: LinesProps) => {
 					cursor.lineEntries()[virtualRow.index]
 				if (!entry) return null
 
-				const highlights = props.getLineHighlights
-					? props.getLineHighlights(entry.index)
-					: undefined
+				
 
 				return (
 					<Line
@@ -31,7 +29,7 @@ export const Lines = (props: LinesProps) => {
 						onMouseDown={props.onMouseDown}
 						isActive={props.activeLineIndex() === entry.index}
 						bracketDepths={props.bracketDepths}
-						highlights={highlights}
+						highlights={props?.getLineHighlights?.(entry.index)}
 					/>
 				)
 			})}

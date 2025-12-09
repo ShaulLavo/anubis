@@ -1,19 +1,16 @@
 import { createMemo } from 'solid-js'
-import { trackSync } from '@repo/perf'
-import { loggers } from '@repo/logger'
 import { getPieceTableText } from '@repo/utils'
-import { computeBracketDepths, textToLineEntries } from '../utils'
+import { textToLineEntries } from '../utils'
 import { toLineHighlightSegments } from '../utils/highlights'
 import { CursorProvider } from '../cursor'
 import { HistoryProvider } from '../history'
 import { TextFileEditorInner } from './TextFileEditorInner'
 import type {
+	BracketDepthMap,
 	LineEntry,
 	LineHighlightSegment,
 	TextFileEditorProps
 } from '../types'
-
-const textFileEditorLogger = loggers.codeEditor.withTag('TextFileEditor')
 
 export const TextFileEditor = (props: TextFileEditorProps) => {
 	const pieceTableText = createMemo(() => {
@@ -29,33 +26,16 @@ export const TextFileEditor = (props: TextFileEditorProps) => {
 		return textToLineEntries(pieceTableText())
 	})
 
-		const bracketDepths = createMemo(() => {
-			if (!props.isFileSelected()) return undefined
-		const text = pieceTableText()
-		if (!text || text.length === 0) return undefined
-		const stats = props.stats()
-		const rules = stats?.language.rules
-		const filePath = props.document.filePath()
-		const metadata = {
-			filePath,
-			textLength: text.length
+	// Convert BracketInfo[] from tree-sitter to BracketDepthMap for components
+	const bracketDepths = createMemo<BracketDepthMap | undefined>(() => {
+		const brackets = props.brackets?.()
+		if (!brackets || brackets.length === 0) return undefined
+		const depthMap: BracketDepthMap = {}
+		for (const bracket of brackets) {
+			depthMap[bracket.index] = bracket.depth
 		}
-			return trackSync(
-				'code-editor:computeBracketDepths',
-				() => {
-					const result = computeBracketDepths(text, {
-						angleBrackets: rules?.angleBrackets,
-						stringRules: rules?.strings
-					})
-					return result
-				},
-				{
-					metadata,
-					persist: false,
-				logger: textFileEditorLogger
-			}
-		)
-		})
+		return depthMap
+	})
 
 		const lineHighlights = createMemo<LineHighlightSegment[][]>(() => {
 			if (!props.isFileSelected()) return []

@@ -33,7 +33,7 @@ type SelectedFilePanelProps = {
 export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	const [
 		state,
-		{ selectPath, updateSelectedFilePieceTable, updateSelectedFileHighlights }
+		{ selectPath, updateSelectedFilePieceTable, updateSelectedFileHighlights, updateSelectedFileBrackets }
 	] = useFs()
 	const focus = useFocusManager()
 	// const [fontSize, setFontSize] = createSignal(DEFAULT_FONT_SIZE)
@@ -89,13 +89,16 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		isEditable,
 		applyIncrementalEdit: edit => {
 			if (isBinary()) return
-			const highlightsPromise = sendIncrementalTreeEdit(
+			const parsePromise = sendIncrementalTreeEdit(
 				state.lastKnownFilePath,
 				edit
 			)
-			if (!highlightsPromise) return
-			void highlightsPromise.then(highlights => {
-				updateSelectedFileHighlights(highlights)
+			if (!parsePromise) return
+			void parsePromise.then(result => {
+				if (result) {
+					updateSelectedFileHighlights(result.captures)
+					updateSelectedFileBrackets(result.brackets)
+				}
 			})
 		}
 	}
@@ -138,6 +141,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 						activeScopes={focus.activeScopes}
 						previewBytes={() => state.selectedFilePreviewBytes}
 						highlights={editorHighlights}
+						brackets={() => state.selectedFileBrackets}
 					/>
 				}
 			>

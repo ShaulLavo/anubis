@@ -4,14 +4,25 @@ export type TreeSitterCapture = {
 	captureName: string
 }
 
+export type BracketInfo = {
+	index: number
+	char: string
+	depth: number
+}
+
+export type TreeSitterParseResult = {
+	captures: TreeSitterCapture[]
+	brackets: BracketInfo[]
+}
+
 export type TreeSitterWorkerApi = {
 	init(): Promise<void>
-	parse(source: string): Promise<TreeSitterCapture[] | undefined>
+	parse(source: string): Promise<TreeSitterParseResult | undefined>
 	parseBuffer(payload: {
 		path: string
 		buffer: ArrayBuffer
-	}): Promise<TreeSitterCapture[] | undefined>
-	applyEdit(payload: TreeSitterEditPayload): Promise<TreeSitterCapture[] | undefined>
+	}): Promise<TreeSitterParseResult | undefined>
+	applyEdit(payload: TreeSitterEditPayload): Promise<TreeSitterParseResult | undefined>
 	dispose(): Promise<void>
 }
 
@@ -30,3 +41,4 @@ export type TreeSitterEditPayload = {
 	newEndPosition: TreeSitterPoint
 	insertedText: string
 }
+

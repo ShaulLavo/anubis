@@ -136,21 +136,26 @@ export const useFileSelection = ({
 						const text = textDecoder.decode(textBytes)
 						selectedFileContentValue = text
 
-						const highlightsPromise = parseBufferWithTreeSitter(path, buffer)
-						if (highlightsPromise) {
-							void highlightsPromise
-								.then(highlights => {
-									if (requestId !== selectRequestId) return
-									fileCache.set(path, { highlights })
-								})
-								.catch(error => {
-									console.error(
-										'[Tree-sitter worker] highlight failed',
-										path,
-										error
-									)
-								})
-						}
+							const parseResultPromise = parseBufferWithTreeSitter(path, buffer)
+								if (parseResultPromise) {
+									void parseResultPromise
+										.then(result => {
+											if (requestId !== selectRequestId) return
+											if (result) {
+												fileCache.set(path, {
+													highlights: result.captures,
+													brackets: result.brackets
+												})
+											}
+										})
+										.catch(error => {
+											console.error(
+												'[Tree-sitter worker] parse failed',
+												path,
+												error
+											)
+										})
+								}
 
 						fileStatsResult = timeSync('parse-file-buffer', () =>
 							parseFileBuffer(text, {
@@ -226,9 +231,17 @@ export const useFileSelection = ({
 			fileCache.set(path, { highlights })
 		}
 
+	const updateSelectedFileBrackets: FsContextValue[1]['updateSelectedFileBrackets'] =
+		brackets => {
+			const path = state.lastKnownFilePath
+			if (!path) return
+			fileCache.set(path, { brackets })
+		}
+
 	return {
 		selectPath,
 		updateSelectedFilePieceTable,
-		updateSelectedFileHighlights
+		updateSelectedFileHighlights,
+		updateSelectedFileBrackets
 	}
 }

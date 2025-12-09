@@ -3,14 +3,15 @@ import { Parser, Language, Query, Tree } from 'web-tree-sitter'
 import type {
 	TreeSitterWorkerApi,
 	TreeSitterEditPayload,
-	TreeSitterCapture
+	TreeSitterCapture,
+	BracketInfo,
+	TreeSitterParseResult
 } from './treeSitterWorkerTypes'
-// Use JSX highlights from npm (no custom version needed)
+// Import highlight queries - custom ones + JSX from npm
+import jsHighlightsQuerySource from '../treeSitter/queries/javascript-highlights.scm?raw'
 import jsJsxHighlightsQuerySource from 'tree-sitter-javascript/queries/highlights-jsx.scm?raw'
+import tsHighlightsQuerySource from '../treeSitter/queries/typescript-highlights.scm?raw'
 
-// Custom highlights will be loaded from public directory at runtime
-let cachedJsHighlights: string | null = null
-let cachedTsHighlights: string | null = null
 
 
 type CachedTreeEntry = {
@@ -64,19 +65,11 @@ const setCachedEntry = (path: string, entry: CachedTreeEntry) => {
 	astCache.set(path, entry)
 }
 
-const loadCustomHighlightSource = async (path: string): Promise<string | null> => {
-	try {
-		const response = await fetch(path)
-		if (!response.ok) {
-			console.warn(`[Tree-sitter worker] failed to load ${path}:`, response.status)
-			return null
-		}
-		return await response.text()
-	} catch (error) {
-		console.warn(`[Tree-sitter worker] error loading ${path}:`, error)
-		return null
-	}
-}
+const highlightQuerySources = [
+	tsHighlightsQuerySource,
+	jsHighlightsQuerySource,
+	jsJsxHighlightsQuerySource,
+].filter(Boolean)
 
 const ensureHighlightQueries = async () => {
 	if (highlightQueries.length > 0) return highlightQueries
@@ -85,32 +78,68 @@ const ensureHighlightQueries = async () => {
 	const language = languageInstance ?? parser.language
 	if (!language) return []
 
-	// Load custom highlights from public directory
-	if (cachedJsHighlights === null) {
-		cachedJsHighlights = await loadCustomHighlightSource('/tree-sitter/javascript-highlights.scm') ?? ''
+	try {
+		const source = highlightQuerySources.join('\n')
+		highlightQueries = [new Query(language, source)]
+	} catch (error) {
+		console.error('[Tree-sitter worker] failed to init query', error)
+		highlightQueries = []
 	}
-	if (cachedTsHighlights === null) {
-		cachedTsHighlights = await loadCustomHighlightSource('/tree-sitter/typescript-highlights.scm') ?? ''
-	}
-
-	const highlightSources = [
-		cachedJsHighlights,
-		jsJsxHighlightsQuerySource,
-		cachedTsHighlights
-	].filter(Boolean)
-
-	const queries: Query[] = []
-	for (const source of highlightSources) {
-		try {
-			queries.push(new Query(language, source))
-		} catch (error) {
-			console.error('[Tree-sitter worker] failed to init query', error)
-		}
-	}
-	highlightQueries = queries
 	return highlightQueries
 }
 
+// Bracket types we care about
+const BRACKET_PAIRS: Record<string, string> = {
+	'(': ')',
+	'[': ']',
+	'{': '}'
+}
+
+const OPEN_BRACKETS = new Set(Object.keys(BRACKET_PAIRS))
+const CLOSE_BRACKETS = new Set(Object.values(BRACKET_PAIRS))
+
+// Type alias for SyntaxNode (not directly exported from web-tree-sitter)
+type SyntaxNode = ReturnType<Tree['rootNode']['child']>
+
+const extractBrackets = (tree: Tree): BracketInfo[] => {
+	const brackets: BracketInfo[] = []
+	const stack: { char: string; index: number }[] = []
+
+	const walk = (node: SyntaxNode) => {
+		if (!node) return
+		const text = node.text
+		// Only process single-character leaf nodes that are brackets
+		if (node.childCount === 0 && text.length === 1) {
+			if (OPEN_BRACKETS.has(text)) {
+				stack.push({ char: text, index: node.startIndex })
+				brackets.push({
+					index: node.startIndex,
+					char: text,
+					depth: stack.length
+				})
+			} else if (CLOSE_BRACKETS.has(text)) {
+				const depth = stack.length > 0 ? stack.length : 1
+				brackets.push({
+					index: node.startIndex,
+					char: text,
+					depth
+				})
+				// Pop matching open bracket
+				const last = stack[stack.length - 1]
+				if (last && BRACKET_PAIRS[last.char] === text) {
+					stack.pop()
+				}
+			}
+		}
+		// Recurse into children
+		for (let i = 0; i < node.childCount; i++) {
+			walk(node.child(i)!)
+		}
+	}
+
+	walk(tree.rootNode)
+	return brackets
+}
 
 const runHighlightQueries = async (
 	tree: Tree | null
@@ -143,20 +172,21 @@ const runHighlightQueries = async (
 const parseAndCacheText = async (
 	path: string,
 	text: string
-): Promise<TreeSitterCapture[] | undefined> => {
+): Promise<TreeSitterParseResult | undefined> => {
 	const parser = await ensureParser()
 	if (!parser) return undefined
 	const tree = parser.parse(text)
 	if (!tree) return undefined
 	setCachedEntry(path, { tree, text })
-	const highlights = await runHighlightQueries(tree)
-	return highlights
+	const captures = await runHighlightQueries(tree)
+	const brackets = extractBrackets(tree)
+	return { captures: captures ?? [], brackets }
 }
 
 const reparseWithEdit = async (
 	path: string,
 	payload: TreeSitterEditPayload
-): Promise<TreeSitterCapture[] | undefined> => {
+): Promise<TreeSitterParseResult | undefined> => {
 	const parser = await ensureParser()
 	if (!parser) return undefined
 	const cached = astCache.get(path)
@@ -181,8 +211,9 @@ const reparseWithEdit = async (
 	if (!nextTree) return undefined
 
 	setCachedEntry(path, { tree: nextTree, text: updatedText })
-	const highlights = await runHighlightQueries(nextTree)
-	return highlights
+	const captures = await runHighlightQueries(nextTree)
+	const brackets = extractBrackets(nextTree)
+	return { captures: captures ?? [], brackets }
 }
 
 const api: TreeSitterWorkerApi = {
@@ -192,9 +223,11 @@ const api: TreeSitterWorkerApi = {
 	async parse(source) {
 		const parser = await ensureParser()
 		const tree = parser?.parse(source)
-			const results = await runHighlightQueries(tree ?? null)
-		tree?.delete()
-		return results
+		if (!tree) return undefined
+		const captures = await runHighlightQueries(tree)
+		const brackets = extractBrackets(tree)
+		tree.delete()
+		return { captures: captures ?? [], brackets }
 	},
 	async parseBuffer(payload) {
 		const text = textDecoder.decode(new Uint8Array(payload.buffer))
