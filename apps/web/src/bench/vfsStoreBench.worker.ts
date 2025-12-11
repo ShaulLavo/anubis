@@ -212,6 +212,7 @@ const runScenario = async (
 	})
 
 	await store.clear()
+	await store.flush?.()
 	await store.close?.()
 
 	const totalMs = writeMs + readMs + removeMs
