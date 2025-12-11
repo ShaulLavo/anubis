@@ -1,9 +1,11 @@
 import localforage from 'localforage'
 import {
 	createFs,
-	createStore,
+	createStorage,
 	getRootDirectory,
-	createSyncStore
+	createStorageNoCache,
+	createSyncStore,
+	createWorkerStorageNoCache
 } from '@repo/fs'
 
 type Store = {
@@ -12,6 +14,7 @@ type Store = {
 	removeItem(key: string): Promise<void>
 	clear(): Promise<void>
 	flush?(): Promise<void>
+	close?(): Promise<void> | void
 }
 
 type StoreAdapter = {
@@ -100,23 +103,34 @@ const localforageIndexedDbAdapter: StoreAdapter = {
 }
 
 const vfsOpfsAdapter: StoreAdapter = {
-	name: 'vfs store (OPFS async)',
+	name: '(OPFS async cached)',
 	enabled: supportsOpfs(),
 	async create() {
 		const root = await getRootDirectory('opfs', BENCH_ROOT)
 		const fs = createFs(root)
-		const store = createStore(fs, { filePath: STORE_FILE })
+		const store = createStorage(fs, { filePath: STORE_FILE })
+		await store.clear()
+		return store
+	}
+}
+
+const vfsOpfsNoCacheAdapter: StoreAdapter = {
+	name: '(OPFS async no-cache)',
+	enabled: supportsOpfs(),
+	async create() {
+		const root = await getRootDirectory('opfs', BENCH_ROOT)
+		const fs = createFs(root)
+		const store = createStorageNoCache(fs, { filePath: STORE_FILE })
 		await store.clear()
 		return store
 	}
 }
 
 const syncOpfsAdapter: StoreAdapter = {
-	name: 'vfs store (OPFS sync)',
+	name: '(OPFS sync cached)',
 	enabled:
 		supportsOpfs() &&
-		typeof (FileSystemFileHandle.prototype as any).createSyncAccessHandle ===
-			'function',
+		typeof FileSystemFileHandle.prototype.createSyncAccessHandle === 'function',
 	async create() {
 		const store = await createSyncStore(SYNC_STORE_NAME)
 		await store.clear()
@@ -124,7 +138,25 @@ const syncOpfsAdapter: StoreAdapter = {
 	}
 }
 
-const adapters = [localforageIndexedDbAdapter, vfsOpfsAdapter, syncOpfsAdapter]
+const syncOpfsNoCacheAdapter: StoreAdapter = {
+	name: '(OPFS sync no-cache)',
+	enabled:
+		supportsOpfs() &&
+		typeof FileSystemFileHandle.prototype.createSyncAccessHandle === 'function',
+	async create() {
+		const store = await createWorkerStorageNoCache(SYNC_STORE_NAME)
+		await store.clear()
+		return store
+	}
+}
+
+const adapters = [
+	localforageIndexedDbAdapter,
+	vfsOpfsAdapter,
+	vfsOpfsNoCacheAdapter,
+	syncOpfsAdapter,
+	syncOpfsNoCacheAdapter
+]
 
 const runScenario = async (
 	adapter: StoreAdapter,
@@ -180,6 +212,7 @@ const runScenario = async (
 	})
 
 	await store.clear()
+	await store.close?.()
 
 	const totalMs = writeMs + readMs + removeMs
 
@@ -199,6 +232,14 @@ self.addEventListener('message', async event => {
 
 	try {
 		const runnableAdapters = adapters.filter(adapter => adapter.enabled)
+		if (runnableAdapters.length === 0) {
+			self.postMessage({
+				type: 'skipped',
+				reason: 'no available adapters (OPFS/localforage/sync handle)'
+			})
+			return
+		}
+
 		const payload: { scenario: Scenario; results: ScenarioResult[] }[] = []
 
 		for (const scenario of scenarios) {
@@ -209,12 +250,12 @@ self.addEventListener('message', async event => {
 			payload.push({ scenario, results })
 		}
 
-		;(self as DedicatedWorkerGlobalScope).postMessage({
+		self.postMessage({
 			type: 'results',
 			payload
 		})
 	} catch (error) {
-		;(self as DedicatedWorkerGlobalScope).postMessage({
+		self.postMessage({
 			type: 'error',
 			error: error instanceof Error ? error.message : String(error)
 		})

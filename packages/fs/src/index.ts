@@ -1,6 +1,11 @@
 export { getRootDirectory } from './getRoot'
-export { createFs, createStore, VDir, VFile } from './vfs'
-export { createWorkerStorage, createSyncStore } from './vfs'
+export { createFs, createStorage, VDir, VFile } from './vfs'
+export {
+	createWorkerStorage,
+	createWorkerStorageNoCache,
+	createStorageNoCache,
+	createSyncStore
+} from './vfs'
 export { buildFsTree, walkDirectory } from './vfs/utils/tree'
 export type {
 	FsContext,
@@ -13,7 +18,7 @@ export type {
 	FsDirTreeNode,
 	FsTreeNode,
 	FsTreeOptions,
-	VfsStore,
-	CreateVfsStoreOptions,
-	VfsStoreSource
+	VfsStorage,
+	CreateVfsStorageOptions,
+	VfsStorageSource
 } from './vfs'
