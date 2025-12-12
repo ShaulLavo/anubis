@@ -4,27 +4,27 @@ import {
 	DialogDescription,
 	DialogFooter,
 	DialogHeader,
-	DialogTitle
+	DialogTitle,
 } from '@repo/ui/dialog'
 import {
 	createMemo,
 	createSignal,
 	onCleanup,
 	type Component,
-	type JSX
+	type JSX,
 } from 'solid-js'
 import { logger } from '~/logger'
 import { importDirectoryToMemory } from '../fallback/importDirectoryToMemory'
 import {
 	importDirectoryToOpfs,
 	hasOpfsAccess,
-	type ImportOptions
+	type ImportOptions,
 } from '../fallback/importDirectoryToOpfs'
 import {
 	registerLocalDirectoryFallback,
 	unregisterLocalDirectoryFallback,
 	type LocalDirectoryFallbackReason,
-	type LocalDirectoryFallbackResult
+	type LocalDirectoryFallbackResult,
 } from '../fallback/localDirectoryFallbackCoordinator'
 import type { FsSource } from '../types'
 
@@ -84,7 +84,7 @@ export const LocalDirectoryFallbackDialog: Component = () => {
 	const handleFilesSelected: JSX.ChangeEventHandlerUnion<
 		HTMLInputElement,
 		Event
-	> = async event => {
+	> = async (event) => {
 		const files = event.currentTarget.files
 		const mode = pendingMode()
 		if (!pending || !mode) {
@@ -110,7 +110,7 @@ export const LocalDirectoryFallbackDialog: Component = () => {
 									'This will replace your existing browser storage workspace. ' +
 										'All current files in the workspace will be permanently deleted. ' +
 										'Are you sure you want to continue?'
-								)
+								),
 						})
 			const nextSource: FsSource = mode === 'memory' ? 'memory' : 'opfs'
 			pending.resolve({ handle, nextSource })
@@ -161,7 +161,7 @@ export const LocalDirectoryFallbackDialog: Component = () => {
 		<>
 			<input
 				type="file"
-				ref={el => {
+				ref={(el) => {
 					fileInput = el
 					el.setAttribute('webkitdirectory', '')
 					el.setAttribute('directory', '')
