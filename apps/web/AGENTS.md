@@ -19,6 +19,7 @@
 - When updating more than one Solid signal/store in the same tick, wrap the setters in `batch(() => { ... })` to prevent redundant recomputations.
 - Keep modules focused; colocate feature-specific code under `src/fs`, `src/terminal`, or `src/components/fs`.
 - Follow the shared ESLint config; fix all reported issues before committing.
+- Client-only app: browser globals like `window` are always present; skip `typeof window !== 'undefined'` guards.
 
 ## Logging
 - Use the consola-based logger from `~/logger` (`logger` instance) for all runtime logging.

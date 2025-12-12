@@ -13,6 +13,7 @@ import { useFileSelection } from '../hooks/useFileSelection'
 import { useFsRefresh } from '../hooks/useFsRefresh'
 import { createFileCacheController } from '../cache/fileCacheController'
 import { LocalDirectoryFallbackDialog } from '../components/LocalDirectoryFallbackDialog'
+import { findNode } from '../runtime/tree'
 
 export function FsProvider(props: { children: JSX.Element }) {
 	const {
@@ -134,6 +135,36 @@ export function FsProvider(props: { children: JSX.Element }) {
 		getActiveSource: () => state.activeSource
 	})
 
+	const ensureDirPathLoaded = async (
+		path: string
+	): Promise<FsDirTreeNode | undefined> => {
+		const tree = state.tree
+		if (!tree) return undefined
+		if (!path) {
+			return tree
+		}
+
+		const segments = path.split('/').filter(Boolean)
+		let currentPath = ''
+
+		for (const segment of segments) {
+			currentPath = currentPath ? `${currentPath}/${segment}` : segment
+			const load = ensureDirLoaded(currentPath)
+			if (load) {
+				await load
+			}
+			const currentNode = findNode(state.tree, currentPath)
+			if (!currentNode || currentNode.kind !== 'dir') {
+				return undefined
+			}
+		}
+
+		const latestTree = state.tree
+		if (!latestTree) return undefined
+		const node = findNode(latestTree, path)
+		return node && node.kind === 'dir' ? node : undefined
+	}
+
 	const setSource = (source: FsSource) => refresh(source)
 
 	onMount(() => {
@@ -172,11 +203,13 @@ export function FsProvider(props: { children: JSX.Element }) {
 			createDir,
 			createFile,
 			deleteNode,
+			ensureDirPathLoaded,
 			updateSelectedFilePieceTable,
 			updateSelectedFileHighlights,
 			updateSelectedFileFolds,
 			updateSelectedFileBrackets,
-			updateSelectedFileErrors
+			updateSelectedFileErrors,
+			fileCache
 		}
 	]
 

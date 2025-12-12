@@ -6,10 +6,22 @@ import {
 	type CanvasRenderer
 } from 'ghostty-web'
 import { LocalEchoController } from './localEcho'
-import { handleCommand } from './commands'
-import { createPrompt } from './prompt'
+import { handleCommand, type CommandContext } from './commands'
+import type { TerminalPrompt } from './prompt'
 
-export const createTerminalController = async (container: HTMLDivElement) => {
+export type TerminalController = Awaited<
+	ReturnType<typeof createTerminalController>
+>
+
+type TerminalControllerOptions = {
+	getPrompt: () => TerminalPrompt
+	commandContext: Omit<CommandContext, 'localEcho' | 'term'>
+}
+
+export const createTerminalController = async (
+	container: HTMLDivElement,
+	options: TerminalControllerOptions
+) => {
 	let disposed = false
 	let initialFitRaf: number | null = null
 
@@ -43,12 +55,15 @@ export const createTerminalController = async (container: HTMLDivElement) => {
 	}
 
 	const startPromptLoop = async () => {
-		const { label, continuation } = createPrompt()
-		console.log(label)
 		while (!disposed) {
+			const { label, continuation } = options.getPrompt()
 			try {
 				const input = await echoAddon.read(label, continuation)
-				handleCommand(input, { localEcho: echoAddon, term })
+				await handleCommand(input, {
+					localEcho: echoAddon,
+					term,
+					...options.commandContext
+				})
 			} catch {
 				break
 			}
