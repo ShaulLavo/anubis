@@ -168,7 +168,7 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 		>
 			<div
 				ref={scrollElement}
-				class="relative mt-4 flex-1 overflow-auto rounded border border-zinc-800/70 bg-zinc-950/30"
+				class="relative  flex-1 overflow-auto   bg-zinc-950/30"
 				style={{
 					'font-size': `${props.fontSize()}px`,
 					'font-family': props.fontFamily(),
