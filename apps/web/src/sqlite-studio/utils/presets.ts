@@ -24,7 +24,15 @@ WHERE a.id < b.id AND soundex(a.name) = soundex(b.name);`,
 	},
 	fts: {
 		name: 'Full Text Search',
-		sql: `-- Snippet example
+		sql: `-- Ensure tables exist
+CREATE VIRTUAL TABLE IF NOT EXISTS documents_fts USING fts5(title, content, content='', contentless_delete=1);
+CREATE TABLE IF NOT EXISTS documents (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT NOT NULL);
+
+-- Insert sample data if not exists
+INSERT OR IGNORE INTO documents (id, title, content) VALUES (1, 'Introduction to SQLite', 'SQLite is a C library that provides a lightweight disk-based database. It allows accessing the database using SQL queries without a separate server process.');
+INSERT OR IGNORE INTO documents_fts (rowid, title, content) VALUES (1, 'Introduction to SQLite', 'SQLite is a C library that provides a lightweight disk-based database. It allows accessing the database using SQL queries without a separate server process.');
+
+-- Snippet example
 SELECT 
   d.title,
   snippet(documents_fts, 1, '<b>', '</b>', '...', 10) as snippet,

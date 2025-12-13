@@ -1,25 +1,96 @@
 export const splitStatements = (sql: string): string[] => {
-	const lines = sql.split('\n')
 	const statements: string[] = []
-	let current = ''
+	let buffer = ''
+	let state: 'NORMAL' | 'SINGLE' | 'DOUBLE' | 'BLOCK' | 'LINE' = 'NORMAL'
 
-	for (const line of lines) {
-		const trimmed = line.trim()
-		if (!trimmed || trimmed.startsWith('--')) {
+	for (let i = 0; i < sql.length; i++) {
+		const char = sql[i]
+		const nextChar = sql[i + 1]
+
+		buffer += char
+
+		if (state === 'LINE') {
+			if (char === '\n') {
+				state = 'NORMAL'
+			}
 			continue
 		}
 
-		current += line + '\n'
+		if (state === 'BLOCK') {
+			if (char === '*' && nextChar === '/') {
+				state = 'NORMAL'
+				buffer += '/'
+				i++
+			}
+			continue
+		}
 
-		if (trimmed.endsWith(';')) {
-			statements.push(current.trim())
-			current = ''
+		if (state === 'SINGLE') {
+			if (char === "'") {
+				if (nextChar === "'") {
+					buffer += "'"
+					i++
+				} else {
+					state = 'NORMAL'
+				}
+			}
+			continue
+		}
+
+		if (state === 'DOUBLE') {
+			if (char === '"') {
+				if (nextChar === '"') {
+					buffer += '"'
+					i++
+				} else {
+					state = 'NORMAL'
+				}
+			}
+			continue
+		}
+
+		// NORMAL state
+		if (char === '-' && nextChar === '-') {
+			state = 'LINE'
+			buffer += '-' // consume next dash
+			i++
+			continue
+		}
+
+		if (char === '/' && nextChar === '*') {
+			state = 'BLOCK'
+			buffer += '*'
+			i++
+			continue
+		}
+
+		if (char === "'") {
+			state = 'SINGLE'
+			continue
+		}
+
+		if (char === '"') {
+			state = 'DOUBLE'
+			continue
+		}
+
+		if (char === ';') {
+			const trimmed = buffer.trim()
+			if (trimmed) {
+				statements.push(trimmed)
+			}
+			buffer = ''
 		}
 	}
 
-	if (current.trim()) {
-		statements.push(current.trim())
+	const trimmed = buffer.trim()
+	if (trimmed) {
+		statements.push(trimmed)
 	}
 
 	return statements
+}
+
+export const quoteIdentifier = (id: string) => {
+	return `"${id.replace(/"/g, '""')}"`
 }

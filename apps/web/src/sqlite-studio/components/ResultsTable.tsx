@@ -1,4 +1,5 @@
 import { For, Show, type Accessor } from 'solid-js'
+import { EditingCell } from '../types'
 
 type ResultsTableProps = {
 	columns: Accessor<string[]>
@@ -7,18 +8,8 @@ type ResultsTableProps = {
 	queryResults: Accessor<Record<string, any>[] | null>
 	hasRowId: Accessor<boolean>
 	primaryKeys: Accessor<string[]>
-	editingCell: Accessor<{
-		row: Record<string, any>
-		col: string
-		value: any
-	} | null>
-	setEditingCell: (
-		cell: {
-			row: Record<string, any>
-			col: string
-			value: any
-		} | null
-	) => void
+	editingCell: Accessor<EditingCell | null>
+	setEditingCell: (cell: EditingCell | null) => void
 	onCommitEdit: () => void
 }
 
@@ -44,7 +35,9 @@ export const ResultsTable = (props: ResultsTableProps) => {
 							fallback={
 								<tr>
 									<td
-										colspan={props.columns().length}
+										colspan={
+											props.columns().filter((c) => c !== 'rowid').length
+										}
 										class="px-4 py-8 text-center text-zinc-600 italic"
 									>
 										No results
@@ -92,16 +85,15 @@ export const ResultsTable = (props: ResultsTableProps) => {
 														ref={(el) => setTimeout(() => el.focus(), 0)}
 														value={String(props.editingCell()?.value ?? '')}
 														class="w-full bg-zinc-900 text-white px-1 py-0.5 rounded border border-indigo-500 outline-none"
-														onInput={(e) =>
-															props.setEditingCell((prev) =>
-																prev
-																	? {
-																			...prev,
-																			value: e.currentTarget.value,
-																		}
-																	: null
-															)
-														}
+														onInput={(e) => {
+															const current = props.editingCell()
+															if (current) {
+																props.setEditingCell({
+																	...current,
+																	value: e.currentTarget.value,
+																})
+															}
+														}}
 														onBlur={() => props.onCommitEdit()}
 														onKeyDown={(e) => {
 															if (e.key === 'Enter') props.onCommitEdit()

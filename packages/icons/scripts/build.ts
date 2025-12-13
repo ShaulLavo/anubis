@@ -48,20 +48,6 @@ const RUNTIME_EXPORT = {
 	default: './lib/index.jsx',
 }
 
-const VS_EXPORT = {
-	import: './vs/index.js',
-	require: './vs/index.cjs',
-	types: './vs/index.d.ts',
-	default: './vs/index.js',
-}
-
-const VS_WILDCARD_EXPORT = {
-	import: './vs/*.js',
-	require: './vs/*.cjs',
-	types: './vs/*.d.ts',
-	default: './vs/*.js',
-}
-
 const svgoConfig: Config = {
 	multipass: true,
 	plugins: [
@@ -296,6 +282,27 @@ const copyMetaFiles = async () => {
 
 const writeDistPackage = async () => {
 	const pkg = JSON.parse(await readFile(path.resolve('package.json'), 'utf8'))
+
+	const exports: Record<string, any> = {
+		'.': RUNTIME_EXPORT,
+		'./lib': RUNTIME_EXPORT,
+	}
+
+	for (const pack of PACKS) {
+		exports[`./${pack.shortName}`] = {
+			types: `./${pack.shortName}/index.d.ts`,
+			import: `./${pack.shortName}/index.js`,
+			require: `./${pack.shortName}/index.cjs`,
+			default: `./${pack.shortName}/index.js`,
+		}
+		exports[`./${pack.shortName}/*`] = {
+			types: `./${pack.shortName}/*.d.ts`,
+			import: `./${pack.shortName}/*.js`,
+			require: `./${pack.shortName}/*.cjs`,
+			default: `./${pack.shortName}/*.js`,
+		}
+	}
+
 	const distPackage = {
 		name: pkg.name,
 		private: true,
@@ -304,12 +311,7 @@ const writeDistPackage = async () => {
 		main: './lib/index.cjs',
 		module: './lib/index.jsx',
 		types: './lib/index.d.ts',
-		exports: {
-			'.': RUNTIME_EXPORT,
-			'./lib': RUNTIME_EXPORT,
-			'./vs': VS_EXPORT,
-			'./vs/*': VS_WILDCARD_EXPORT,
-		},
+		exports,
 	}
 
 	await writeFile(

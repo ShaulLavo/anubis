@@ -10,7 +10,7 @@ import {
 	type Config,
 } from 'sqlite-wasm/client'
 import wasmUrl from 'sqlite-wasm/sqlite3.wasm?url'
-
+console.log('sqlite-wasm/sqlite3.wasm?url', wasmUrl)
 const log = logger.withTag('sqlite').debug
 
 let sqlite3: Sqlite3Static | null = null
@@ -18,7 +18,7 @@ let client: Sqlite3Client | null = null
 let db: Database | null = null
 let initPromise: Promise<{ version: string; opfsEnabled: boolean }> | null =
 	null
-let clientCofig: Config = { url: 'file:/vibe.sqlite3' }
+let clientConfig: Config = { url: 'file:/vibe.sqlite3' }
 const getClient = (): Sqlite3Client => {
 	if (!client) {
 		throw new Error('SQLite not initialized. Call init() first.')
@@ -43,13 +43,13 @@ const performInit = async (): Promise<{
 	}
 
 	const opfsEnabled = 'opfs' in sqlite3
-	clientCofig = {
+	clientConfig = {
 		url: opfsEnabled ? 'file:/vibe.sqlite3' : ':memory:',
 	}
-	;[client, db] = createClient(clientCofig, sqlite3)
+	;[client, db] = createClient(clientConfig, sqlite3)
 
 	log(
-		`[SQLite] v${sqlite3.version.libVersion} initialized. OPFS: ${opfsEnabled}, URL: ${clientCofig.url}`
+		`[SQLite] v${sqlite3.version.libVersion} initialized. OPFS: ${opfsEnabled}, URL: ${clientConfig.url}`
 	)
 
 	return { version: sqlite3.version.libVersion, opfsEnabled }
@@ -74,7 +74,7 @@ const exec = async (sql: string): Promise<void> => {
 
 const run = async <T = Record<string, unknown>>(
 	sql: string,
-	params?: Record<string, unknown> | unknown[]
+	params?: unknown[]
 ): Promise<{ columns: string[]; rows: T[] }> => {
 	const result = await getClient().execute({
 		sql,
@@ -83,9 +83,8 @@ const run = async <T = Record<string, unknown>>(
 
 	const rows = result.rows.map((row) => {
 		const obj: Record<string, unknown> = {}
-		for (const col of result.columns) {
-			const index = result.columns.indexOf(col)
-			obj[col] = row[index]
+		for (let i = 0; i < result.columns.length; i++) {
+			obj[result.columns[i]!] = row[i]
 		}
 		return obj as T
 	})

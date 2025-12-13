@@ -4,16 +4,8 @@ import {
 	resetSqlite,
 	runSqliteQuery,
 } from '../../workers/sqliteClient'
-import { splitStatements } from '../utils/sqlUtils'
-
-type TableInfo = {
-	cid: number
-	name: string
-	type: string
-	notnull: number
-	dflt_value: any
-	pk: number
-}
+import { quoteIdentifier, splitStatements } from '../utils/sqlUtils'
+import { EditingCell, TableInfo } from '../types'
 
 export const useSqliteStudio = () => {
 	const [tables, setTables] = createSignal<string[]>([])
@@ -29,11 +21,7 @@ export const useSqliteStudio = () => {
 	const [queryResults, setQueryResults] = createSignal<
 		{ columns: string[]; rows: Record<string, any>[] }[] | null
 	>(null)
-	const [editingCell, setEditingCell] = createSignal<{
-		row: Record<string, any>
-		col: string
-		value: any
-	} | null>(null)
+	const [editingCell, setEditingCell] = createSignal<EditingCell | null>(null)
 
 	const fetchTables = async () => {
 		try {
@@ -48,13 +36,24 @@ export const useSqliteStudio = () => {
 	}
 
 	const refreshTableData = async (tableName: string) => {
-		let selectCols = '*'
+		const safeTableName = quoteIdentifier(tableName)
+
+		// Get columns to build safe select list
+		const info = await runSqliteQuery<TableInfo>(
+			`PRAGMA table_info(${safeTableName})`
+		)
+		const columnNames = info.rows.map((c) => c.name)
+		let selectCols = columnNames.map(quoteIdentifier).join(', ')
+
 		if (hasRowId()) {
-			selectCols = 'rowid, *'
+			// Use __rowid alias if available to avoid collision with user columns
+			if (!columnNames.includes('__rowid')) {
+				selectCols = `rowid AS "__rowid", ${selectCols}`
+			}
 		}
 
 		const res = await runSqliteQuery<any>(
-			`SELECT ${selectCols} FROM "${tableName}" LIMIT 100`
+			`SELECT ${selectCols} FROM ${safeTableName} LIMIT 100`
 		)
 		setTableData(res.rows)
 	}
@@ -72,7 +71,7 @@ export const useSqliteStudio = () => {
 
 		try {
 			const info = await runSqliteQuery<TableInfo>(
-				`PRAGMA table_info("${tableName}")`
+				`PRAGMA table_info(${quoteIdentifier(tableName)})`
 			)
 			batch(() => {
 				const pks = info.rows
@@ -85,7 +84,9 @@ export const useSqliteStudio = () => {
 
 			let rowIdAvailable = true
 			try {
-				await runSqliteQuery(`SELECT rowid FROM "${tableName}" LIMIT 1`)
+				await runSqliteQuery(
+					`SELECT rowid FROM ${quoteIdentifier(tableName)} LIMIT 1`
+				)
 			} catch (e) {
 				rowIdAvailable = false
 			}
@@ -141,15 +142,17 @@ export const useSqliteStudio = () => {
 		if (!cell || !tableName) return
 
 		try {
+			const safeTableName = quoteIdentifier(tableName)
 			let whereClause = ''
 			const params = [cell.value]
 
 			if (hasRowId()) {
 				whereClause = 'rowid = ?'
-				params.push(cell.row.rowid)
+				// Prefer __rowid alias if it was selected, otherwise fallback to rowid
+				params.push(cell.row.__rowid ?? cell.row.rowid)
 			} else if (primaryKeys().length > 0) {
 				whereClause = primaryKeys()
-					.map((pk) => `"${pk}" = ?`)
+					.map((pk) => `${quoteIdentifier(pk)} = ?`)
 					.join(' AND ')
 				primaryKeys().forEach((pk) => params.push(cell.row[pk]))
 			} else {
@@ -157,7 +160,7 @@ export const useSqliteStudio = () => {
 			}
 
 			await runSqliteQuery(
-				`UPDATE "${tableName}" SET "${cell.col}" = ? WHERE ${whereClause}`,
+				`UPDATE ${safeTableName} SET ${quoteIdentifier(cell.col)} = ? WHERE ${whereClause}`,
 				params
 			)
 			setEditingCell(null)
