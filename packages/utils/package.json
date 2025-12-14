@@ -9,9 +9,7 @@
     "./pieceTable": "./src/pieceTable.ts",
     "./textHeuristics": "./src/textHeuristics.ts"
   },
-  "dependencies": {
-    "@repo/perf": "*"
-  },
+  "dependencies": {},
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "check-types": "tsc --noEmit",
