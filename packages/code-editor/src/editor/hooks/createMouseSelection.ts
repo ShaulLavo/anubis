@@ -118,18 +118,18 @@ export function createMouseSelection(
 		}
 	}
 
-		const runDragUpdate = () => {
-			if (!isDragging || anchorOffset === null) return
-			if (!lastPointer) return
+	const runDragUpdate = () => {
+		if (!isDragging || anchorOffset === null) return
+		if (!lastPointer) return
 
-			const pos = getPositionFromPointer(lastPointer)
-			if (!pos) return
+		const pos = getPositionFromPointer(lastPointer)
+		if (!pos) return
 
-			const focusOffset = cursor.lines.positionToOffset(pos.lineIndex, pos.column)
-			cursor.actions.setSelection(anchorOffset, focusOffset)
+		const focusOffset = cursor.lines.positionToOffset(pos.lineIndex, pos.column)
+		cursor.actions.setSelection(anchorOffset, focusOffset)
 
-			updateAutoScroll(lastPointer.clientY)
-		}
+		updateAutoScroll(lastPointer.clientY)
+	}
 
 	const scheduleDragUpdate = () => {
 		if (dragRafId) return

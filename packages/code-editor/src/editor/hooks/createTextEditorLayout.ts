@@ -125,32 +125,32 @@ export function createTextEditorLayout(
 		cursor.lines.lineStarts()
 		setMaxColumnsSeen(0)
 		lastWidthScanStart = 0
+		lastWidthScanEnd = -1
+	})
+
+	createEffect(() => {
+		const items = virtualItems()
+		const tabSize = options.tabSize()
+
+		if (items.length === 0) {
+			lastWidthScanStart = 0
 			lastWidthScanEnd = -1
-		})
+			return
+		}
 
-		createEffect(() => {
-			const items = virtualItems()
-			const tabSize = options.tabSize()
+		const startIndex = items[0]?.index ?? 0
+		const endIndex = items[items.length - 1]?.index ?? startIndex
 
-			if (items.length === 0) {
-				lastWidthScanStart = 0
-				lastWidthScanEnd = -1
-				return
-			}
-
-			const startIndex = items[0]?.index ?? 0
-			const endIndex = items[items.length - 1]?.index ?? startIndex
-
-			const previousMax = untrack(() => maxColumnsSeen())
-			let max = previousMax
-			const scanRange = (from: number, to: number) => {
-				for (let lineIndex = from; lineIndex <= to; lineIndex++) {
-					const text = cursor.lines.getLineText(lineIndex)
-					const visualWidth = calculateVisualColumnCount(text, tabSize)
-					if (visualWidth > max) {
-						max = visualWidth
-					}
+		const previousMax = untrack(() => maxColumnsSeen())
+		let max = previousMax
+		const scanRange = (from: number, to: number) => {
+			for (let lineIndex = from; lineIndex <= to; lineIndex++) {
+				const text = cursor.lines.getLineText(lineIndex)
+				const visualWidth = calculateVisualColumnCount(text, tabSize)
+				if (visualWidth > max) {
+					max = visualWidth
 				}
+			}
 		}
 
 		const overlaps =
@@ -167,15 +167,15 @@ export function createTextEditorLayout(
 			if (endIndex > lastWidthScanEnd) {
 				scanRange(lastWidthScanEnd + 1, endIndex)
 			}
-			}
+		}
 
-			lastWidthScanStart = startIndex
-			lastWidthScanEnd = endIndex
+		lastWidthScanStart = startIndex
+		lastWidthScanEnd = endIndex
 
-			if (max !== previousMax) {
-				setMaxColumnsSeen(max)
-			}
-		})
+		if (max !== previousMax) {
+			setMaxColumnsSeen(max)
+		}
+	})
 
 	const contentWidth = createMemo(() => {
 		const visualColumns = maxColumnsSeen()

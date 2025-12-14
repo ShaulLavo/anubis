@@ -41,7 +41,7 @@ export const useWhitespaceMarkers = (
 
 		outer: for (const virtualRow of virtualItems) {
 			const lineIndex = virtualRow.index
-			if (lineIndex >= cursor.lines.lineCount()) continue
+			if (lineIndex < 0 || lineIndex >= cursor.lines.lineCount()) continue
 
 			const lineStart = cursor.lines.getLineStart(lineIndex)
 			const lineEnd = lineStart + cursor.lines.getLineLength(lineIndex)
@@ -92,11 +92,10 @@ export const useWhitespaceMarkers = (
 					if (maxMarkers > 0 && markers.length >= maxMarkers) {
 						break outer
 					}
-					}
-
-					visualColumn = nextVisualColumn
 				}
+				visualColumn = nextVisualColumn
 			}
+		}
 
 		return markers
 	})
