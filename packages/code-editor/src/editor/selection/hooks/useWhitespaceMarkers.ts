@@ -6,22 +6,11 @@ import type {
 	WhitespaceMarker,
 } from '../types'
 import { useCursor } from '../../cursor'
-import { DEFAULT_TAB_SIZE } from '../../consts'
+import { getTabAdvance, normalizeCharWidth, normalizeTabSize } from '../utils'
 import {
 	MAX_WHITESPACE_MARKERS,
 	MAX_WHITESPACE_MARKER_SELECTION_LENGTH,
 } from '../constants'
-
-const normalizeCharWidth = (charWidth: number): number =>
-	Number.isFinite(charWidth) && charWidth > 0 ? charWidth : 1
-
-const normalizeTabSize = (tabSize: number): number =>
-	Number.isFinite(tabSize) && tabSize > 0 ? tabSize : DEFAULT_TAB_SIZE
-
-const getTabAdvance = (visualColumn: number, tabSize: number): number => {
-	const remainder = visualColumn % tabSize
-	return remainder === 0 ? tabSize : tabSize - remainder
-}
 
 export const useWhitespaceMarkers = (
 	props: SelectionLayerProps,
@@ -52,7 +41,7 @@ export const useWhitespaceMarkers = (
 
 		outer: for (const virtualRow of virtualItems) {
 			const lineIndex = virtualRow.index
-			if (lineIndex >= cursor.lines.lineCount()) continue
+			if (lineIndex < 0 || lineIndex >= cursor.lines.lineCount()) continue
 
 			const lineStart = cursor.lines.getLineStart(lineIndex)
 			const lineEnd = lineStart + cursor.lines.getLineLength(lineIndex)
@@ -80,8 +69,7 @@ export const useWhitespaceMarkers = (
 			for (let column = 0; column < safeEndCol; column++) {
 				const char = text[column]
 				const columnOffsetStart = visualColumn * charWidth
-				const advance =
-					char === '\t' ? getTabAdvance(visualColumn, tabSize) : 1
+				const advance = char === '\t' ? getTabAdvance(visualColumn, tabSize) : 1
 				const nextVisualColumn = visualColumn + advance
 
 				if (column >= safeStartCol && (char === ' ' || char === '\t')) {
