@@ -110,15 +110,14 @@ export function createFixedRowVirtualizer(
 			log.warn(message)
 			console.assert(false, message)
 			return
-		}
+			}
+	
+			setScrollTop(normalizeNumber(element.scrollTop))
 
-		setScrollTop(normalizeNumber(element.scrollTop))
-		setViewportHeight(normalizeNumber(element.clientHeight))
-
-		let warnedZeroHeight = false
-		const updateViewportHeight = () => {
-			const height = normalizeNumber(element.clientHeight)
-			setViewportHeight(height)
+			let warnedZeroHeight = false
+			const updateViewportHeight = () => {
+				const height = normalizeNumber(element.clientHeight)
+				setViewportHeight(height)
 
 			if (height === 0) {
 				if (warnedZeroHeight) return
@@ -159,39 +158,15 @@ export function createFixedRowVirtualizer(
 
 		element.addEventListener('scroll', onScroll, { passive: true })
 
-		const resizeObserver = new ResizeObserver(() => {
-			updateViewportHeight()
-		})
-		resizeObserver.observe(element)
-		updateViewportHeight()
-
-		const ensureNonZeroHeight = () => {
-			if (heightRafId) return
-			let attempts = 0
-			const maxAttempts = 10
-
-			const tick = () => {
-				heightRafId = 0
+			const resizeObserver = new ResizeObserver(() => {
 				updateViewportHeight()
-				attempts += 1
+			})
+			resizeObserver.observe(element)
+			updateViewportHeight()
 
-				if (element.clientHeight > 0 || attempts >= maxAttempts) {
-					return
-				}
-
-				heightRafId = requestAnimationFrame(tick)
-			}
-
-			heightRafId = requestAnimationFrame(tick)
-		}
-
-		if (element.clientHeight === 0) {
-			ensureNonZeroHeight()
-		}
-
-		onCleanup(() => {
-			element.removeEventListener('scroll', onScroll)
-			resizeObserver.disconnect()
+			onCleanup(() => {
+				element.removeEventListener('scroll', onScroll)
+				resizeObserver.disconnect()
 			if (rafId) {
 				cancelAnimationFrame(rafId)
 			}
