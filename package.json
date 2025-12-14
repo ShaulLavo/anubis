@@ -11,6 +11,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types",
     "test": "turbo run test",
+    "fetch-icons": "bun run --filter @repo/icons fetch-icons",
     "repo:health": "turbo run repo:health --parallel",
     "postinstall": "bun run --cwd apps/web copy-tree-sitter-assets",
     "depcheck": "turbo run depcheck --parallel",
