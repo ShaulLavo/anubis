@@ -59,35 +59,35 @@ export const LineGutters = (props: LineGuttersProps) => {
 							return null
 						}
 
-							const height = createMemo(() => virtualRow.size || props.lineHeight())
-							const isActive = createMemo(
-								() => props.activeLineIndex() === index
-							)
-							const hasFold = createMemo(() => foldMap().has(index))
-							const isFolded = createMemo(
-								() => props.foldedStarts?.()?.has(index) ?? false
-							)
+						const height = createMemo(() => virtualRow.size || props.lineHeight())
+						const isActive = createMemo(
+							() => props.activeLineIndex() === index
+						)
+						const hasFold = createMemo(() => foldMap().has(index))
+						const isFolded = createMemo(
+							() => props.foldedStarts?.()?.has(index) ?? false
+						)
 
-							return (
-								<div
-									data-index={virtualRow.index}
-									class="absolute left-0 right-0"
+						return (
+							<div
+								data-index={virtualRow.index}
+								class="absolute left-0 right-0"
 								style={{
 									transform: `translateY(${virtualRow.start}px)`,
 									top: 0,
-										height: `${height()}px`,
-									}}
+									height: `${height()}px`,
+								}}
+							>
+								<div
+									class="relative flex h-full items-center justify-end"
+									onMouseDown={(event) => handleRowMouseDown(event, index)}
 								>
-									<div
-										class="relative flex h-full items-center justify-end"
-										onMouseDown={(event) => handleRowMouseDown(event, index)}
-									>
-										<LineGutter
-											lineNumber={index + 1}
-											lineHeight={height()}
-											isActive={isActive()}
-											isFoldable={hasFold()}
-											isFolded={isFolded()}
+									<LineGutter
+										lineNumber={index + 1}
+										lineHeight={height()}
+										isActive={isActive()}
+										isFoldable={hasFold()}
+										isFolded={isFolded()}
 										onFoldClick={
 											hasFold()
 												? () => props.onToggleFold?.(index)
