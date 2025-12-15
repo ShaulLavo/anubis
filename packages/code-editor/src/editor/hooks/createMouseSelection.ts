@@ -52,11 +52,15 @@ export function createMouseSelection(
 	}
 
 	const startAutoScroll = (direction: 'up' | 'down') => {
+		const scrollEl = options.scrollElement()
+		if (!scrollEl) {
+			stopAutoScroll()
+			return
+		}
+
 		if (autoScrollInterval && autoScrollDirection === direction) return
 		stopAutoScroll()
 		autoScrollDirection = direction
-		const scrollEl = options.scrollElement()
-		if (!scrollEl) return
 
 		autoScrollInterval = setInterval(() => {
 			if (direction === 'up') {
@@ -89,7 +93,10 @@ export function createMouseSelection(
 		// Calculate column (simplified - assumes click is on text area)
 		const text = cursor.lines.getLineText(lineIndex)
 
-		const relativeX = Math.max(0, point.clientX - rect.left + scrollEl.scrollLeft - LINE_NUMBER_WIDTH)
+		const relativeX = Math.max(
+			0,
+			point.clientX - rect.left + scrollEl.scrollLeft - LINE_NUMBER_WIDTH
+		)
 
 		const column = calculateColumnFromClick(
 			text,
@@ -202,17 +209,17 @@ export function createMouseSelection(
 			// Shift+click: extend selection
 			event.preventDefault()
 			cursor.actions.setCursorFromClick(lineIndex, column, true)
-			} else {
-				// Normal click: start potential drag
-				event.preventDefault()
-				anchorOffset = offset
-				isDragging = true
-				lastPointer = { clientX: event.clientX, clientY: event.clientY }
-				scrollRect = options.scrollElement()?.getBoundingClientRect() ?? null
-				cursor.actions.setCursorFromClick(lineIndex, column, false)
+		} else {
+			// Normal click: start potential drag
+			event.preventDefault()
+			anchorOffset = offset
+			isDragging = true
+			lastPointer = { clientX: event.clientX, clientY: event.clientY }
+			scrollRect = options.scrollElement()?.getBoundingClientRect() ?? null
+			cursor.actions.setCursorFromClick(lineIndex, column, false)
 
-				document.addEventListener('mousemove', handleMouseMove)
-				document.addEventListener('mouseup', handleMouseUp)
+			document.addEventListener('mousemove', handleMouseMove)
+			document.addEventListener('mouseup', handleMouseUp)
 		}
 	}
 
