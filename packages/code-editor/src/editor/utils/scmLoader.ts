@@ -4,7 +4,12 @@
  */
 
 import { parseScmQuery, mergeScmRules, type ScmRules } from './scmParser'
-import { createQuickLexer, type QuickToken, LexState } from './quickLexer'
+import {
+	createQuickLexer,
+	defaultQuickLexer,
+	type QuickToken,
+	LexState,
+} from './quickLexer'
 
 // SCM file sources - these will be imported at build time
 // For now, we'll use dynamic loading or raw imports from the app layer
@@ -28,7 +33,6 @@ export const initQuickLexerFromSources = (...sources: string[]) => {
 export const getQuickLexer = () => {
 	if (!cachedLexer) {
 		// Use default built-in rules if SCM not loaded
-		const { defaultQuickLexer } = require('./quickLexer')
 		return defaultQuickLexer
 	}
 	return cachedLexer
