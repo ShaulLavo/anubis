@@ -10,10 +10,10 @@ const LOGGER_TOGGLE_TREE = {
 		clipboard: false,
 		cursor: false,
 		history: false,
-		virtualizer: false
+		virtualizer: false,
 	},
 	desktop: false,
-	fs: true,
+	fs: false,
 	server: false,
 	web: {
 		$self: false,
@@ -21,8 +21,8 @@ const LOGGER_TOGGLE_TREE = {
 		LocalDirectoryFallback: false,
 		prefetch: false,
 		terminal: false,
-		treeSitter: false
-	}
+		treeSitter: false,
+	},
 } as const satisfies LoggerToggleTree
 
 const LOGGER_TOGGLE_DEFAULTS = flattenTree(LOGGER_TOGGLE_TREE)

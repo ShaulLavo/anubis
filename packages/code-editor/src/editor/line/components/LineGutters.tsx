@@ -28,7 +28,6 @@ export const LineGutters = (props: LineGuttersProps) => {
 		const folds = props.folds?.()
 		const map = new Map<number, FoldRange>()
 		if (!folds) return map
-		// TODO: integrate fold gutter with custom virtualization once folded rows are hidden
 		for (const fold of folds) {
 			if (fold.endLine <= fold.startLine) continue
 			const existing = map.get(fold.startLine)
@@ -54,23 +53,37 @@ export const LineGutters = (props: LineGuttersProps) => {
 			>
 				<For each={props.rows()}>
 					{(virtualRow) => {
-						const index = virtualRow.index
-						if (index < 0 || index >= cursor.lines.lineCount()) {
+						// Convert display index to actual line index (accounting for folds)
+						// MUST be reactive so it updates when folds change
+						const lineIndex = createMemo(() =>
+							props.displayToLine
+								? props.displayToLine(virtualRow.index)
+								: virtualRow.index
+						)
+
+						const isValidLine = createMemo(
+							() => lineIndex() >= 0 && lineIndex() < cursor.lines.lineCount()
+						)
+
+						if (!isValidLine()) {
 							return null
 						}
 
-						const height = createMemo(() => virtualRow.size || props.lineHeight())
-						const isActive = createMemo(
-							() => props.activeLineIndex() === index
+						const height = createMemo(
+							() => virtualRow.size || props.lineHeight()
 						)
-						const hasFold = createMemo(() => foldMap().has(index))
+						const isActive = createMemo(
+							() => props.activeLineIndex() === lineIndex()
+						)
+						const hasFold = createMemo(() => foldMap().has(lineIndex()))
 						const isFolded = createMemo(
-							() => props.foldedStarts?.()?.has(index) ?? false
+							() => props.foldedStarts?.()?.has(lineIndex()) ?? false
 						)
 
 						return (
 							<div
 								data-index={virtualRow.index}
+								data-line={lineIndex()}
 								class="absolute left-0 right-0"
 								style={{
 									transform: `translateY(${virtualRow.start}px)`,
@@ -80,17 +93,25 @@ export const LineGutters = (props: LineGuttersProps) => {
 							>
 								<div
 									class="relative flex h-full items-center justify-end"
-									onMouseDown={(event) => handleRowMouseDown(event, index)}
+									onMouseDown={(event) =>
+										handleRowMouseDown(event, lineIndex())
+									}
 								>
 									<LineGutter
-										lineNumber={index + 1}
+										lineNumber={lineIndex() + 1}
 										lineHeight={height()}
 										isActive={isActive()}
 										isFoldable={hasFold()}
 										isFolded={isFolded()}
 										onFoldClick={
 											hasFold()
-												? () => props.onToggleFold?.(index)
+												? () => {
+														console.log('[LineGutters] onFoldClick called', {
+															lineIndex,
+															hasOnToggleFold: !!props.onToggleFold,
+														})
+														props.onToggleFold?.(lineIndex())
+													}
 												: undefined
 										}
 									/>

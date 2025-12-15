@@ -49,12 +49,17 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 
 	const isEditable = () => props.document.isEditable()
 
+	// Track which fold regions are currently collapsed
+	const [foldedStarts, setFoldedStarts] = createSignal<Set<number>>(new Set())
+
 	const layout = createTextEditorLayout({
 		fontSize: () => props.fontSize(),
 		fontFamily: () => props.fontFamily(),
 		isFileSelected: () => props.isFileSelected(),
 		tabSize,
 		scrollElement,
+		folds: props.folds,
+		foldedStarts,
 	})
 
 	const cursorScroll = createCursorScrollSync({
@@ -87,16 +92,19 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 		lineHeight: layout.lineHeight,
 	})
 
-	const [foldedStarts, setFoldedStarts] = createSignal<Set<number>>(new Set())
-
 	const toggleFold = (startLine: number) => {
+		console.log('[TextFileEditorInner] toggleFold called', { startLine })
 		const foldRanges = props.folds?.()
-		if (
-			!foldRanges?.some(
-				(range) =>
-					range.startLine === startLine && range.endLine > range.startLine
-			)
-		) {
+		console.log('[TextFileEditorInner] foldRanges', foldRanges)
+
+		const matchingRange = foldRanges?.find(
+			(range) =>
+				range.startLine === startLine && range.endLine > range.startLine
+		)
+		console.log('[TextFileEditorInner] matchingRange', matchingRange)
+
+		if (!matchingRange) {
+			console.log('[TextFileEditorInner] No matching range found, returning')
 			return
 		}
 
@@ -104,9 +112,12 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 			const next = new Set(prev)
 			if (next.has(startLine)) {
 				next.delete(startLine)
+				console.log('[TextFileEditorInner] Removing fold at line', startLine)
 			} else {
 				next.add(startLine)
+				console.log('[TextFileEditorInner] Adding fold at line', startLine)
 			}
+			console.log('[TextFileEditorInner] New foldedStarts', Array.from(next))
 			return next
 		})
 	}
@@ -177,7 +188,7 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 				endIndex: error.endIndex,
 				scope: error.isMissing ? 'missing' : 'error',
 			}))
-				.sort((a, b) => a.startIndex - b.startIndex)
+			.sort((a, b) => a.startIndex - b.startIndex)
 	})
 
 	const getLineHighlights = (entry: LineEntry): LineHighlightSegment[] => {
@@ -283,6 +294,7 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 							folds={props.folds}
 							foldedStarts={foldedStarts}
 							onToggleFold={toggleFold}
+							displayToLine={layout.displayToLine}
 						/>
 
 						<Lines
@@ -297,6 +309,7 @@ export const TextFileEditorInner = (props: TextFileEditorInnerProps) => {
 							activeLineIndex={layout.activeLineIndex}
 							bracketDepths={props.bracketDepths}
 							getLineHighlights={getLineHighlights}
+							displayToLine={layout.displayToLine}
 						/>
 					</div>
 				</div>
