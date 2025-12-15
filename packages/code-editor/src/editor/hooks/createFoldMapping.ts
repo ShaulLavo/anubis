@@ -1,4 +1,4 @@
-import { createMemo, type Accessor } from 'solid-js'
+import type { Accessor } from 'solid-js'
 import type { FoldRange } from '../types'
 
 export type FoldMapping = {
@@ -43,7 +43,7 @@ export type FoldMappingOptions = {
 type HiddenRange = {
 	/** First hidden line (startLine + 1 of the fold) */
 	startHidden: number
-	/** Last hidden line (endLine - 1 of the fold, so closing line stays visible) */
+	/** Last hidden line (endLine of the fold) */
 	endHidden: number
 	/** Number of lines hidden in this range */
 	count: number
@@ -60,60 +60,68 @@ type HiddenRange = {
  * - lineIndex: actual line in the document (0 to totalLines-1)
  */
 export function createFoldMapping(options: FoldMappingOptions): FoldMapping {
-	/**
-	 * Compute sorted, non-overlapping hidden ranges from the current fold state.
-	 *
-	 * A fold from startLine to endLine hides lines [startLine+1, endLine].
-	 * The startLine (fold header) remains visible.
-	 *
-	 * If folds are nested, the inner fold's hidden range is already covered
-	 * by the outer fold, so we merge/skip them.
-	 */
-	const hiddenRanges = createMemo<HiddenRange[]>(() => {
+	let cachedFolds: FoldRange[] | undefined
+	let cachedFoldedStarts: Set<number> | undefined
+	let cachedFoldedStartsSize = -1
+	let cachedHiddenRanges: HiddenRange[] = []
+	let cachedTotalHiddenLines = 0
+
+	const recompute = () => {
 		const folds = options.folds()
 		const foldedStarts = options.foldedStarts()
 
-		if (!folds?.length || foldedStarts.size === 0) {
-			return []
+		if (
+			folds === cachedFolds &&
+			foldedStarts === cachedFoldedStarts &&
+			foldedStarts.size === cachedFoldedStartsSize
+		) {
+			return
 		}
 
-		// Get only the folds that are currently folded
+		cachedFolds = folds
+		cachedFoldedStarts = foldedStarts
+		cachedFoldedStartsSize = foldedStarts.size
+
+		if (!folds?.length || foldedStarts.size === 0) {
+			cachedHiddenRanges = []
+			cachedTotalHiddenLines = 0
+			return
+		}
+
 		const activeFolds = folds.filter(
 			(fold) =>
 				foldedStarts.has(fold.startLine) && fold.endLine > fold.startLine
 		)
 
 		if (activeFolds.length === 0) {
-			return []
+			cachedHiddenRanges = []
+			cachedTotalHiddenLines = 0
+			return
 		}
 
-		// Sort by startLine
 		const sorted = activeFolds.slice().sort((a, b) => a.startLine - b.startLine)
 
-		// Merge overlapping/nested ranges
 		const merged: Array<{ startHidden: number; endHidden: number }> = []
 
 		for (const fold of sorted) {
 			const startHidden = fold.startLine + 1
-			// Hide up to endLine - 1 so the closing bracket line (endLine) stays visible
-			const endHidden = fold.endLine - 1
+			const endHidden = fold.endLine
 
-			if (startHidden > endHidden) continue // No lines to hide
+			if (startHidden > endHidden) continue
 
-			if (merged.length === 0) {
+			const last = merged[merged.length - 1]
+			if (!last) {
 				merged.push({ startHidden, endHidden })
+				continue
+			}
+
+			if (startHidden <= last.endHidden + 1) {
+				last.endHidden = Math.max(last.endHidden, endHidden)
 			} else {
-				const last = merged[merged.length - 1]!
-				// If this range overlaps or is adjacent to the last one, merge
-				if (startHidden <= last.endHidden + 1) {
-					last.endHidden = Math.max(last.endHidden, endHidden)
-				} else {
-					merged.push({ startHidden, endHidden })
-				}
+				merged.push({ startHidden, endHidden })
 			}
 		}
 
-		// Build final ranges with cumulative counts
 		const result: HiddenRange[] = []
 		let cumulativeHidden = 0
 
@@ -128,27 +136,25 @@ export function createFoldMapping(options: FoldMappingOptions): FoldMapping {
 			cumulativeHidden += count
 		}
 
-		return result
-	})
+		cachedHiddenRanges = result
+		cachedTotalHiddenLines = cumulativeHidden
+	}
 
-	/**
-	 * Total number of hidden lines across all folded regions.
-	 */
-	const totalHiddenLines = createMemo(() => {
-		const ranges = hiddenRanges()
-		if (ranges.length === 0) return 0
-		const last = ranges[ranges.length - 1]!
-		return last.cumulativeHiddenBefore + last.count
-	})
+	const hiddenRanges = (): HiddenRange[] => {
+		recompute()
+		return cachedHiddenRanges
+	}
 
-	/**
-	 * Number of visible lines = total - hidden.
-	 */
-	const visibleCount = createMemo(() => {
+	const totalHiddenLines = (): number => {
+		recompute()
+		return cachedTotalHiddenLines
+	}
+
+	const visibleCount: Accessor<number> = () => {
 		const total = options.totalLines()
 		const hidden = totalHiddenLines()
 		return Math.max(0, total - hidden)
-	})
+	}
 
 	/**
 	 * Binary search to find which hidden range (if any) contains a line.
