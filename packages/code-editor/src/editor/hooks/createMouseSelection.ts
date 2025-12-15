@@ -1,6 +1,6 @@
-import { onCleanup } from 'solid-js'
-import type { Accessor } from 'solid-js'
-import { positionToOffset, useCursor } from '../cursor'
+import { onCleanup, type Accessor } from 'solid-js'
+import { LINE_NUMBER_WIDTH } from '../consts'
+import { useCursor } from '../cursor'
 import { calculateColumnFromClick } from '../utils'
 
 export type MouseSelectionOptions = {
@@ -14,14 +14,18 @@ export type MouseSelectionHandlers = {
 	handleMouseDown: (
 		event: MouseEvent,
 		lineIndex: number,
-		column: number,
-		textElement: HTMLElement | null
+		column: number
 	) => void
 }
 
 const DOUBLE_CLICK_THRESHOLD = 300 // ms
 const AUTO_SCROLL_MARGIN = 30 // pixels from edge
 const AUTO_SCROLL_SPEED = 10 // pixels per frame
+
+type MousePoint = {
+	clientX: number
+	clientY: number
+}
 
 export function createMouseSelection(
 	options: MouseSelectionOptions
@@ -34,16 +38,23 @@ export function createMouseSelection(
 	let lastClickLine = -1
 	let lastClickColumn = -1
 	let autoScrollInterval: ReturnType<typeof setInterval> | null = null
+	let autoScrollDirection: 'up' | 'down' | null = null
+	let scrollRect: DOMRect | null = null
+	let lastPointer: MousePoint | null = null
+	let dragRafId = 0
 
 	const stopAutoScroll = () => {
 		if (autoScrollInterval) {
 			clearInterval(autoScrollInterval)
 			autoScrollInterval = null
 		}
+		autoScrollDirection = null
 	}
 
 	const startAutoScroll = (direction: 'up' | 'down') => {
+		if (autoScrollInterval && autoScrollDirection === direction) return
 		stopAutoScroll()
+		autoScrollDirection = direction
 		const scrollEl = options.scrollElement()
 		if (!scrollEl) return
 
@@ -53,38 +64,35 @@ export function createMouseSelection(
 			} else {
 				scrollEl.scrollTop += AUTO_SCROLL_SPEED
 			}
+			scheduleDragUpdate()
 		}, 16) // ~60fps
 	}
 
-	const getPositionFromMouseEvent = (
-		event: MouseEvent
+	const getPositionFromPointer = (
+		point: MousePoint
 	): { lineIndex: number; column: number } | null => {
 		const scrollEl = options.scrollElement()
 		if (!scrollEl) return null
 
-		const rect = scrollEl.getBoundingClientRect()
-		const entries = cursor.lineEntries()
-		if (entries.length === 0) return null
+		const rect = scrollRect ?? scrollEl.getBoundingClientRect()
+		const lineCount = cursor.lines.lineCount()
+		if (lineCount === 0) return null
 
 		// Calculate Y position relative to scroll content
-		const relativeY = event.clientY - rect.top + scrollEl.scrollTop
+		const relativeY = point.clientY - rect.top + scrollEl.scrollTop
 		const lineHeight = options.lineHeight()
 
 		// Find line index
 		let lineIndex = Math.floor(relativeY / lineHeight)
-		lineIndex = Math.max(0, Math.min(lineIndex, entries.length - 1))
+		lineIndex = Math.max(0, Math.min(lineIndex, lineCount - 1))
 
 		// Calculate column (simplified - assumes click is on text area)
-		const entry = entries[lineIndex]
-		if (!entry) return null
+		const text = cursor.lines.getLineText(lineIndex)
 
-		const relativeX = Math.max(
-			0,
-			event.clientX - rect.left + scrollEl.scrollLeft - 52
-		) // 52 = approximate gutter width
+		const relativeX = Math.max(0, point.clientX - rect.left + scrollEl.scrollLeft - LINE_NUMBER_WIDTH)
 
 		const column = calculateColumnFromClick(
-			entry.text,
+			text,
 			relativeX,
 			options.charWidth(),
 			options.tabSize()
@@ -93,34 +101,57 @@ export function createMouseSelection(
 		return { lineIndex, column }
 	}
 
-	const handleMouseMove = (event: MouseEvent) => {
-		if (!isDragging || anchorOffset === null) return
+	const updateAutoScroll = (clientY: number) => {
+		const scrollEl = options.scrollElement()
+		if (!scrollEl) return
+		const rect = scrollRect ?? scrollEl.getBoundingClientRect()
 
-		const pos = getPositionFromMouseEvent(event)
+		if (clientY < rect.top + AUTO_SCROLL_MARGIN) {
+			startAutoScroll('up')
+		} else if (clientY > rect.bottom - AUTO_SCROLL_MARGIN) {
+			startAutoScroll('down')
+		} else {
+			stopAutoScroll()
+		}
+	}
+
+	const runDragUpdate = () => {
+		if (!isDragging || anchorOffset === null) return
+		if (!lastPointer) return
+
+		const pos = getPositionFromPointer(lastPointer)
 		if (!pos) return
 
-		const entries = cursor.lineEntries()
-		const focusOffset = positionToOffset(pos.lineIndex, pos.column, entries)
-
+		const focusOffset = cursor.lines.positionToOffset(pos.lineIndex, pos.column)
 		cursor.actions.setSelection(anchorOffset, focusOffset)
 
-		// Auto-scroll when near edges
-		const scrollEl = options.scrollElement()
-		if (scrollEl) {
-			const rect = scrollEl.getBoundingClientRect()
-			if (event.clientY < rect.top + AUTO_SCROLL_MARGIN) {
-				startAutoScroll('up')
-			} else if (event.clientY > rect.bottom - AUTO_SCROLL_MARGIN) {
-				startAutoScroll('down')
-			} else {
-				stopAutoScroll()
-			}
-		}
+		updateAutoScroll(lastPointer.clientY)
+	}
+
+	const scheduleDragUpdate = () => {
+		if (dragRafId) return
+		dragRafId = requestAnimationFrame(() => {
+			dragRafId = 0
+			runDragUpdate()
+		})
+	}
+
+	const handleMouseMove = (event: MouseEvent) => {
+		if (!isDragging || anchorOffset === null) return
+		lastPointer = { clientX: event.clientX, clientY: event.clientY }
+		scheduleDragUpdate()
 	}
 
 	const handleMouseUp = () => {
 		isDragging = false
+		anchorOffset = null
+		scrollRect = null
+		lastPointer = null
 		stopAutoScroll()
+		if (dragRafId) {
+			cancelAnimationFrame(dragRafId)
+			dragRafId = 0
+		}
 		document.removeEventListener('mousemove', handleMouseMove)
 		document.removeEventListener('mouseup', handleMouseUp)
 	}
@@ -128,16 +159,14 @@ export function createMouseSelection(
 	const handleMouseDown = (
 		event: MouseEvent,
 		lineIndex: number,
-		column: number,
-		_textElement: HTMLElement | null
+		column: number
 	) => {
 		if (event.button !== 0) return
 
-		const entries = cursor.lineEntries()
-		if (entries.length === 0) return
+		if (cursor.lines.lineCount() === 0) return
 
 		const now = Date.now()
-		const offset = positionToOffset(lineIndex, column, entries)
+		const offset = cursor.lines.positionToOffset(lineIndex, column)
 
 		// Detect click count for double/triple click
 		if (
@@ -173,21 +202,27 @@ export function createMouseSelection(
 			// Shift+click: extend selection
 			event.preventDefault()
 			cursor.actions.setCursorFromClick(lineIndex, column, true)
-		} else {
-			// Normal click: start potential drag
-			event.preventDefault()
-			anchorOffset = offset
-			isDragging = true
-			cursor.actions.setCursorFromClick(lineIndex, column, false)
+			} else {
+				// Normal click: start potential drag
+				event.preventDefault()
+				anchorOffset = offset
+				isDragging = true
+				lastPointer = { clientX: event.clientX, clientY: event.clientY }
+				scrollRect = options.scrollElement()?.getBoundingClientRect() ?? null
+				cursor.actions.setCursorFromClick(lineIndex, column, false)
 
-			document.addEventListener('mousemove', handleMouseMove)
-			document.addEventListener('mouseup', handleMouseUp)
+				document.addEventListener('mousemove', handleMouseMove)
+				document.addEventListener('mouseup', handleMouseUp)
 		}
 	}
 
 	// Cleanup on unmount
 	onCleanup(() => {
 		stopAutoScroll()
+		if (dragRafId) {
+			cancelAnimationFrame(dragRafId)
+			dragRafId = 0
+		}
 		document.removeEventListener('mousemove', handleMouseMove)
 		document.removeEventListener('mouseup', handleMouseUp)
 	})

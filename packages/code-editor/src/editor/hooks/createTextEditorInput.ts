@@ -10,7 +10,7 @@ import {
 	type CommandDescriptor,
 	type KeybindingOptions,
 } from '@repo/keyboard'
-import type { DocumentIncrementalEdit, LineEntry } from '../types'
+import type { DocumentIncrementalEdit } from '../types'
 import { useCursor, getSelectionBounds, hasSelection } from '../cursor'
 import { useHistory, type HistoryMergeMode } from '../history'
 import { clipboard } from '../utils/clipboard'
@@ -52,7 +52,7 @@ export type TextEditorInputHandlers = {
 	handleInput: (event: InputEvent) => void
 	handleKeyDown: (event: KeyboardEvent) => void
 	handleKeyUp: (event: KeyboardEvent) => void
-	handleRowClick: (entry: LineEntry) => void
+	handleRowClick: (lineIndex: number) => void
 	handlePreciseClick: (
 		lineIndex: number,
 		column: number,
@@ -121,16 +121,33 @@ export function createTextEditorInput(
 			return false
 		}
 
-		const documentText = cursor.documentText()
 		const deletedText =
-			deleteLength > 0 ? documentText.slice(clampedStart, clampedEnd) : ''
+			deleteLength > 0
+				? cursor.getTextRange(clampedStart, clampedEnd)
+				: ''
 
-		const lineEntriesSnapshot = cursor.lineEntries().slice()
 		const cursorBefore = snapshotCursorPosition()
 		const selectionBefore = snapshotSelection()
 
+		const incrementalEdit =
+			options.onIncrementalEdit &&
+			describeIncrementalEdit(
+				(offset) => {
+					const position = cursor.lines.offsetToPosition(offset)
+					return {
+						row: position.line,
+						column: position.column,
+					}
+				},
+				clampedStart,
+				deletedText,
+				insertedText
+			)
+
 		options.updatePieceTable((current) => {
-			const baseSnapshot = current ?? createPieceTableSnapshot(documentText)
+			const baseSnapshot =
+				current ??
+				createPieceTableSnapshot(cursor.getTextRange(0, cursor.documentLength()))
 			let snapshot = baseSnapshot
 
 			if (deleteLength > 0) {
@@ -143,6 +160,8 @@ export function createTextEditorInput(
 
 			return snapshot
 		})
+
+		cursor.lines.applyEdit(clampedStart, deletedText, insertedText)
 
 		const cursorOffsetAfter =
 			typeof changeOptions?.cursorOffsetAfter === 'number'
@@ -171,16 +190,8 @@ export function createTextEditorInput(
 			}
 		)
 
-		if (options.onIncrementalEdit) {
-			const incrementalEdit = describeIncrementalEdit(
-				lineEntriesSnapshot,
-				clampedStart,
-				deletedText,
-				insertedText
-			)
-			if (incrementalEdit) {
-				options.onIncrementalEdit(incrementalEdit)
-			}
+		if (incrementalEdit) {
+			options.onIncrementalEdit?.(incrementalEdit)
 		}
 
 		options.scrollCursorIntoView()
@@ -440,7 +451,7 @@ export function createTextEditorInput(
 			id: 'editor.cursor.pageUp',
 			run: (context) => {
 				const range = options.visibleLineRange()
-				const visibleLines = range.end - range.start
+				const visibleLines = Math.max(1, range.end - range.start + 1)
 				cursor.actions.moveCursorByLines(-visibleLines, context.event.shiftKey)
 				options.scrollCursorIntoView()
 			},
@@ -454,7 +465,7 @@ export function createTextEditorInput(
 			id: 'editor.cursor.pageDown',
 			run: (context) => {
 				const range = options.visibleLineRange()
-				const visibleLines = range.end - range.start
+				const visibleLines = Math.max(1, range.end - range.start + 1)
 				cursor.actions.moveCursorByLines(visibleLines, context.event.shiftKey)
 				options.scrollCursorIntoView()
 			},
@@ -536,8 +547,9 @@ export function createTextEditorInput(
 		}
 	}
 
-	const handleRowClick = (entry: LineEntry) => {
-		cursor.actions.setCursorFromClick(entry.index, entry.text.length)
+	const handleRowClick = (lineIndex: number) => {
+		const textLength = cursor.lines.getLineTextLength(lineIndex)
+		cursor.actions.setCursorFromClick(lineIndex, textLength)
 		focusInput()
 	}
 

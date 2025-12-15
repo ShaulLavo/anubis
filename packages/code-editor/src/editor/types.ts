@@ -1,7 +1,12 @@
-import type { VirtualItem, Virtualizer } from '@tanstack/virtual-core'
 import type { Accessor } from 'solid-js'
 import type { ParseResult } from '@repo/utils/parse'
 import type { PieceTableSnapshot } from '@repo/utils'
+
+export type VirtualItem = {
+	index: number
+	start: number
+	size: number
+}
 
 // Bracket depth map: character index -> nesting depth
 export type BracketDepthMap = Record<number, number>
@@ -96,7 +101,6 @@ export type LineEntry = {
 }
 
 export type LineProps = {
-	rowVirtualizer: Virtualizer<HTMLDivElement, HTMLDivElement>
 	virtualRow: VirtualItem
 	entry: LineEntry
 	lineHeight: number
@@ -104,7 +108,6 @@ export type LineProps = {
 	charWidth: number
 	tabSize: number
 	isEditable: Accessor<boolean>
-	onRowClick: (entry: LineEntry) => void
 	onPreciseClick: (
 		lineIndex: number,
 		column: number,
@@ -124,12 +127,10 @@ export type LineProps = {
 export type LinesProps = {
 	rows: Accessor<VirtualItem[]>
 	contentWidth: Accessor<number>
-	rowVirtualizer: Virtualizer<HTMLDivElement, HTMLDivElement>
 	lineHeight: Accessor<number>
 	charWidth: Accessor<number>
 	tabSize: Accessor<number>
 	isEditable: Accessor<boolean>
-	onRowClick: (entry: LineEntry) => void
 	onPreciseClick: (
 		lineIndex: number,
 		column: number,
@@ -143,13 +144,13 @@ export type LinesProps = {
 	) => void
 	activeLineIndex: Accessor<number | null>
 	bracketDepths: Accessor<BracketDepthMap | undefined>
-	getLineHighlights?: (lineIndex: number) => LineHighlightSegment[] | undefined
+	getLineHighlights?: (entry: LineEntry) => LineHighlightSegment[] | undefined
 }
 
 export type LineGuttersProps = {
 	rows: Accessor<VirtualItem[]>
 	lineHeight: Accessor<number>
-	onRowClick: (entry: LineEntry) => void
+	onRowClick: (lineIndex: number) => void
 	activeLineIndex: Accessor<number | null>
 	folds?: Accessor<FoldRange[] | undefined>
 	foldedStarts?: Accessor<Set<number>>
