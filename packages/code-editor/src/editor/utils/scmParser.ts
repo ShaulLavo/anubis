@@ -3,6 +3,11 @@
  * Parses tree-sitter .scm highlight query files and extracts rules for quick lexing.
  */
 
+import safeRegex from 'safe-regex'
+import { loggers } from '@repo/logger'
+
+const scmLogger = loggers.codeEditor.withTag('scmParser')
+
 /**
  * Extracted rules from SCM query files
  */
@@ -391,6 +396,14 @@ export const parseScmQuery = (source: string): ScmRules => {
 			const matchPred = findMatchPredicate(expr.items)
 			if (matchPred) {
 				try {
+					// Validate pattern is safe from ReDoS before constructing RegExp
+					if (!safeRegex(matchPred.pattern)) {
+						// Skip unsafe patterns that could cause catastrophic backtracking
+						scmLogger.warn(
+							`Skipping unsafe regex pattern that could cause ReDoS: ${matchPred.pattern}`
+						)
+						continue
+					}
 					const regex = new RegExp(matchPred.pattern)
 					regexRules.push({ pattern: regex, scope: capture })
 				} catch {

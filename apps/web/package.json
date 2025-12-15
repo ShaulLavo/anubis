@@ -60,6 +60,7 @@
     "gsap": "^3.13.0",
     "localforage": "^1.10.0",
     "nanoid": "^5.1.6",
+    "safe-regex": "^2.1.1",
     "shell-quote": "^1.8.2",
     "solid-js": "^1.9.5",
     "solid-sonner": "^0.2.8",
