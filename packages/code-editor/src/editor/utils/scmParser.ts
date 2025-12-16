@@ -406,8 +406,12 @@ export const parseScmQuery = (source: string): ScmRules => {
 					}
 					const regex = new RegExp(matchPred.pattern)
 					regexRules.push({ pattern: regex, scope: capture })
-				} catch {
-					// Invalid regex, skip
+				} catch (err) {
+					// Invalid or unparsable regex, skip
+					scmLogger.warn(
+						`Skipping invalid SCM regex pattern: ${matchPred.pattern}`,
+						err
+					)
 				}
 				continue
 			}

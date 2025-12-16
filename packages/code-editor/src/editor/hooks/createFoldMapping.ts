@@ -43,7 +43,7 @@ export type FoldMappingOptions = {
 type HiddenRange = {
 	/** First hidden line (startLine + 1 of the fold) */
 	startHidden: number
-	/** Last hidden line (endLine of the fold) */
+	/** Last hidden line (endLine - 1 of the fold, so closing line stays visible) */
 	endHidden: number
 	/** Number of lines hidden in this range */
 	count: number

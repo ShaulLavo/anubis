@@ -5,7 +5,6 @@
     "": {
       "name": "vibe",
       "dependencies": {
-        "safe-regex": "^2.1.1",
         "sqlite-wasm": "^0.0.2",
       },
       "devDependencies": {
@@ -60,6 +59,7 @@
         "@solid-primitives/deep": "^0.3.3",
         "@solid-primitives/event-listener": "^2.4.3",
         "@solid-primitives/resize-observer": "^2.1.3",
+        "@solid-primitives/set": "^0.7.2",
         "@solid-primitives/storage": "^4.3.3",
         "@solid-primitives/transition-group": "^1.1.2",
         "@solidjs/router": "^0.15.4",
@@ -108,6 +108,7 @@
         "@repo/perf": "*",
         "@repo/utils": "*",
         "@solid-primitives/map": "^0.7.2",
+        "@solid-primitives/set": "^0.7.2",
         "solid-js": "^1.9.5",
       },
       "devDependencies": {
@@ -516,6 +517,8 @@
     "@solid-primitives/rootless": ["@solid-primitives/rootless@1.5.2", "", { "dependencies": { "@solid-primitives/utils": "^6.3.2" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-9HULb0QAzL2r47CCad0M+NKFtQ+LrGGNHZfteX/ThdGvKIg2o2GYhBooZubTCd/RTu2l2+Nw4s+dEfiDGvdrrQ=="],
 
     "@solid-primitives/scheduled": ["@solid-primitives/scheduled@1.5.2", "", { "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-/j2igE0xyNaHhj6kMfcUQn5rAVSTLbAX+CDEBm25hSNBmNiHLu2lM7Usj2kJJ5j36D67bE8wR1hBNA8hjtvsQA=="],
+
+    "@solid-primitives/set": ["@solid-primitives/set@0.7.2", "", { "dependencies": { "@solid-primitives/trigger": "^1.2.2" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-E4UzC1cQtPWicnbK9ulG0G27d8802DFi4OSC6HZm+yyQOVAb0ebkfJq9FKSYpFxE+gb6M2lM6Zh4ulXRna35CA=="],
 
     "@solid-primitives/static-store": ["@solid-primitives/static-store@0.1.2", "", { "dependencies": { "@solid-primitives/utils": "^6.3.2" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-ReK+5O38lJ7fT+L6mUFvUr6igFwHBESZF+2Ug842s7fvlVeBdIVEdTCErygff6w7uR6+jrr7J8jQo+cYrEq4Iw=="],
 

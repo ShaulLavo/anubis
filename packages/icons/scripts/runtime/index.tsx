@@ -44,6 +44,10 @@ export function IconTemplate(iconSrc: IconTree, props: IconProps): JSX.Element {
 			: iconSrc.c
 	)
 
+	// NOTE: Icons never render without this effect. The rawContent memo alone
+	// doesn't trigger updates to innerHTML for some reason.
+	// TODO: Investigate why this effect is necessary - possible Solid reactivity issue
+	// with innerHTML or memo timing.
 	createEffect(() => setContent(rawContent()))
 
 	onCleanup(() => {

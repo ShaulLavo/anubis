@@ -23,9 +23,7 @@ export type TextEditorLayoutOptions = {
 	isFileSelected: Accessor<boolean>
 	tabSize: Accessor<number>
 	scrollElement: () => HTMLDivElement | null
-	/** Optional fold ranges from syntax analysis */
 	folds?: Accessor<FoldRange[] | undefined>
-	/** Set of startLine indices for currently collapsed folds */
 	foldedStarts?: Accessor<Set<number>>
 }
 
@@ -224,10 +222,14 @@ export function createTextEditorLayout(
 			LINE_NUMBER_WIDTH + columnOffset(cursorLineIndex(), cursorColumnIndex())
 	)
 
-	const inputY = createMemo(() => cursorLineIndex() * lineHeight())
+	const inputY = createMemo(() => {
+		const displayIndex = foldMapping.lineToDisplay(cursorLineIndex())
+		return displayIndex * lineHeight()
+	})
 
 	const getLineY = (lineIndex: number): number => {
-		return lineIndex * lineHeight()
+		const displayIndex = foldMapping.lineToDisplay(lineIndex)
+		return Math.max(0, displayIndex) * lineHeight()
 	}
 
 	const visibleLineRange = rowVirtualizer.visibleRange

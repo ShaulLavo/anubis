@@ -1,4 +1,4 @@
-import { For, createMemo } from 'solid-js'
+import { For, Show, createMemo } from 'solid-js'
 import { EDITOR_PADDING_LEFT, LINE_NUMBER_WIDTH } from '../../consts'
 import { useCursor } from '../../cursor'
 import type { FoldRange, LineGuttersProps } from '../../types'
@@ -53,8 +53,6 @@ export const LineGutters = (props: LineGuttersProps) => {
 			>
 				<For each={props.rows()}>
 					{(virtualRow) => {
-						// Convert display index to actual line index (accounting for folds)
-						// MUST be reactive so it updates when folds change
 						const lineIndex = createMemo(() =>
 							props.displayToLine
 								? props.displayToLine(virtualRow.index)
@@ -64,10 +62,6 @@ export const LineGutters = (props: LineGuttersProps) => {
 						const isValidLine = createMemo(
 							() => lineIndex() >= 0 && lineIndex() < cursor.lines.lineCount()
 						)
-
-						if (!isValidLine()) {
-							return null
-						}
 
 						const height = createMemo(
 							() => virtualRow.size || props.lineHeight()
@@ -81,36 +75,36 @@ export const LineGutters = (props: LineGuttersProps) => {
 						)
 
 						return (
-							<div
-								data-index={virtualRow.index}
-								data-line={lineIndex()}
-								class="absolute left-0 right-0"
-								style={{
-									transform: `translateY(${virtualRow.start}px)`,
-									top: 0,
-									height: `${height()}px`,
-								}}
-							>
+							<Show when={isValidLine()}>
 								<div
-									class="relative flex h-full items-center justify-end"
-									onMouseDown={(event) =>
-										handleRowMouseDown(event, lineIndex())
-									}
+									data-index={virtualRow.index}
+									data-line={lineIndex()}
+									class="absolute left-0 right-0"
+									style={{
+										transform: `translateY(${virtualRow.start}px)`,
+										top: 0,
+										height: `${height()}px`,
+									}}
 								>
-									<LineGutter
-										lineNumber={lineIndex() + 1}
-										lineHeight={height()}
-										isActive={isActive()}
-										isFoldable={hasFold()}
-										isFolded={isFolded()}
-										onFoldClick={
-											hasFold()
-												? () => props.onToggleFold?.(lineIndex())
-												: undefined
+									<div
+										class="relative flex h-full items-center justify-end"
+										onMouseDown={(event) =>
+											handleRowMouseDown(event, lineIndex())
 										}
-									/>
+									>
+										<LineGutter
+											lineNumber={lineIndex() + 1}
+											lineHeight={height()}
+											isActive={isActive()}
+											isFoldable={hasFold()}
+											isFolded={isFolded()}
+											onFoldClick={() =>
+												hasFold() && props.onToggleFold?.(lineIndex())
+											}
+										/>
+									</div>
 								</div>
-							</div>
+							</Show>
 						)
 					}}
 				</For>
