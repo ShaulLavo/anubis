@@ -6,6 +6,9 @@
 - [ ] Tab drag/drop: reorder, move between panes, detach to new pane
 - [ ] Cross-pane DnD to create splits by dropping tabs/files on edges/corners
 - [ ] Minimap; code lens; peek/go-to definition/references; breadcrumbs
+- [ ] Horizantol virtuazltion
+- [ ] GPU rendering
+- [ ] FAST scroll without gpu instant render
 
 # File System & Explorer
 
@@ -18,7 +21,7 @@
 
 - [x] Piece-table-backed text editing with virtualized lines/cursor/selection
 - [ ] Tree-sitter syntax highlighting (multi-language) + semantic tokens
-- [ ] Folding driven by syntax; outline/symbol view; breadcrumbs
+- [x] Folding driven by syntax; outline/symbol view; breadcrumbs
 - [ ] LSP client: hover, completion, signature help, rename, code actions, format, diagnostics, inlay hints
 - [ ] Snippets and snippet contributions
 - [ ] Formatter integration per language; on-save hooks
@@ -70,10 +73,8 @@
 # Logging, Perf, Infrastructure
 
 - [x] Logger/perf scaffolding (`@repo/logger`, `@repo/perf`)
-- [ ] More tracing around FS/search/indexing; perf dashboards
-- [ ] Offline/persistence for indexes; eviction policies
 
 # Testing
 
-- [ ] Playwright E2E coverage for core flows (fs, editor, search, DnD, tabs)
-- [ ] Broader unit tests using Bun (key packages: fs, code-editor, search engine)
+- [ ] Browswer testing
+- [ ] Add missing unit tests if any
