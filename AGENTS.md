@@ -32,6 +32,12 @@
 - **Never support backward compatibility**: We do not support backward compatibility. Remove any code that exists solely for this purpose.
 - Always fix ESLint and formatting issues before opening a PR.
 
+## Greenfield & Performance Philosophy
+
+- **Greenfield App**: This is a strictly greenfield project. Treat it as such.
+- **Zero Backward Compatibility**: Never keep backward compatibility. There is no such thing as a breaking change here; we optimize for the best possible implementation.
+- **Performance & Cleanliness Above All**: Write the cleanest, most performant code at all costs. Refactor aggressively.
+
 ## Testing Guidelines
 
 - No global test runner is enforced yet; prefer adding tests close to the code (`*.test.ts` / `*.test.tsx`).
