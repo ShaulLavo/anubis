@@ -157,6 +157,13 @@ export const Minimap = (props: MinimapProps) => {
 			const layout = getLayout()
 			if (layout) {
 				void worker.updateLayout(layout)
+
+				// Re-render base layer after resize if we already have content
+				const filePath = props.filePath
+				const version = props.version?.() ?? 0
+				if (hasRenderedBase && filePath) {
+					void worker.renderFromPath(filePath, version)
+				}
 			}
 
 			if (hasRenderedBase && overlayVisible() === false) {
@@ -182,25 +189,17 @@ export const Minimap = (props: MinimapProps) => {
 					props.version?.(),
 				] as const,
 			async ([active, treeSitterWorker, filePath, version]) => {
-				console.log('[Minimap] Effect triggered', {
-					active,
-					hasTS: !!treeSitterWorker,
-					filePath,
-					version,
-				})
 				if (!active) return
 
 				if (
 					treeSitterWorker &&
 					connectedTreeSitterWorker !== treeSitterWorker
 				) {
-					console.log('[Minimap] Connecting TS worker')
 					worker.connectTreeSitter(treeSitterWorker)
 					connectedTreeSitterWorker = treeSitterWorker
 				}
 
 				if (!treeSitterWorker || !filePath) {
-					console.log('[Minimap] Missing requirements')
 					hasRenderedBase = false
 					lastRenderedPath = null
 					setOverlayVisible(false)
@@ -216,9 +215,7 @@ export const Minimap = (props: MinimapProps) => {
 					await worker.clear()
 				}
 
-				console.log('[Minimap] Requesting renderFromPath', filePath, version)
 				const rendered = await worker.renderFromPath(filePath, version ?? 0)
-				console.log('[Minimap] renderFromPath result:', rendered)
 				if (!rendered) return
 
 				hasRenderedBase = true
@@ -400,6 +397,7 @@ export const Minimap = (props: MinimapProps) => {
 			}
 			;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 		} else {
+			// Click outside slider - smooth scroll to that position
 			const scrollHeight = element.scrollHeight
 			const clientHeight = element.clientHeight
 			const maxScrollTop = Math.max(0, scrollHeight - clientHeight)

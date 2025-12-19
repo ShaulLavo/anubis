@@ -9,14 +9,24 @@
  * - Prebaked atlas data for scales 1 and 2
  * - Brightness normalization in downsampling
  * - True background color blending
+ * - Partial repainting (only changed lines)
+ * - Light/Normal font variants for theme support
+ * - Partial repainting (only changed lines)
+ *
+ * TODO: Add search result decorations when search feature is implemented
+ * TODO: Add git diff decorations (added/modified/deleted lines)
+ * TODO: Add configurable minimap scale option (user preference for character size)
  */
 
 import { expose, proxy, wrap, type Remote } from 'comlink'
+import { loggers } from '@repo/logger'
 import {
 	MINIMAP_DEFAULT_PALETTE,
 	type MinimapTokenSummary,
 } from './tokenSummary'
 import type { MinimapLayout } from './workerTypes'
+
+const log = loggers.codeEditor.withTag('minimap')
 
 /**
  * Minimal Tree-sitter worker interface for minimap communication
@@ -65,6 +75,20 @@ const Constants = {
 const BACKGROUND_R = 24 // #18181b (zinc-900)
 const BACKGROUND_G = 24
 const BACKGROUND_B = 27
+
+// Font variant intensity ratios (from VS Code)
+const NORMAL_FONT_RATIO = 12 / 15 // ~0.8
+const LIGHT_FONT_RATIO = 50 / 60 // ~0.83
+
+// ============================================================================
+// Partial Repainting State
+// ============================================================================
+
+// Previous render state for partial repainting
+let previousTokens: Uint16Array | null = null
+let previousMaxChars: number = 0
+let previousLineCount: number = 0
+let cachedImageData: ImageData | null = null
 
 // ============================================================================
 // Prebaked Minimap Data (from VS Code)
@@ -128,8 +152,26 @@ const prebakedMiniMaps: Record<number, () => Uint8ClampedArray> = {
 // Font Atlas Generation
 // ============================================================================
 
-let fontAtlas: Uint8ClampedArray | null = null
+// Font atlas variants
+let fontAtlasNormal: Uint8ClampedArray | null = null
+let fontAtlasLight: Uint8ClampedArray | null = null
 let atlasScale: number = 0
+let useLightFont: boolean = false // Toggle for light vs dark theme
+
+/**
+ * Soften atlas data (like VS Code's soften function)
+ * Used to create normal and light font variants
+ */
+const softenAtlas = (
+	input: Uint8ClampedArray,
+	ratio: number
+): Uint8ClampedArray => {
+	const result = new Uint8ClampedArray(input.length)
+	for (let i = 0; i < input.length; i++) {
+		result[i] = Math.floor(input[i]! * ratio)
+	}
+	return result
+}
 
 /**
  * Get char index in atlas
@@ -138,31 +180,39 @@ const getCharIndex = (chCode: number, scale: number): number => {
 	const idx = chCode - Constants.START_CH_CODE
 	if (idx < 0 || idx >= Constants.CHAR_COUNT) {
 		if (scale <= 2) {
-			// For smaller scales, wrap around
 			return (idx + Constants.CHAR_COUNT) % Constants.CHAR_COUNT
 		}
-		return Constants.CHAR_COUNT - 1 // Unknown symbol
+		return Constants.CHAR_COUNT - 1
 	}
 	return idx
 }
 
 /**
  * Create font atlas - uses prebaked data for scales 1 and 2,
- * otherwise renders dynamically
+ * otherwise renders dynamically. Creates both normal and light variants.
  */
-const createFontAtlas = (
-	fontFamily: string,
-	scale: number
-): Uint8ClampedArray => {
+const createFontAtlas = (fontFamily: string, scale: number): void => {
 	atlasScale = scale
+
+	let baseAtlas: Uint8ClampedArray
 
 	// Use prebaked data for common scales
 	if (prebakedMiniMaps[scale]) {
-		return prebakedMiniMaps[scale]!()
+		baseAtlas = prebakedMiniMaps[scale]!()
+	} else {
+		baseAtlas = createFontAtlasFromSample(fontFamily, scale)
 	}
 
-	// Generate dynamically for other scales
-	return createFontAtlasFromSample(fontFamily, scale)
+	// Create both font variants
+	fontAtlasNormal = softenAtlas(baseAtlas, NORMAL_FONT_RATIO)
+	fontAtlasLight = softenAtlas(baseAtlas, LIGHT_FONT_RATIO)
+}
+
+/**
+ * Get the active font atlas based on theme setting
+ */
+const getActiveAtlas = (): Uint8ClampedArray => {
+	return useLightFont ? fontAtlasLight! : fontAtlasNormal!
 }
 
 /**
@@ -188,7 +238,6 @@ const createFontAtlasFromSample = (
 		ctx.fillText(String.fromCharCode(i), x, Constants.SAMPLED_CHAR_HEIGHT / 2)
 		x += Constants.SAMPLED_CHAR_WIDTH
 	}
-	// Unknown char
 	ctx.fillText('?', x, Constants.SAMPLED_CHAR_HEIGHT / 2)
 
 	const imageData = ctx.getImageData(
@@ -230,7 +279,7 @@ const downsampleAtlas = (
 		sourceOffset += Constants.SAMPLED_CHAR_WIDTH * Constants.RGBA_CHANNELS_CNT
 	}
 
-	// Brightness normalization - scale all values so brightest becomes 255
+	// Brightness normalization
 	if (brightest > 0) {
 		const adjust = 255 / brightest
 		for (let i = 0; i < result.length; i++) {
@@ -269,7 +318,6 @@ const downsampleChar = (
 			const sourceX1 = (x / width) * Constants.SAMPLED_CHAR_WIDTH
 			const sourceX2 = ((x + 1) / width) * Constants.SAMPLED_CHAR_WIDTH
 
-			// Weighted bilinear sampling
 			let value = 0
 			let samples = 0
 
@@ -284,7 +332,6 @@ const downsampleChar = (
 
 					const weight = xBalance * yBalance
 					samples += weight
-					// Combine RGB and Alpha
 					value +=
 						((source[sourceIndex]! * source[sourceIndex + 3]!) / 255) * weight
 				}
@@ -299,18 +346,160 @@ const downsampleChar = (
 	return brightest
 }
 
+// ============================================================================
+// Partial Repainting
+// ============================================================================
+
 /**
- * Soften atlas data (like VS Code's soften function)
+ * Find dirty lines by comparing token buffers
  */
-const softenAtlas = (
-	input: Uint8ClampedArray,
-	ratio: number
-): Uint8ClampedArray => {
-	const result = new Uint8ClampedArray(input.length)
-	for (let i = 0; i < input.length; i++) {
-		result[i] = Math.floor(input[i]! * ratio)
+const findDirtyLines = (
+	newTokens: Uint16Array,
+	newMaxChars: number,
+	newLineCount: number
+): Set<number> => {
+	const dirtyLines = new Set<number>()
+
+	// If dimensions changed, repaint everything
+	if (!previousTokens || previousMaxChars !== newMaxChars) {
+		for (let i = 0; i < newLineCount; i++) {
+			dirtyLines.add(i)
+		}
+		return dirtyLines
 	}
-	return result
+
+	// Compare line by line
+	const maxLines = Math.max(previousLineCount, newLineCount)
+	for (let line = 0; line < maxLines; line++) {
+		// New line added
+		if (line >= previousLineCount) {
+			dirtyLines.add(line)
+			continue
+		}
+		// Line removed
+		if (line >= newLineCount) {
+			dirtyLines.add(line)
+			continue
+		}
+
+		// Compare tokens in this line
+		const offset = line * newMaxChars
+		let isDirty = false
+		for (let char = 0; char < newMaxChars; char++) {
+			if (newTokens[offset + char] !== previousTokens[offset + char]) {
+				isDirty = true
+				break
+			}
+		}
+		if (isDirty) {
+			dirtyLines.add(line)
+		}
+	}
+
+	return dirtyLines
+}
+
+/**
+ * Clear specific lines in the image data
+ */
+const clearLines = (
+	dest: Uint8ClampedArray,
+	dirtyLines: Set<number>,
+	charH: number,
+	deviceWidth: number,
+	deviceHeight: number
+): void => {
+	const destWidth = deviceWidth * Constants.RGBA_CHANNELS_CNT
+
+	for (const line of dirtyLines) {
+		const yStart = line * charH
+		if (yStart >= deviceHeight) continue
+
+		const yEnd = Math.min(yStart + charH, deviceHeight)
+		const startIdx = yStart * destWidth
+		const endIdx = yEnd * destWidth
+
+		// Clear to transparent
+		for (let i = startIdx; i < endIdx; i++) {
+			dest[i] = 0
+		}
+	}
+}
+
+/**
+ * Render a single line
+ */
+const renderLine = (
+	line: number,
+	tokens: Uint16Array,
+	maxChars: number,
+	dest: Uint8ClampedArray,
+	charW: number,
+	charH: number,
+	pixelsPerChar: number,
+	scale: number,
+	deviceWidth: number,
+	deviceHeight: number
+): void => {
+	const yStart = line * charH
+	if (yStart >= deviceHeight) return
+
+	const tokenOffset = line * maxChars
+	const safeMaxChars = Math.min(maxChars, Math.ceil(deviceWidth / charW))
+	const destWidth = deviceWidth * Constants.RGBA_CHANNELS_CNT
+	const fontAtlas = getActiveAtlas()
+
+	for (let char = 0; char < safeMaxChars; char++) {
+		const val = tokens[tokenOffset + char]!
+		const charCode = val & 0xff
+
+		if (charCode <= 32) continue
+
+		const colorId = val >> 8
+		const rawColor = palette[colorId] ?? palette[0]!
+
+		const colorR = rawColor & 0xff
+		const colorG = (rawColor >> 8) & 0xff
+		const colorB = (rawColor >> 16) & 0xff
+		const foregroundAlpha = (rawColor >> 24) & 0xff
+
+		const deltaR = colorR - BACKGROUND_R
+		const deltaG = colorG - BACKGROUND_G
+		const deltaB = colorB - BACKGROUND_B
+
+		const charIndex = getCharIndex(charCode, scale)
+		const atlasOffset = charIndex * pixelsPerChar
+		const xStart = char * charW
+
+		let sourceIdx = atlasOffset
+		let rowStart = yStart * destWidth + xStart * Constants.RGBA_CHANNELS_CNT
+
+		for (let dy = 0; dy < charH; dy++) {
+			const py = yStart + dy
+			if (py >= deviceHeight) break
+
+			let destIdx = rowStart
+
+			for (let dx = 0; dx < charW; dx++) {
+				const px = xStart + dx
+				if (px >= deviceWidth) break
+
+				const charAlpha = fontAtlas[sourceIdx++]!
+				const c = (charAlpha / 255) * (foregroundAlpha / 255)
+
+				if (c > 0.02) {
+					dest[destIdx] = BACKGROUND_R + deltaR * c
+					dest[destIdx + 1] = BACKGROUND_G + deltaG * c
+					dest[destIdx + 2] = BACKGROUND_B + deltaB * c
+					dest[destIdx + 3] = Math.max(foregroundAlpha, 200)
+				}
+
+				destIdx += Constants.RGBA_CHANNELS_CNT
+			}
+
+			rowStart += destWidth
+		}
+	}
 }
 
 // ============================================================================
@@ -337,102 +526,107 @@ const waitForMinimapReady = (path: string, nonce: number) =>
 	})
 
 /**
- * Render from binary token summary with true background blending
+ * Render from binary token summary with partial repainting
  */
-const renderFromSummary = (summary: MinimapTokenSummary) => {
+const renderFromSummary = (
+	summary: MinimapTokenSummary,
+	forceFullRepaint = false
+) => {
 	if (!ctx || !canvas || !layout) {
-		console.warn('[minimap] Missing context/canvas/layout')
+		log.warn('Missing context/canvas/layout')
 		return
 	}
 
 	const { dpr, deviceWidth, deviceHeight } = layout.size
 	const scale = Math.round(dpr)
 
-	// Get or create atlas for this scale
-	if (!fontAtlas || atlasScale !== scale) {
-		fontAtlas = createFontAtlas('monospace', scale)
+	// Create atlas if needed
+	if (!fontAtlasNormal || atlasScale !== scale) {
+		createFontAtlas('monospace', scale)
 	}
 
 	const { tokens, maxChars, lineCount } = summary
 
-	ctx.setTransform(1, 0, 0, 1, 0, 0)
-	ctx.clearRect(0, 0, deviceWidth, deviceHeight)
-
-	const imageData = ctx.createImageData(deviceWidth, deviceHeight)
-	const dest = imageData.data
-
 	const charW = Constants.BASE_CHAR_WIDTH * scale
 	const charH = Constants.BASE_CHAR_HEIGHT * scale
 	const pixelsPerChar = charW * charH
-	const rows = Math.min(lineCount, Math.floor(deviceHeight / charH))
-	const destWidth = deviceWidth * Constants.RGBA_CHANNELS_CNT
 
-	for (let row = 0; row < rows; row++) {
-		const yStart = row * charH
-		const tokenOffset = row * maxChars
-		const safeMaxChars = Math.min(maxChars, Math.ceil(deviceWidth / charW))
+	// Find dirty lines
+	const dirtyLines = forceFullRepaint
+		? new Set(Array.from({ length: lineCount }, (_, i) => i))
+		: findDirtyLines(tokens, maxChars, lineCount)
 
-		for (let char = 0; char < safeMaxChars; char++) {
-			const val = tokens[tokenOffset + char]!
-			const charCode = val & 0xff
+	// Check if dimensions changed - always requires full repaint
+	const dimensionsChanged =
+		!cachedImageData ||
+		cachedImageData.width !== deviceWidth ||
+		cachedImageData.height !== deviceHeight
 
-			if (charCode <= 32) continue // Skip space/invisible
+	// Optimization: if no dirty lines AND dimensions unchanged, skip render
+	if (dirtyLines.size === 0 && !dimensionsChanged) {
+		return
+	}
 
-			const colorId = val >> 8
-			const rawColor = palette[colorId] ?? palette[0]!
+	// Full repaint if dimensions changed or too many dirty lines (threshold: 30%)
+	const fullRepaint =
+		forceFullRepaint || dimensionsChanged || dirtyLines.size > lineCount * 0.3
 
-			// Extract RGB from 0xAABBGGRR
-			const colorR = rawColor & 0xff
-			const colorG = (rawColor >> 8) & 0xff
-			const colorB = (rawColor >> 16) & 0xff
-			const foregroundAlpha = (rawColor >> 24) & 0xff
+	let imageData: ImageData
 
-			// Calculate delta from background
-			const deltaR = colorR - BACKGROUND_R
-			const deltaG = colorG - BACKGROUND_G
-			const deltaB = colorB - BACKGROUND_B
+	if (fullRepaint) {
+		// Full repaint
+		ctx.setTransform(1, 0, 0, 1, 0, 0)
+		ctx.clearRect(0, 0, deviceWidth, deviceHeight)
+		imageData = ctx.createImageData(deviceWidth, deviceHeight)
 
-			// Get atlas data
-			const charIndex = getCharIndex(charCode, scale)
-			const atlasOffset = charIndex * pixelsPerChar
+		// Render all visible lines
+		const rows = Math.min(lineCount, Math.floor(deviceHeight / charH))
+		for (let row = 0; row < rows; row++) {
+			renderLine(
+				row,
+				tokens,
+				maxChars,
+				imageData.data,
+				charW,
+				charH,
+				pixelsPerChar,
+				scale,
+				deviceWidth,
+				deviceHeight
+			)
+		}
+	} else {
+		// Partial repaint - reuse cached image data
+		imageData = cachedImageData!
 
-			const xStart = char * charW
+		// Clear and re-render only dirty lines
+		clearLines(imageData.data, dirtyLines, charH, deviceWidth, deviceHeight)
 
-			// Render character with true background blending
-			let sourceIdx = atlasOffset
-			let rowStart = yStart * destWidth + xStart * Constants.RGBA_CHANNELS_CNT
-
-			for (let dy = 0; dy < charH; dy++) {
-				let destIdx = rowStart
-
-				for (let dx = 0; dx < charW; dx++) {
-					const px = xStart + dx
-					if (px >= deviceWidth) break
-
-					// Character alpha from atlas combined with foreground alpha
-					const charAlpha = fontAtlas![sourceIdx++]!
-					const c = (charAlpha / 255) * (foregroundAlpha / 255)
-
-					if (c > 0.02) {
-						// Skip nearly invisible
-						// True background blending: bg + (fg - bg) * alpha
-						dest[destIdx] = BACKGROUND_R + deltaR * c
-						dest[destIdx + 1] = BACKGROUND_G + deltaG * c
-						dest[destIdx + 2] = BACKGROUND_B + deltaB * c
-						dest[destIdx + 3] = Math.max(foregroundAlpha, 200) // High alpha for visibility
-					}
-
-					destIdx += Constants.RGBA_CHANNELS_CNT
-				}
-
-				rowStart += destWidth
-				const py = yStart + dy + 1
-				if (py >= deviceHeight) break
+		for (const line of dirtyLines) {
+			if (line < lineCount) {
+				renderLine(
+					line,
+					tokens,
+					maxChars,
+					imageData.data,
+					charW,
+					charH,
+					pixelsPerChar,
+					scale,
+					deviceWidth,
+					deviceHeight
+				)
 			}
 		}
 	}
 
 	ctx.putImageData(imageData, 0, 0)
+
+	// Cache for next render
+	cachedImageData = imageData
+	previousTokens = new Uint16Array(tokens)
+	previousMaxChars = maxChars
+	previousLineCount = lineCount
 }
 
 // ============================================================================
@@ -461,6 +655,10 @@ const api = {
 		if (!ctx) {
 			throw new Error('Failed to get 2D context from OffscreenCanvas')
 		}
+
+		// Reset partial repaint state
+		previousTokens = null
+		cachedImageData = null
 	},
 
 	/**
@@ -495,9 +693,11 @@ const api = {
 		if (canvas) {
 			if (canvas.width !== layout.size.deviceWidth) {
 				canvas.width = layout.size.deviceWidth
+				cachedImageData = null
 			}
 			if (canvas.height !== layout.size.deviceHeight) {
 				canvas.height = layout.size.deviceHeight
+				cachedImageData = null
 			}
 		}
 	},
@@ -507,6 +707,17 @@ const api = {
 	 */
 	updatePalette(newPalette: Uint32Array) {
 		palette = newPalette
+		cachedImageData = null // Force full repaint on palette change
+	},
+
+	/**
+	 * Set font variant (light for light themes, normal for dark themes)
+	 */
+	setLightFont(isLight: boolean) {
+		if (useLightFont !== isLight) {
+			useLightFont = isLight
+			cachedImageData = null // Force full repaint on variant change
+		}
 	},
 
 	/**
@@ -522,7 +733,7 @@ const api = {
 	async renderFromPath(path: string, version: number) {
 		const nonce = ++renderNonce
 		if (!treeSitterWorker) {
-			console.warn('[minimap] Tree-sitter worker not connected')
+			log.warn('Tree-sitter worker not connected')
 			return false
 		}
 
@@ -533,7 +744,7 @@ const api = {
 			try {
 				summary = await treeSitterWorker.getMinimapSummary({ path, version })
 			} catch (err) {
-				console.error('[minimap] getMinimapSummary failed:', err)
+				log.error('getMinimapSummary failed:', err)
 				return false
 			}
 
@@ -564,6 +775,8 @@ const api = {
 	clear() {
 		if (!ctx || !canvas || !layout) return
 		ctx.clearRect(0, 0, layout.size.deviceWidth, layout.size.deviceHeight)
+		previousTokens = null
+		cachedImageData = null
 	},
 
 	/**
@@ -579,6 +792,8 @@ const api = {
 		treeSitterWorker = null
 		minimapSubscriptionId = null
 		readyWaiters.clear()
+		previousTokens = null
+		cachedImageData = null
 	},
 }
 

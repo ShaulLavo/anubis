@@ -49,7 +49,8 @@ export const Line = (props: LineProps) => {
 				transform: `translateY(${props.virtualRow.start}px)`,
 				'will-change': 'transform',
 				top: 0,
-				width: `${props.contentWidth}px`,
+				'min-width': `${props.contentWidth}px`,
+				width: '100%',
 				height: `${props.virtualRow.size || props.lineHeight}px`,
 				'tab-size': Math.max(1, props.tabSize),
 			}}

@@ -749,14 +749,11 @@ const generateMinimapSummary = (
 ): MinimapTokenSummary | undefined => {
 	const cached = astCache.get(path)
 	if (!cached) {
-		console.log(
-			'[TreeSitter] generateMinimapSummary: No cached entry for',
-			path
-		)
+		log.debug('generateMinimapSummary: No cached entry for', path)
 		return undefined
 	}
-	console.log(
-		'[TreeSitter] generateMinimapSummary: Cached entry found for',
+	log.debug(
+		'generateMinimapSummary: Cached entry found for',
 		path,
 		'Language:',
 		cached.languageId
