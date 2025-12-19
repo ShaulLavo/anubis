@@ -156,9 +156,7 @@ export const createFsMutations = ({
 				}
 
 				// Update raw content cache
-				if (filePath === state.lastKnownFilePath) {
-					setSelectedFileContent(content)
-				}
+				setSelectedFileContent(content)
 
 				// Clear dirty state
 				setDirtyPath(filePath, false)
