@@ -1,4 +1,11 @@
-import { Show, createEffect, createMemo, createSignal, onCleanup, untrack } from 'solid-js'
+import {
+	Show,
+	createEffect,
+	createMemo,
+	createSignal,
+	onCleanup,
+	untrack,
+} from 'solid-js'
 import { DEFAULT_TAB_SIZE } from '../consts'
 import { useCursor } from '../cursor'
 import { useHistory } from '../history'
@@ -167,9 +174,10 @@ export const TextEditorView = (props: EditorProps) => {
 	const handleLineMouseDown = (
 		event: MouseEvent,
 		lineIndex: number,
-		column: number
+		column: number,
+		textElement: HTMLElement | null
 	) => {
-		mouseSelection.handleMouseDown(event, lineIndex, column)
+		mouseSelection.handleMouseDown(event, lineIndex, column, textElement)
 		if (isEditable()) input.focusInput()
 	}
 
