@@ -71,4 +71,48 @@ describe('createLineHighlights', () => {
 			dispose()
 		})
 	})
+
+	it('handles large number of highlights using spatial index', () => {
+		createRoot((dispose) => {
+			const lexer = Lexer.create()
+
+			// Generate many highlights properly sorted
+			const largeHighlights = Array.from({ length: 5000 }, (_, i) => ({
+				startIndex: i * 10,
+				endIndex: i * 10 + 5,
+				scope: 'variable',
+			}))
+
+			const [highlights, setHighlights] = createSignal(largeHighlights)
+
+			const { getLineHighlights } = createLineHighlights({
+				lexer,
+				highlights,
+			})
+
+			// Test a line in the middle
+			// Line corresponds to index 2500 -> start char 25000
+			const entry = {
+				index: 0,
+				start: 25000,
+				length: 100,
+				text: ' '.repeat(100),
+			}
+			const segments = getLineHighlights(entry)
+
+			// Should return highlights falling in range [25000, 25100]
+			// i=2500 -> 25000-25005 (in range)
+			// i=2501 -> 25010-25015 (in range)
+			// ...
+			// i=2510 -> 25100-25105 (touching end)
+
+			expect(segments.length).toBeGreaterThan(0)
+
+			const firstSegment = segments[0]
+			expect(firstSegment).toBeDefined()
+			expect(firstSegment!.scope).toBe('variable')
+
+			dispose()
+		})
+	})
 })

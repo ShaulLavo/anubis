@@ -54,6 +54,44 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			.sort((a, b) => a.startIndex - b.startIndex)
 	})
 
+	let spatialIndex: Map<number, EditorSyntaxHighlight[]> = new Map()
+	let largeHighlights: EditorSyntaxHighlight[] = []
+	const SPATIAL_CHUNK_SIZE = 512
+
+	const buildSpatialIndex = (highlights: EditorSyntaxHighlight[]) => {
+		spatialIndex.clear()
+		largeHighlights = []
+
+		for (const highlight of highlights) {
+			if (
+				highlight.startIndex === undefined ||
+				highlight.endIndex === undefined ||
+				highlight.endIndex <= highlight.startIndex
+			) {
+				continue
+			}
+
+			// If a highlight spans many chunks, treat it as "large" to avoid bloating the index
+			// For example, a multi-line comment or string that spans > 10 chunks
+			if (highlight.endIndex - highlight.startIndex > SPATIAL_CHUNK_SIZE * 10) {
+				largeHighlights.push(highlight)
+				continue
+			}
+
+			const startChunk = Math.floor(highlight.startIndex / SPATIAL_CHUNK_SIZE)
+			const endChunk = Math.floor((highlight.endIndex - 1) / SPATIAL_CHUNK_SIZE)
+
+			for (let i = startChunk; i <= endChunk; i++) {
+				let bucket = spatialIndex.get(i)
+				if (!bucket) {
+					bucket = []
+					spatialIndex.set(i, bucket)
+				}
+				bucket.push(highlight)
+			}
+		}
+	}
+
 	let highlightCache = new Map<number, CachedLineHighlights>()
 	let lastHighlightsRef: EditorSyntaxHighlight[] | undefined
 	let lastErrorsRef: ErrorHighlight[] | undefined
@@ -77,6 +115,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			lastHighlightsRef = highlights
 			lastErrorsRef = errors
 			lastLexerStatesRef = lexerStates
+			buildSpatialIndex(highlights)
 		}
 
 		const cached = highlightCache.get(entry.index)
@@ -102,11 +141,35 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 		let highlightSegments: LineHighlightSegment[]
 		if (highlights.length > 0) {
+			const startChunk = Math.floor(lineStart / SPATIAL_CHUNK_SIZE)
+			const endChunk = Math.floor(
+				(lineStart + lineLength - 1) / SPATIAL_CHUNK_SIZE
+			)
+
+			const candidates: EditorSyntaxHighlight[] = []
+
+			if (largeHighlights.length > 0) {
+				candidates.push(...largeHighlights)
+			}
+
+			for (let i = startChunk; i <= endChunk; i++) {
+				const bucket = spatialIndex.get(i)
+				if (bucket) {
+					candidates.push(...bucket)
+				}
+			}
+
+			let relevantHighlights = candidates
+			if (startChunk !== endChunk) {
+				relevantHighlights = Array.from(new Set(candidates))
+			}
+			relevantHighlights.sort((a, b) => a.startIndex - b.startIndex)
+
 			highlightSegments = toLineHighlightSegmentsForLine(
 				lineStart,
 				lineLength,
 				lineTextLength,
-				highlights
+				relevantHighlights
 			)
 		} else {
 			const lineState =
