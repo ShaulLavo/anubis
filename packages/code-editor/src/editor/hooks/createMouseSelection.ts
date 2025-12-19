@@ -14,7 +14,8 @@ export type MouseSelectionHandlers = {
 	handleMouseDown: (
 		event: MouseEvent,
 		lineIndex: number,
-		column: number
+		column: number,
+		textElement: HTMLElement | null
 	) => void
 }
 
@@ -165,7 +166,8 @@ export function createMouseSelection(
 	const handleMouseDown = (
 		event: MouseEvent,
 		lineIndex: number,
-		column: number
+		column: number,
+		textElement: HTMLElement | null
 	) => {
 		if (event.button !== 0) return
 

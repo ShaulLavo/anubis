@@ -564,21 +564,22 @@ const reparseWithEditBatch = async (
 		let shiftedBrackets = cached.brackets!
 		let shiftedFolds = cached.folds!
 
+		let cumulativeCharDelta = 0
+		let cumulativeLineDelta = 0
+
 		for (const edit of edits) {
 			const charDelta = getEditCharDelta(edit)
 			const lineDelta = getEditLineDelta(edit)
 
-			shiftedCaptures = shiftCaptures(
-				shiftedCaptures,
-				edit.startIndex,
-				charDelta
-			)
-			shiftedBrackets = shiftBrackets(
-				shiftedBrackets,
-				edit.startIndex,
-				charDelta
-			)
-			shiftedFolds = shiftFolds(shiftedFolds, edit.startPosition.row, lineDelta)
+			const adjustedIndex = edit.startIndex + cumulativeCharDelta
+			const adjustedRow = edit.startPosition.row + cumulativeLineDelta
+
+			shiftedCaptures = shiftCaptures(shiftedCaptures, adjustedIndex, charDelta)
+			shiftedBrackets = shiftBrackets(shiftedBrackets, adjustedIndex, charDelta)
+			shiftedFolds = shiftFolds(shiftedFolds, adjustedRow, lineDelta)
+
+			cumulativeCharDelta += charDelta
+			cumulativeLineDelta += lineDelta
 		}
 
 		// Walk tree for errors (still useful to update error locations)
