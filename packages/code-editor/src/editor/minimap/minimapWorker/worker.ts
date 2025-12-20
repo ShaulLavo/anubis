@@ -28,7 +28,6 @@ import {
 	renderFromSummary,
 	incrementRenderNonce,
 	getCurrentNonce,
-	waitForMinimapReady,
 	wakeWaiters,
 	clearWaiters,
 } from './rendering'
@@ -172,6 +171,8 @@ const api = {
 
 	/**
 	 * Request summary from Tree-sitter and render
+	 * Returns immediately if no tree-sitter cache is available.
+	 * The caller should fall back to renderFromText for unsupported languages.
 	 */
 	async renderFromPath(path: string, version: number) {
 		const nonce = incrementRenderNonce()
@@ -180,58 +181,44 @@ const api = {
 			return false
 		}
 
-		// Try twice - once immediately, once after waiting for tree-sitter to be ready
-		for (let attempt = 0; attempt < 2; attempt++) {
-			if (nonce !== getCurrentNonce()) return false
+		if (nonce !== getCurrentNonce()) return false
 
-			let summary: MinimapTokenSummary | undefined
-			try {
-				const activeLayout = layout
-				if (!activeLayout) return false
+		let summary: MinimapTokenSummary | undefined
+		try {
+			const activeLayout = layout
+			if (!activeLayout) return false
 
-				const scale = Math.round(activeLayout.size.dpr)
-				const rowHeightDevice = Constants.BASE_CHAR_HEIGHT * scale
-				const targetLineCount = Math.max(
-					1,
-					Math.floor(activeLayout.size.deviceHeight / rowHeightDevice)
-				)
+			const scale = Math.round(activeLayout.size.dpr)
+			const rowHeightDevice = Constants.BASE_CHAR_HEIGHT * scale
+			const targetLineCount = Math.max(
+				1,
+				Math.floor(activeLayout.size.deviceHeight / rowHeightDevice)
+			)
 
-				summary = await treeSitterWorker.getMinimapSummary({
-					path,
-					version,
-					maxChars: activeLayout.maxChars,
-					targetLineCount,
-				})
-			} catch (err) {
-				log.error('getMinimapSummary failed:', err)
-				return false
-			}
-
-			if (nonce !== getCurrentNonce()) return false
-
-			if (summary) {
-				if (!ctx || !layout) {
-					log.warn('Missing context/layout')
-					return false
-				}
-				lastSummary = summary
-				renderFromSummary(summary, ctx, layout, palette, scrollY)
-				return true
-			}
-
-			// Clear canvas while waiting
-			api.clear()
-
-			// Wait for tree-sitter to notify that the file is ready
-			const becameReady = await Promise.race([
-				waitForMinimapReady(path, nonce),
-				new Promise<boolean>((resolve) =>
-					setTimeout(() => resolve(false), 2000)
-				),
-			])
-			if (!becameReady) return false
+			summary = await treeSitterWorker.getMinimapSummary({
+				path,
+				version,
+				maxChars: activeLayout.maxChars,
+				targetLineCount,
+			})
+		} catch (err) {
+			log.error('getMinimapSummary failed:', err)
+			return false
 		}
 
+		if (nonce !== getCurrentNonce()) return false
+
+		if (summary) {
+			if (!ctx || !layout) {
+				log.warn('Missing context/layout')
+				return false
+			}
+			lastSummary = summary
+			renderFromSummary(summary, ctx, layout, palette, scrollY)
+			return true
+		}
+
+		// No summary available - caller should fall back to renderFromText
 		return false
 	},
 

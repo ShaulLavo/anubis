@@ -7,6 +7,7 @@
 
 import {
 	createContext,
+	createSignal,
 	onCleanup,
 	useContext,
 	type ParentComponent,
@@ -37,6 +38,8 @@ type ScrollContextValue = {
 	setContainerHeight: (height: number) => void
 	/** Current scroll element */
 	getScrollElement: () => HTMLElement | null
+	/** Reactive scroll element accessor */
+	scrollElement: () => HTMLElement | null
 }
 
 const ScrollContext = createContext<ScrollContextValue>()
@@ -53,6 +56,8 @@ const defaultScrollState: ScrollStateStore = {
 export const ScrollStateProvider: ParentComponent = (props) => {
 	const [scrollState, setScrollState] =
 		createStore<ScrollStateStore>(defaultScrollState)
+	const [scrollElementSignal, setScrollElementSignal] =
+		createSignal<HTMLElement | null>(null)
 
 	let scrollElement: HTMLElement | null = null
 	let scrollHandler: (() => void) | null = null
@@ -74,15 +79,14 @@ export const ScrollStateProvider: ParentComponent = (props) => {
 			totalMinimapHeight
 		)
 
-		// Calculate scroll ratio
+		// Calculate scroll ratio using FULL scroll range (including overscroll)
+		// This matches the logic in scrollUtils.ts getMinimapScrollState
 		const scrollHeight = scrollElement.scrollHeight
 		const clientHeight = scrollElement.clientHeight
-		const overscrollPadding = clientHeight * 0.5
-		const actualContentHeight = scrollHeight - overscrollPadding
-		const maxActualScroll = Math.max(0, actualContentHeight - clientHeight)
+		const maxScroll = Math.max(0, scrollHeight - clientHeight)
 		const scrollRatio =
-			maxActualScroll > 0
-				? Math.min(1, Math.max(0, scrollElement.scrollTop / maxActualScroll))
+			maxScroll > 0
+				? Math.min(1, Math.max(0, scrollElement.scrollTop / maxScroll))
 				: 0
 
 		setScrollState({
@@ -99,6 +103,7 @@ export const ScrollStateProvider: ParentComponent = (props) => {
 		}
 
 		scrollElement = element
+		setScrollElementSignal(element)
 
 		if (element) {
 			scrollHandler = () => updateScrollState()
@@ -135,6 +140,7 @@ export const ScrollStateProvider: ParentComponent = (props) => {
 				setLineCount,
 				setContainerHeight,
 				getScrollElement,
+				scrollElement: scrollElementSignal,
 			}}
 		>
 			{props.children}

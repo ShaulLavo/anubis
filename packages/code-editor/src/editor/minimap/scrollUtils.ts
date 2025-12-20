@@ -39,22 +39,20 @@ export const getMinimapScrollState = (
 		return { minimapScrollTop: 0, sliderTop: 0, sliderHeight: minimapHeight }
 	}
 
-	// The editor adds 50% of viewport height as overscroll padding.
-	// We need to account for this to properly sync with the minimap.
-	const overscrollPadding = clientHeight * 0.5
-	const actualContentHeight = scrollHeight - overscrollPadding
-
-	// Calculate scroll ratio based on actual content, not the padded scroll area
-	const maxActualScroll = Math.max(0, actualContentHeight - clientHeight)
-	const clampedScrollTop = Math.min(scrollTop, maxActualScroll)
-	const scrollRatio =
-		maxActualScroll > 0 ? clampedScrollTop / maxActualScroll : 0
+	// Use the FULL scroll range including overscroll padding.
+	// This way the scrollbar/minimap track the entire scrollable area,
+	// not just the content - they hit bottom when scroll hits bottom.
+	const maxScroll = Math.max(0, scrollHeight - clientHeight)
+	const scrollRatio = maxScroll > 0 ? Math.min(1, scrollTop / maxScroll) : 0
 
 	// How much the minimap content needs to scroll to show the end of the document
 	const maxMinimapScroll = Math.max(0, totalMinimapHeight - minimapHeight)
 	const minimapScrollTop = scrollRatio * maxMinimapScroll
 
 	// Slider height: proportional to how much of the document is visible
+	// based on actual content, not including overscroll padding
+	const overscrollPadding = clientHeight * 0.5
+	const actualContentHeight = scrollHeight - overscrollPadding
 	const sliderHeight = Math.max(
 		MINIMAP_MIN_SLIDER_HEIGHT_CSS,
 		(clientHeight / actualContentHeight) * totalMinimapHeight
@@ -86,14 +84,10 @@ export const computeScrollOffset = (
 
 	if (scrollHeight <= clientHeight) return 0
 
-	// Account for editor's overscroll padding
-	const overscrollPadding = clientHeight * 0.5
-	const actualContentHeight = scrollHeight - overscrollPadding
-	const maxActualScroll = Math.max(0, actualContentHeight - clientHeight)
+	// Use FULL scroll range including overscroll (matches getMinimapScrollState)
+	const maxScroll = Math.max(0, scrollHeight - clientHeight)
 	const scrollRatio =
-		maxActualScroll > 0
-			? Math.min(1, Math.max(0, element.scrollTop / maxActualScroll))
-			: 0
+		maxScroll > 0 ? Math.min(1, Math.max(0, element.scrollTop / maxScroll)) : 0
 
 	// Worker's formula: maxScroll = lineCount * charH - deviceHeight
 	const charH = MINIMAP_ROW_HEIGHT_CSS * scale

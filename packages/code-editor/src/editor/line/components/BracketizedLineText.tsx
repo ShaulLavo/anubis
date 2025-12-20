@@ -71,7 +71,9 @@ const normalizeHighlightSegments = (
 const buildTextRuns = (
 	text: string,
 	depthMap: LineBracketDepthMap | undefined,
-	highlights: NormalizedHighlightSegment[]
+	highlights: NormalizedHighlightSegment[],
+	startIndex: number,
+	endIndex: number
 ): TextRun[] => {
 	if (text.length === 0) return []
 
@@ -79,10 +81,22 @@ const buildTextRuns = (
 	let currentRun: TextRun | null = null
 
 	let highlightIdx = 0
-	const numHighlights = highlights.length
-	let currentHighlight: NormalizedHighlightSegment | undefined = highlights[0]
+	// Optimization: Skip highlights that end before our start index
+	while (
+		highlightIdx < highlights.length &&
+		highlights[highlightIdx]!.end <= startIndex
+	) {
+		highlightIdx++
+	}
 
-	for (let i = 0; i < text.length; i++) {
+	const numHighlights = highlights.length
+	let currentHighlight: NormalizedHighlightSegment | undefined =
+		highlightIdx < numHighlights ? highlights[highlightIdx] : undefined
+
+	// Clamp endIndex to text length
+	const actualEndIndex = Math.min(text.length, endIndex)
+
+	for (let i = startIndex; i < actualEndIndex; i++) {
 		// 1. Advance the highlight cursor if we've passed the current one
 		while (currentHighlight && i >= currentHighlight.end) {
 			highlightIdx++
@@ -178,6 +192,8 @@ type BracketizedLineTextProps = {
 	text: string
 	bracketDepths?: LineBracketDepthMap
 	highlightSegments?: LineHighlightSegment[]
+	columnStart?: number
+	columnEnd?: number
 }
 
 export const BracketizedLineText = (props: BracketizedLineTextProps) => {
@@ -195,8 +211,11 @@ export const BracketizedLineText = (props: BracketizedLineTextProps) => {
 			text.length
 		)
 
+		const startIndex = Math.max(0, props.columnStart ?? 0)
+		const endIndex = props.columnEnd ?? text.length
+
 		// Build optimized text runs - groups consecutive chars with same styling
-		const runs = buildTextRuns(text, depthMap, highlights)
+		const runs = buildTextRuns(text, depthMap, highlights, startIndex, endIndex)
 
 		// Fast path: single unstyled run = just return the text
 		const firstRun = runs[0]

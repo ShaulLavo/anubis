@@ -35,6 +35,12 @@ export const Line = (props: LineProps) => {
 		props.onPreciseClick(props.entry.index, column, event.shiftKey)
 	}
 
+	// Cast to any to access 2D virtual properties if they exist
+	const virtualRowAny = props.virtualRow as any
+	const columnStart = virtualRowAny.columnStart ?? 0
+	const columnEnd = virtualRowAny.columnEnd
+	const xOffset = columnStart * props.charWidth
+
 	return (
 		<div
 			ref={(el) => {
@@ -46,7 +52,7 @@ export const Line = (props: LineProps) => {
 				'cursor-text': props.isEditable(),
 			}}
 			style={{
-				transform: `translateY(${props.virtualRow.start}px)`,
+				transform: `translate(${xOffset}px, ${props.virtualRow.start}px)`,
 				'will-change': 'transform',
 				top: 0,
 				'min-width': `${props.contentWidth}px`,
@@ -60,6 +66,8 @@ export const Line = (props: LineProps) => {
 				text={props.entry.text}
 				bracketDepths={props.lineBracketDepths}
 				highlightSegments={props.highlights}
+				columnStart={columnStart}
+				columnEnd={columnEnd}
 			/>
 		</div>
 	)

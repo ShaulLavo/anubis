@@ -6,8 +6,10 @@
  */
 
 import { clsx } from 'clsx'
-import { createSignal, type JSX } from 'solid-js'
+import { createEffect, createSignal, onCleanup, type JSX } from 'solid-js'
+import { loggers } from '@repo/logger'
 import { useScrollState } from './ScrollState'
+import styles from './Scrollbar.module.css'
 
 export type ScrollbarProps = {
 	/** Width of the scrollbar in pixels */
@@ -20,9 +22,11 @@ export type ScrollbarProps = {
 
 const SCROLLBAR_WIDTH = 14
 const SCROLLBAR_MIN_THUMB_HEIGHT = 20
+const NATIVE_SCROLLBAR_HIDE_CLASS = styles['scrollbar-hidden']!
 
 export const Scrollbar = (props: ScrollbarProps) => {
-	const { scrollState, getScrollElement } = useScrollState()
+	const { scrollState, scrollElement } = useScrollState()
+	const log = loggers.codeEditor.withTag('scrollbar')
 
 	const [isHovered, setIsHovered] = createSignal(false)
 	const [isDragging, setIsDragging] = createSignal(false)
@@ -36,16 +40,66 @@ export const Scrollbar = (props: ScrollbarProps) => {
 		| undefined
 
 	let containerRef: HTMLDivElement | undefined
+	let lastScrollElement: HTMLElement | null = null
+	let warnedMissingClass = false
 
 	// Read from shared store
 	const thumbTop = () => scrollState.sliderTop
 	const thumbHeight = () =>
 		Math.max(SCROLLBAR_MIN_THUMB_HEIGHT, scrollState.sliderHeight)
 
+	const syncNativeScrollbar = (element: HTMLElement | null) => {
+		if (!NATIVE_SCROLLBAR_HIDE_CLASS) {
+			if (!warnedMissingClass) {
+				warnedMissingClass = true
+				const message = 'Scrollbar CSS module class is missing'
+				log.warn(message)
+				console.assert(false, message)
+			}
+			return
+		}
+		if (element === lastScrollElement) return
+
+		if (lastScrollElement) {
+			lastScrollElement.classList.remove(NATIVE_SCROLLBAR_HIDE_CLASS)
+			log.debug('Native scrollbar restored', {
+				className: NATIVE_SCROLLBAR_HIDE_CLASS,
+			})
+		}
+
+		lastScrollElement = element
+		if (!element) return
+
+		element.classList.add(NATIVE_SCROLLBAR_HIDE_CLASS)
+		log.debug('Native scrollbar disabled', {
+			className: NATIVE_SCROLLBAR_HIDE_CLASS,
+		})
+	}
+
+	const getScrollElementOrWarn = (context: string) => {
+		const element = scrollElement()
+		if (!element) {
+			const message = `Scrollbar ${context} ignored: missing scroll element`
+			log.warn(message)
+			console.assert(false, message)
+			return null
+		}
+		return element
+	}
+
+	createEffect(() => {
+		syncNativeScrollbar(scrollElement())
+	})
+
+	onCleanup(() => {
+		if (!lastScrollElement) return
+		lastScrollElement.classList.remove(NATIVE_SCROLLBAR_HIDE_CLASS)
+	})
+
 	const handlePointerDown = (event: PointerEvent) => {
 		event.preventDefault()
 
-		const element = getScrollElement()
+		const element = getScrollElementOrWarn('pointer-down')
 		if (!element || !containerRef) return
 
 		const rect = containerRef.getBoundingClientRect()
@@ -85,7 +139,7 @@ export const Scrollbar = (props: ScrollbarProps) => {
 	const handlePointerMove = (event: PointerEvent) => {
 		if (!dragState || event.pointerId !== dragState.pointerId) return
 
-		const element = getScrollElement()
+		const element = getScrollElementOrWarn('pointer-move')
 		if (!element || !containerRef) return
 
 		const rect = containerRef.getBoundingClientRect()
@@ -120,7 +174,7 @@ export const Scrollbar = (props: ScrollbarProps) => {
 
 	const handleWheel = (event: WheelEvent) => {
 		event.preventDefault()
-		const element = getScrollElement()
+		const element = getScrollElementOrWarn('wheel')
 		if (element) {
 			element.scrollTop += event.deltaY
 		}
