@@ -14,9 +14,8 @@ import { useFsRefresh } from '../hooks/useFsRefresh'
 import { createFileCacheController } from '../cache/fileCacheController'
 import { LocalDirectoryFallbackModal } from '../components/LocalDirectoryFallbackModal'
 import { findNode } from '../runtime/tree'
-import { useFileSystemObserver } from '../hooks/useFileSystemObserver'
 import { getRootHandle } from '../runtime/fsRuntime'
-
+import { useFileSystemObserver } from '../hooks/useFileSystemObserver'
 export function FsProvider(props: { children: JSX.Element }) {
 	const {
 		state,

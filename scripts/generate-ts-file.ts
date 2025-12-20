@@ -16,7 +16,7 @@ const fileName =
 	formatBytes(targetBytes)
 		.toLowerCase()
 		.replace(/\.\d+/g, '') // drop decimals: "97.7 kb" -> "97 kb"
-		.replace(/\s+/g, '') + '.ts' // "97 kb" -> "97kb.ts"
+		.replace(/\s+/g, '') + '.generated.ts' // "97 kb" -> "97kb.generated.ts"
 
 const outPath = `${process.cwd()}/${fileName}`
 const chunks: string[] = []

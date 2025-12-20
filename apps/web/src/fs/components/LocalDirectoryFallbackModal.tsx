@@ -1,8 +1,17 @@
-import { createMemo, createSignal, onCleanup, type Component, type JSX } from 'solid-js'
+import {
+	createMemo,
+	createSignal,
+	onCleanup,
+	type Component,
+	type JSX,
+} from 'solid-js'
 import { logger } from '~/logger'
 import { modal } from '@repo/ui/modal'
 import { importDirectoryToMemory } from '../fallback/importDirectoryToMemory'
-import { importDirectoryToOpfs, hasOpfsAccess } from '../fallback/importDirectoryToOpfs'
+import {
+	importDirectoryToOpfs,
+	hasOpfsAccess,
+} from '../fallback/importDirectoryToOpfs'
 import {
 	registerLocalDirectoryFallback,
 	unregisterLocalDirectoryFallback,
@@ -24,9 +33,8 @@ type PendingRequest = {
 }
 
 export const LocalDirectoryFallbackModal: Component = () => {
-	const [reason, setReason] = createSignal<LocalDirectoryFallbackReason>(
-		'unsupported'
-	)
+	const [reason, setReason] =
+		createSignal<LocalDirectoryFallbackReason>('unsupported')
 	const [error, setError] = createSignal<string | undefined>()
 	const [processing, setProcessing] = createSignal(false)
 	const [pendingMode, setPendingMode] = createSignal<FallbackMode>()
@@ -137,11 +145,12 @@ export const LocalDirectoryFallbackModal: Component = () => {
 						<>
 							<p class="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
 								This browser only supports the temporary memory import. Load a
-								folder to edit it for this session; the workspace will reset
-								as soon as you reload and changes won't sync to disk.
+								folder to edit it for this session; the workspace will reset as
+								soon as you reload and changes won't sync to disk.
 							</p>
 							<p class="text-[11px] text-zinc-400">
-								For persistent access, open this app in a Chromium-based browser.
+								For persistent access, open this app in a Chromium-based
+								browser.
 							</p>
 						</>
 					) : (
@@ -213,6 +222,10 @@ export const LocalDirectoryFallbackModal: Component = () => {
 		} catch (err) {
 			// If user cancelled the confirmation, just reset the pending mode
 			if (err instanceof Error && err.message.includes('cancelled by user')) {
+				if (pending) {
+					pending.reject(err)
+					pending = null
+				}
 				setError(undefined)
 			} else {
 				log.error(FALLBACK_ERROR, err)

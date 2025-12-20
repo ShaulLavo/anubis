@@ -46,6 +46,7 @@
 - No global test runner is enforced yet; prefer adding tests close to the code (`*.test.ts` / `*.test.tsx`).
 - When introducing tests to a package, add a `test` script to that package and document how to run it in the README.
 - Keep tests fast and deterministic; avoid hitting real external services.
+- **Never run browser tasks/tests unless explicitly asked.** If a browser test is needed, ask the user to run it and provide the exact command.
 
 ## Commit & Pull Request Guidelines
 

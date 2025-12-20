@@ -38,7 +38,5 @@ yarn-error.log*
 # Misc
 .DS_Store
 *.pem
-*gb.ts
-*mb.ts
-*kb.ts
-*b.ts
+# Generated files from scripts/generate-ts-file.ts
+*.generated.ts

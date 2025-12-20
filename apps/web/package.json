@@ -9,6 +9,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
     "copy-tree-sitter-assets": "bun scripts/install-tree-sitter-assets.ts",
     "postinstall": "bun run copy-tree-sitter-assets",
     "depcheck": "depcheck",

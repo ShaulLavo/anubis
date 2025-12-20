@@ -1,4 +1,5 @@
 import * as DialogPrimitive from '@kobalte/core/dialog'
+import { VsClose } from '@repo/icons/vs/VsClose'
 import { createRoot, For, Show, type Component } from 'solid-js'
 import { Button } from './button'
 import { cn } from './lib/utils'
@@ -26,6 +27,12 @@ const isPromise = (value: unknown): value is Promise<unknown> => {
 
 const runAction = (action: ModalAction, id: string) => {
 	try {
+		const current = modalStore.state()
+		console.assert(
+			current && current.id === id,
+			'[modal] action invoked for unknown modal'
+		)
+		console.info('[modal] action', { id, actionId: action.id })
 		const result = action.onPress?.()
 		if (action.autoClose === false) return
 		if (isPromise(result)) {
@@ -77,21 +84,23 @@ const Modal: Component = () => {
 								onFocusOutside={preventDismiss}
 								onInteractOutside={preventDismiss}
 							>
-								<DialogPrimitive.Title class="text-lg font-semibold leading-none tracking-tight">
-									{resolveValue(state().options.heading)}
-								</DialogPrimitive.Title>
-								<Show when={resolveValue(state().options.body)}>
-									{(body) => (
-										<DialogPrimitive.Description
-											as="div"
-											class="text-sm text-muted-foreground"
-										>
-											{body()}
-										</DialogPrimitive.Description>
-									)}
-								</Show>
+								<div class="flex flex-col space-y-1.5 text-center sm:text-left">
+									<DialogPrimitive.Title class="text-lg font-semibold leading-none tracking-tight">
+										{resolveValue(state().options.heading)}
+									</DialogPrimitive.Title>
+									<Show when={resolveValue(state().options.body)}>
+										{(body) => (
+											<DialogPrimitive.Description
+												as="div"
+												class="text-sm text-muted-foreground"
+											>
+												{body()}
+											</DialogPrimitive.Description>
+										)}
+									</Show>
+								</div>
 								<Show when={state().options.actions?.length}>
-									<div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+									<div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
 										<For each={state().options.actions}>
 											{(action) => (
 												<Button
@@ -108,6 +117,10 @@ const Modal: Component = () => {
 										</For>
 									</div>
 								</Show>
+								<DialogPrimitive.CloseButton class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[expanded]:bg-accent data-[expanded]:text-muted-foreground">
+									<VsClose class="size-4" />
+									<span class="sr-only">Close</span>
+								</DialogPrimitive.CloseButton>
 							</DialogPrimitive.Content>
 						</div>
 					</DialogPrimitive.Portal>

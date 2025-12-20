@@ -39,4 +39,15 @@ describe('createModalStore', () => {
 			expect(onDismiss).toHaveBeenCalledTimes(1)
 		})
 	})
+
+	it('ignores updates and dismissals for unknown ids', () => {
+		withStore((store) => {
+			const id = store.open({ heading: 'Keep me' })
+			store.update('modal-unknown', { heading: 'Nope' })
+			store.dismiss('modal-unknown')
+			const state = store.state()
+			expect(state?.id).toBe(id)
+			expect(state?.options.heading).toBe('Keep me')
+		})
+	})
 })
