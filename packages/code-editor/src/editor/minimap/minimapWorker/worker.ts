@@ -129,21 +129,33 @@ const api = {
 	},
 
 	/**
-	 * Update scroll position using ratio (0-1) and line count
-	 * The worker calculates the actual scrollY using its own deviceHeight
+	 * Update scroll position
 	 */
-	updateScroll(scrollRatio: number, lineCount: number) {
-		if (!layout) return
+	updateScroll(scrollTop: number) {
+		if (scrollY === scrollTop) return
 
-		const scale = Math.round(layout.size.dpr)
-		const charH = Constants.BASE_CHAR_HEIGHT * scale
-		const deviceHeight = layout.size.deviceHeight
-		const totalMinimapHeight = lineCount * charH
-		const maxScroll = Math.max(0, totalMinimapHeight - deviceHeight)
-		const newScrollY = Math.round(scrollRatio * maxScroll)
+		scrollY = scrollTop
 
-		if (scrollY === newScrollY) return
-		scrollY = newScrollY
+		// DEBUG: Log worker scroll state
+		if (lastSummary && layout) {
+			const scale = Math.round(layout.size.dpr)
+			const charH = Constants.BASE_CHAR_HEIGHT * scale
+			const deviceHeight = layout.size.deviceHeight
+			const maxLine = lastSummary.lineCount - 1
+			const lastLineY = maxLine * charH - scrollY
+			console.log('[Worker Scroll Debug]', {
+				scrollY,
+				scale,
+				charH,
+				deviceHeight,
+				lineCount: lastSummary.lineCount,
+				// Last line position after scroll
+				lastLineY,
+				lastLineVisible: lastLineY >= 0 && lastLineY < deviceHeight,
+				// First visible line
+				firstVisibleLine: Math.floor(scrollY / charH),
+			})
+		}
 
 		if (lastSummary && ctx && layout) {
 			renderFromSummary(lastSummary, ctx, layout, palette, scrollY)
