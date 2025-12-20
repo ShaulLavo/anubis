@@ -436,6 +436,9 @@ export const Minimap = (props: MinimapProps) => {
 
 	// Pointer event handlers for slider interaction
 	const handlePointerDown = (event: PointerEvent) => {
+		// Prevent default to preserve editor selection when clicking minimap
+		event.preventDefault()
+
 		const element = props.scrollElement()
 		if (!element) return
 
@@ -445,7 +448,7 @@ export const Minimap = (props: MinimapProps) => {
 		const lineCount = cursor.lines.lineCount()
 		const totalMinimapHeight = lineCount * MINIMAP_ROW_HEIGHT_CSS
 
-		const { sliderTop, sliderHeight } = getMinimapScrollState(
+		const { minimapScrollTop, sliderTop, sliderHeight } = getMinimapScrollState(
 			element,
 			size.height,
 			totalMinimapHeight
@@ -463,19 +466,23 @@ export const Minimap = (props: MinimapProps) => {
 			;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
 			setIsDragging(true)
 		} else {
-			// Click outside slider - jump to that position (relative to view)
-			const centerY = localY - sliderHeight / 2
-			const maxSliderTop = Math.max(0, size.height - sliderHeight)
-			const ratio = maxSliderTop > 0 ? centerY / maxSliderTop : 0
+			// Click outside slider - jump to the exact text clicked
+			// The clicked position on the minimap represents: minimapScrollTop + localY (in CSS pixels)
+			// Convert to a line number, then scroll to center that line in the editor
+			const clickedMinimapY = minimapScrollTop + localY
+			const clickedLine = Math.floor(clickedMinimapY / MINIMAP_ROW_HEIGHT_CSS)
 
-			const scrollHeight = element.scrollHeight
+			// Get the Y position of that line in the editor
+			// Approximate: each line height in editor is roughly scrollHeight / lineCount
+			const editorLineHeight = element.scrollHeight / lineCount
+			const targetY = clickedLine * editorLineHeight
+
+			// Put the clicked line at the top of the viewport
 			const clientHeight = element.clientHeight
+			const scrollHeight = element.scrollHeight
 			const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
 
-			element.scrollTop = Math.max(
-				0,
-				Math.min(maxScrollTop, ratio * maxScrollTop)
-			)
+			element.scrollTop = Math.max(0, Math.min(maxScrollTop, targetY))
 		}
 	}
 
