@@ -33,6 +33,8 @@ export type MinimapWorkerController = {
 	updateLayout: (layout: MinimapLayout) => Promise<void>
 	/** Update color palette */
 	updatePalette: (palette: Uint32Array) => Promise<void>
+	/** Update scroll position */
+	updateScroll: (scrollTop: number) => Promise<void>
 	/** Render from token summary */
 	renderSummary: (summary: MinimapTokenSummary) => Promise<void>
 	/** Request render from Tree-sitter by path */
@@ -127,6 +129,13 @@ export const useMinimapWorker = (
 	}
 
 	/**
+	 * Update scroll position
+	 */
+	const updateScroll = async (scrollTop: number) => {
+		await api?.updateScroll(scrollTop)
+	}
+
+	/**
 	 * Update color palette
 	 */
 	const updatePalette = async (palette: Uint32Array) => {
@@ -192,6 +201,7 @@ export const useMinimapWorker = (
 		connectTreeSitter,
 		updateLayout,
 		updatePalette,
+		updateScroll,
 		renderSummary,
 		renderFromPath,
 		renderFromText,

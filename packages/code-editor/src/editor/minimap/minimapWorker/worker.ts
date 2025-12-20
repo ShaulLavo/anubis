@@ -44,6 +44,10 @@ let ctx: OffscreenCanvasRenderingContext2D | null = null
 let layout: MinimapLayout | null = null
 let palette: Uint32Array = MINIMAP_DEFAULT_PALETTE
 
+// Scroll state
+let scrollY = 0
+let lastSummary: MinimapTokenSummary | null = null
+
 // Tree-sitter worker proxy for direct communication
 let treeSitterWorker: Remote<TreeSitterMinimapApi> | null = null
 let minimapSubscriptionId: number | null = null
@@ -126,6 +130,20 @@ const api = {
 	},
 
 	/**
+	 * Update scroll position
+	 */
+	updateScroll(scrollTop: number) {
+		if (scrollY === scrollTop) return
+
+		scrollY = scrollTop
+		invalidateCache() // Force repaint on scroll
+
+		if (lastSummary && ctx && layout) {
+			renderFromSummary(lastSummary, ctx, layout, palette, scrollY)
+		}
+	},
+
+	/**
 	 * Update color palette
 	 */
 	updatePalette(newPalette: Uint32Array) {
@@ -150,7 +168,8 @@ const api = {
 			log.warn('Missing context/layout')
 			return
 		}
-		renderFromSummary(summary, ctx, layout, palette)
+		lastSummary = summary
+		renderFromSummary(summary, ctx, layout, palette, scrollY)
 	},
 
 	/**
@@ -197,7 +216,8 @@ const api = {
 					log.warn('Missing context/layout')
 					return false
 				}
-				renderFromSummary(summary, ctx, layout, palette)
+				lastSummary = summary
+				renderFromSummary(summary, ctx, layout, palette, scrollY)
 				return true
 			}
 
@@ -240,7 +260,8 @@ const api = {
 			})
 
 			if (summary) {
-				renderFromSummary(summary, ctx, activeLayout, palette)
+				lastSummary = summary
+				renderFromSummary(summary, ctx, activeLayout, palette, scrollY)
 				return true
 			}
 		} catch (err) {

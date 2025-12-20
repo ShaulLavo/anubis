@@ -3,46 +3,43 @@ import { useCursor } from '../cursor'
 import type { MinimapProps } from './types'
 import { useMinimapWorker } from './useMinimapWorker'
 import type { MinimapLayout } from './workerTypes'
-import { autoHide } from '@repo/utils/dom'
 
 const MINIMAP_ROW_HEIGHT_CSS = 2
 const MINIMAP_PADDING_X_CSS = 3
 const MINIMAP_MIN_SLIDER_HEIGHT_CSS = 18
 const MINIMAP_MAX_CHARS = 160
 
-const clamp = (value: number, min: number, max: number) =>
-	Math.min(max, Math.max(min, value))
-
-const getDrawingHeightCss = (containerHeightCss: number, lineCount: number) => {
-	if (containerHeightCss <= 0) return 0
-	if (lineCount <= 0) return containerHeightCss
-	return Math.min(containerHeightCss, lineCount * MINIMAP_ROW_HEIGHT_CSS)
-}
-
-const getSliderGeometry = (element: HTMLDivElement, heightCss: number) => {
+// Helper to map editor scroll to minimap scroll
+const getMinimapScrollState = (
+	element: HTMLElement,
+	minimapHeight: number,
+	totalMinimapHeight: number
+) => {
 	const scrollHeight = element.scrollHeight
 	const clientHeight = element.clientHeight
 	const scrollTop = element.scrollTop
 
-	if (scrollHeight <= 0 || clientHeight <= 0 || heightCss <= 0) {
-		return { sliderTop: 0, sliderHeight: heightCss, scrollTop, scrollHeight }
+	// If editor content fits, no scroll
+	if (scrollHeight <= clientHeight) {
+		return { minimapScrollTop: 0, sliderTop: 0, sliderHeight: minimapHeight }
 	}
 
-	const ratio = clamp(clientHeight / scrollHeight, 0, 1)
-	const sliderHeight = clamp(
-		heightCss * ratio,
+	const scrollRatio = scrollTop / (scrollHeight - clientHeight)
+	const maxMinimapScroll = Math.max(0, totalMinimapHeight - minimapHeight)
+	const minimapScrollTop = scrollRatio * maxMinimapScroll
+
+	// Total minimap height (lines * 2) -> Scroll Height
+	// Viewport height -> Slider Height
+	const sliderHeight = Math.max(
 		MINIMAP_MIN_SLIDER_HEIGHT_CSS,
-		heightCss
+		(clientHeight / scrollHeight) * minimapHeight // This scales slider by view ratio
 	)
 
-	const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
-	const maxSliderTop = Math.max(0, heightCss - sliderHeight)
-	const sliderTop =
-		maxScrollTop === 0
-			? 0
-			: clamp((scrollTop / maxScrollTop) * maxSliderTop, 0, maxSliderTop)
+	// Slider visual position within the container:
+	// It should move from 0 to (minimapHeight - sliderHeight)
+	const sliderTop = scrollRatio * (minimapHeight - sliderHeight)
 
-	return { sliderTop, sliderHeight, scrollTop, scrollHeight }
+	return { minimapScrollTop, sliderTop, sliderHeight }
 }
 
 /**
@@ -61,6 +58,7 @@ export const Minimap = (props: MinimapProps) => {
 	const [overlayCanvas, setOverlayCanvas] =
 		createSignal<HTMLCanvasElement | null>(null)
 	const [overlayVisible, setOverlayVisible] = createSignal(false)
+	const [isDragging, setIsDragging] = createSignal(false)
 
 	// Worker manages the base canvas rendering
 	const [workerActive, setWorkerActive] = createSignal(false)
@@ -138,7 +136,6 @@ export const Minimap = (props: MinimapProps) => {
 
 	// Initialize worker and transfer base canvas
 	onMount(async () => {
-		autoHide(container()!)
 		const canvas = baseCanvas()
 		if (!canvas) return
 
@@ -263,11 +260,14 @@ export const Minimap = (props: MinimapProps) => {
 		const lineCount = cursor.lines.lineCount()
 		if (lineCount <= 0) return
 
-		const drawingHeight = getDrawingHeightCss(containerHeight, lineCount)
-		const { sliderTop, sliderHeight } = getSliderGeometry(
+		const totalMinimapHeight = lineCount * MINIMAP_ROW_HEIGHT_CSS
+
+		const { minimapScrollTop, sliderTop, sliderHeight } = getMinimapScrollState(
 			element,
-			drawingHeight
+			containerHeight, // The visible height of the minimap container
+			totalMinimapHeight
 		)
+
 		const sliderXCss = 1
 		const sliderWidthCss = Math.max(1, width - 2)
 
@@ -283,20 +283,28 @@ export const Minimap = (props: MinimapProps) => {
 		ctx.lineWidth = Math.max(1, Math.round(1 * dpr))
 		ctx.strokeRect(x, y, w, h)
 
+		// Apply scroll offset to line drawing
+		// We need to shift everything up by minimapScrollTop
+		const scrollOffset = minimapScrollTop * dpr
 		const rowHeight = MINIMAP_ROW_HEIGHT_CSS
-		const rows = Math.max(1, Math.floor(drawingHeight / rowHeight))
-		const ratio = lineCount > rows ? lineCount / rows : 1
 
 		// Helper to convert model line to minimap Y position
-		const lineToMinimapY = (line: number) => (line / ratio) * rowHeight * dpr
+		// This projects the line onto the CANVAS, applying scroll
+		const lineToMinimapY = (line: number) => {
+			const absoluteY = line * rowHeight * dpr
+			return absoluteY - scrollOffset
+		}
 
 		// Draw cursor line highlight
 		const cursorLine = cursor.state.position.line
 		const cursorY = lineToMinimapY(cursorLine)
 		const cursorHeight = Math.max(1, Math.round(rowHeight * dpr))
 
-		ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
-		ctx.fillRect(x, cursorY, w, cursorHeight)
+		// Only draw if visible
+		if (cursorY + cursorHeight >= 0 && cursorY < deviceHeight) {
+			ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'
+			ctx.fillRect(x, cursorY, w, cursorHeight)
+		}
 
 		// Draw selection ranges - more prominent
 		const selections = cursor.state.selections
@@ -368,12 +376,32 @@ export const Minimap = (props: MinimapProps) => {
 		)
 	)
 
-	// Re-render overlay on scroll
+	// Re-render overlay and sync worker on scroll
 	createEffect(() => {
 		const element = props.scrollElement()
 		if (!element) return
 
-		const handleScroll = () => scheduleOverlayRender()
+		const handleScroll = () => {
+			scheduleOverlayRender()
+
+			// Sync scroll to worker
+			const host = container()
+			if (host) {
+				const rect = host.getBoundingClientRect()
+				const minimapHeight = rect.height
+				const lineCount = cursor.lines.lineCount()
+				const totalMinimapHeight = lineCount * MINIMAP_ROW_HEIGHT_CSS
+
+				const { minimapScrollTop } = getMinimapScrollState(
+					element,
+					minimapHeight,
+					totalMinimapHeight
+				)
+
+				const dpr = window.devicePixelRatio || 1
+				void worker.updateScroll(minimapScrollTop * dpr)
+			}
+		}
 		element.addEventListener('scroll', handleScroll, { passive: true })
 
 		onCleanup(() => {
@@ -390,13 +418,15 @@ export const Minimap = (props: MinimapProps) => {
 		if (!size) return
 
 		const lineCount = cursor.lines.lineCount()
-		const drawingHeight = getDrawingHeightCss(size.height, lineCount)
-		const { sliderTop, sliderHeight } = getSliderGeometry(
+		const totalMinimapHeight = lineCount * MINIMAP_ROW_HEIGHT_CSS
+
+		const { sliderTop, sliderHeight } = getMinimapScrollState(
 			element,
-			drawingHeight
+			size.height,
+			totalMinimapHeight
 		)
 		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-		const localY = clamp(event.clientY - rect.top, 0, drawingHeight)
+		const localY = Math.max(0, Math.min(size.height, event.clientY - rect.top))
 		const isOnSlider = localY >= sliderTop && localY <= sliderTop + sliderHeight
 
 		if (isOnSlider) {
@@ -406,15 +436,21 @@ export const Minimap = (props: MinimapProps) => {
 				sliderHeight,
 			}
 			;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
+			setIsDragging(true)
 		} else {
-			// Click outside slider - smooth scroll to that position
+			// Click outside slider - jump to that position (relative to view)
+			const centerY = localY - sliderHeight / 2
+			const maxSliderTop = Math.max(0, size.height - sliderHeight)
+			const ratio = maxSliderTop > 0 ? centerY / maxSliderTop : 0
+
 			const scrollHeight = element.scrollHeight
 			const clientHeight = element.clientHeight
 			const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
-			const newSliderTop = localY - sliderHeight / 2
-			const maxSliderTop = Math.max(0, drawingHeight - sliderHeight)
-			const ratio = maxSliderTop > 0 ? newSliderTop / maxSliderTop : 0
-			element.scrollTop = clamp(ratio * maxScrollTop, 0, maxScrollTop)
+
+			element.scrollTop = Math.max(
+				0,
+				Math.min(maxScrollTop, ratio * maxScrollTop)
+			)
 		}
 	}
 
@@ -428,17 +464,28 @@ export const Minimap = (props: MinimapProps) => {
 		if (!size) return
 
 		const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-		const lineCount = cursor.lines.lineCount()
-		const drawingHeight = getDrawingHeightCss(size.height, lineCount)
-		const localY = clamp(event.clientY - rect.top, 0, drawingHeight)
+
+		// For dragging, we revert the slider logic:
+		// sliderTop / (minimapHeight - sliderHeight) = scrollRatio
+		// newScrollTop = scrollRatio * maxScrollTop
+
+		const localY = Math.max(0, Math.min(size.height, event.clientY - rect.top))
 		const newSliderTop = localY - dragState.dragOffsetY
+
+		const minimapHeight = size.height
+		// const sliderHeight = dragState.sliderHeight // Use stored height
+
+		const maxSliderTop = Math.max(0, minimapHeight - dragState.sliderHeight)
+		const ratio = maxSliderTop > 0 ? newSliderTop / maxSliderTop : 0
 
 		const scrollHeight = element.scrollHeight
 		const clientHeight = element.clientHeight
 		const maxScrollTop = Math.max(0, scrollHeight - clientHeight)
-		const maxSliderTop = Math.max(0, drawingHeight - dragState.sliderHeight)
-		const ratio = maxSliderTop > 0 ? newSliderTop / maxSliderTop : 0
-		element.scrollTop = clamp(ratio * maxScrollTop, 0, maxScrollTop)
+
+		element.scrollTop = Math.max(
+			0,
+			Math.min(maxScrollTop, ratio * maxScrollTop)
+		)
 	}
 
 	const handlePointerUp = (event: PointerEvent) => {
@@ -447,6 +494,15 @@ export const Minimap = (props: MinimapProps) => {
 				event.pointerId
 			)
 			dragState = undefined
+			setIsDragging(false)
+		}
+	}
+
+	const handleWheel = (event: WheelEvent) => {
+		event.preventDefault()
+		const element = props.scrollElement()
+		if (element) {
+			element.scrollTop += event.deltaY
 		}
 	}
 
@@ -456,29 +512,29 @@ export const Minimap = (props: MinimapProps) => {
 
 	return (
 		<div
-			class="relative h-full w-[50px] shrink-0 overflow-hidden"
+			class="relative h-full w-[50px] shrink-0 group before:absolute before:-left-1 before:top-0 before:h-full before:w-[4px] before:content-['']"
 			style={{ 'view-transition-name': 'minimap' }}
 			ref={setContainer}
 			onPointerDown={handlePointerDown}
 			onPointerMove={handlePointerMove}
 			onPointerUp={handlePointerUp}
 			onPointerCancel={handlePointerUp}
+			onLostPointerCapture={handlePointerUp}
+			onWheel={handleWheel}
+			data-show={isDragging()}
 		>
 			<canvas
 				ref={setBaseCanvas}
-				class="absolute left-0 top-0 h-full w-full"
+				class="absolute left-0 top-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-data-[show=true]:opacity-100"
 				style={{
 					'pointer-events': 'none',
-					opacity: overlayVisible() ? '1' : '0',
-					transition: 'opacity 150ms ease-out',
 				}}
 			/>
 			<canvas
 				ref={setOverlayCanvas}
-				class="absolute left-0 top-0 h-full w-full"
+				class="absolute left-0 top-0 h-full w-full opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-data-[show=true]:opacity-100"
 				style={{
 					'pointer-events': 'none',
-					opacity: overlayVisible() ? '1' : '0',
 				}}
 			/>
 		</div>

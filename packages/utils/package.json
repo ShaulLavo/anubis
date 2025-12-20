@@ -11,6 +11,7 @@
     "./DualStorage": "./src/DualStorage.ts",
     "./cn": "./src/cn.ts",
     "./dom": "./src/dom.ts",
+    "./hooks": "./src/hooks/index.ts",
     "./safeLocalStorage": "./src/safeLocalStorage.ts",
     "./viewTransition": "./src/viewTransition.ts"
   },

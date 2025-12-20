@@ -106,6 +106,16 @@ export type MinimapWorkerMessage =
 	| RendererRenderSummaryMessage
 	| RendererClearMessage
 	| RendererDisposeMessage
+	| RendererScrollMessage
+
+/**
+ * Update scroll position
+ */
+export type RendererScrollMessage = {
+	type: 'scroll'
+	/** Vertical scroll position in pixels (relative to the minimap canvas) */
+	scrollTop: number
+}
 
 /**
  * Response from the worker
