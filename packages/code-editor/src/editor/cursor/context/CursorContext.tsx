@@ -223,6 +223,16 @@ export function CursorProvider(props: CursorProviderProps) {
 		return content.slice(clampedStart, clampedEnd)
 	}
 
+	const { currentState, updateCurrentState } = useCursorStateManager({
+		filePath: () => props.filePath(),
+		lineStarts,
+		documentLength,
+	})
+
+	const syncCursorStateToDocument = () => {
+		updateCurrentState(() => ({}))
+	}
+
 	const MAX_CACHED_LINES = 2000
 	const lineTextCache = new Map<number, string>()
 
@@ -238,6 +248,7 @@ export function CursorProvider(props: CursorProviderProps) {
 			setLineStarts((prev) =>
 				applyEditToLineStarts(prev, startIndex, deletedText, insertedText)
 			)
+			syncCursorStateToDocument()
 		})
 		lineTextCache.clear()
 	}
@@ -276,6 +287,7 @@ export function CursorProvider(props: CursorProviderProps) {
 			setActivePieceTable(snapshot)
 			setDocumentLength(length)
 			setLineStarts(starts)
+			syncCursorStateToDocument()
 		})
 		lineTextCache.clear()
 
@@ -295,6 +307,7 @@ export function CursorProvider(props: CursorProviderProps) {
 			setActivePieceTable(undefined)
 			setDocumentLength(length)
 			setLineStarts(starts)
+			syncCursorStateToDocument()
 		})
 		lineTextCache.clear()
 
@@ -344,12 +357,6 @@ export function CursorProvider(props: CursorProviderProps) {
 				initializeFromContent(content)
 			}
 		}
-	})
-
-	const { currentState, updateCurrentState } = useCursorStateManager({
-		filePath: () => props.filePath(),
-		lineStarts,
-		documentLength,
 	})
 
 	const actions = useCursorActions({
