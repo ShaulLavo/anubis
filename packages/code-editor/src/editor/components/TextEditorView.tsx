@@ -19,7 +19,7 @@ import {
 	createTextEditorLayout,
 	createLineHighlights,
 	useFoldedStarts,
-	useStartBenchmark,
+	useScrollBenchmark,
 } from '../hooks'
 import { EditorViewport } from './EditorViewport'
 import { Minimap } from '../minimap'
@@ -36,7 +36,7 @@ export const TextEditorView = (props: EditorProps) => {
 		null
 	)
 
-	useStartBenchmark({ scrollElement })
+	useScrollBenchmark({ scrollElement })
 
 	let inputElement: HTMLTextAreaElement | null = null
 	const setInputElement = (element: HTMLTextAreaElement) => {
@@ -46,11 +46,11 @@ export const TextEditorView = (props: EditorProps) => {
 	const isEditable = () => props.document.isEditable()
 
 	const syncLexer = createMemo(
-			(previousPath: string | undefined): string | undefined => {
-				const selected = props.isFileSelected()
-				const path = props.document.filePath()
-				void props.documentVersion?.()
-				const lineCount = cursor.lines.lineStarts().length
+		(previousPath: string | undefined): string | undefined => {
+			const selected = props.isFileSelected()
+			const path = props.document.filePath()
+			void props.documentVersion?.()
+			const lineCount = cursor.lines.lineStarts().length
 
 			const hasPath = Boolean(path)
 			const isReady = selected && hasPath
@@ -163,17 +163,17 @@ export const TextEditorView = (props: EditorProps) => {
 		cursorScroll.scrollToCursor(pos.line, pos.column)
 	}
 
-		const input = createTextEditorInput({
-			visibleLineRange: layout.visibleLineRange,
-			updatePieceTable: (updater) => props.document.updatePieceTable(updater),
-			isFileSelected: () => props.isFileSelected(),
-			isEditable,
-			getInputElement: () => inputElement,
-			scrollCursorIntoView,
-			activeScopes: () => props.activeScopes?.() ?? ['editor', 'global'],
-			onIncrementalEdit: handleIncrementalEdit,
-			onSave: untrack(() => props.onSave),
-		})
+	const input = createTextEditorInput({
+		visibleLineRange: layout.visibleLineRange,
+		updatePieceTable: (updater) => props.document.updatePieceTable(updater),
+		isFileSelected: () => props.isFileSelected(),
+		isEditable,
+		getInputElement: () => inputElement,
+		scrollCursorIntoView,
+		activeScopes: () => props.activeScopes?.() ?? ['editor', 'global'],
+		onIncrementalEdit: handleIncrementalEdit,
+		onSave: untrack(() => props.onSave),
+	})
 
 	const mouseSelection = createMouseSelection({
 		scrollElement,

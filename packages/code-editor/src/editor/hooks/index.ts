@@ -19,7 +19,10 @@ export {
 	type MouseSelectionOptions,
 	type MouseSelectionHandlers,
 } from './createMouseSelection'
-export { createLineHighlights, type CreateLineHighlightsOptions } from './createLineHighlights'
+export {
+	createLineHighlights,
+	type CreateLineHighlightsOptions,
+} from './createLineHighlights'
 export {
 	createLineBracketDepths,
 	type CreateLineBracketDepthsOptions,
@@ -29,4 +32,7 @@ export {
 	useVisibleBracketDepths,
 	type UseVisibleBracketDepthsOptions,
 } from './useVisibleBracketDepths'
-export { useStartBenchmark, type UseStartBenchmarkOptions } from './useStartBenchmark'
+export {
+	useScrollBenchmark,
+	type UseScrollBenchmarkOptions,
+} from './useScrollBenchmark'

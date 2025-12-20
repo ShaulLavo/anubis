@@ -15,7 +15,7 @@ import {
 } from '../utils'
 import { useCursor } from '../cursor'
 import type { FoldRange, VirtualItem } from '../types'
-import { createFixedRowVirtualizer } from './createFixedRowVirtualizer'
+import { create2DVirtualizer, type VirtualItem2D } from './create2DVirtualizer'
 import { createFoldMapping } from './createFoldMapping'
 
 export type TextEditorLayoutOptions = {
@@ -39,7 +39,7 @@ export type TextEditorLayout = {
 	getColumnOffset: (lineIndex: number, columnIndex: number) => number
 	getLineY: (lineIndex: number) => number
 	visibleLineRange: Accessor<{ start: number; end: number }>
-	virtualItems: Accessor<VirtualItem[]>
+	virtualItems: Accessor<VirtualItem2D[]>
 	totalSize: Accessor<number>
 	/** Convert display row index to actual document line index */
 	displayToLine: (displayIndex: number) => number
@@ -121,7 +121,18 @@ export function createTextEditorLayout(
 		foldedStarts: () => options.foldedStarts?.() ?? new Set<number>(),
 	})
 
-	const rowVirtualizer = createFixedRowVirtualizer({
+	// Calculate line lengths for 2D virtualization
+	const lineLengths = createMemo(() => {
+		const lengths = new Map<number, number>()
+		// We can get lengths directly from line starts if available, or just use getLineLength
+		const count = cursor.lines.lineCount()
+		for (let i = 0; i < count; i++) {
+			lengths.set(i, cursor.lines.getLineLength(i))
+		}
+		return lengths
+	})
+
+	const rowVirtualizer = create2DVirtualizer({
 		// Use visible count from fold mapping instead of total line count
 		count: foldMapping.visibleCount,
 		enabled: () =>
@@ -130,7 +141,9 @@ export function createTextEditorLayout(
 			Boolean(options.scrollElement()),
 		scrollElement: () => options.scrollElement(),
 		rowHeight: lineHeight,
+		charWidth,
 		overscan: VERTICAL_VIRTUALIZER_OVERSCAN,
+		lineLengths,
 	})
 
 	const virtualItems = rowVirtualizer.virtualItems
