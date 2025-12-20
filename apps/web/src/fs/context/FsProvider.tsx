@@ -12,7 +12,7 @@ import { useDirectoryLoader } from '../hooks/useDirectoryLoader'
 import { useFileSelection } from '../hooks/useFileSelection'
 import { useFsRefresh } from '../hooks/useFsRefresh'
 import { createFileCacheController } from '../cache/fileCacheController'
-import { LocalDirectoryFallbackDialog } from '../components/LocalDirectoryFallbackDialog'
+import { LocalDirectoryFallbackModal } from '../components/LocalDirectoryFallbackModal'
 import { findNode } from '../runtime/tree'
 import { useFileSystemObserver } from '../hooks/useFileSystemObserver'
 import { getRootHandle } from '../runtime/fsRuntime'
@@ -28,7 +28,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setSelectedFilePreviewBytes,
 		setSelectedFileContent,
 		setSelectedFileLoading,
-		setError,
 		setLoading,
 		setFileStats,
 		clearParseResults,
@@ -90,7 +89,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 			state,
 			setExpanded,
 			setSelectedPath,
-			setError,
 			setDirNode,
 			runPrefetchTask,
 			treePrefetchClient,
@@ -110,7 +108,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setSelectedFilePreviewBytes,
 		setSelectedFileContent,
 		setSelectedFileLoading,
-		setError,
 		fileCache,
 	})
 
@@ -119,7 +116,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setTree,
 		setExpanded,
 		setActiveSource,
-		setError,
 		setLoading,
 		clearParseResults,
 		clearPieceTables,
@@ -142,7 +138,6 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setSelectedFileSize,
 		setSelectedFileContent,
 		updateSelectedFilePieceTable,
-		setError,
 		setLoading,
 		setDirtyPath,
 		getState: () => state,
@@ -261,7 +256,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 	return (
 		<FsContext.Provider value={value}>
 			{props.children}
-			<LocalDirectoryFallbackDialog />
+			<LocalDirectoryFallbackModal />
 		</FsContext.Provider>
 	)
 }

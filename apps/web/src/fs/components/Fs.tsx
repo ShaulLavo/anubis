@@ -1,6 +1,6 @@
 import { Resizable, ResizableHandle, ResizablePanel } from '@repo/ui/resizable'
 import { makePersisted } from '@solid-primitives/storage'
-import { Show, createEffect, createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createSignal, onCleanup, onMount } from 'solid-js'
 import { useFocusManager } from '~/focus/focusManager'
 import { dualStorage } from '@repo/utils/DualStorage'
 import { useFs } from '../../fs/context/FsContext'
@@ -35,12 +35,6 @@ export const Fs = () => {
 
 	return (
 		<div class="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-zinc-800/70 bg-zinc-950/60 shadow-xl">
-			<Show when={state.error}>
-				<p class="border-b border-zinc-800/70 bg-red-950/30 px-3 py-2 text-xs text-red-200">
-					{state.error}
-				</p>
-			</Show>
-
 			<Resizable
 				class="flex flex-1 min-h-0"
 				orientation="horizontal"

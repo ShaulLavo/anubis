@@ -7,12 +7,13 @@ import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsDirTreeNode } from '@repo/fs'
 import { normalizeDirNodeMetadata } from '../utils/treeNodes'
 import type { TreePrefetchClient } from '../prefetch/treePrefetchClient'
+import { toast } from '@repo/ui/toaster'
+import { loggers } from '@repo/logger'
 
 type UseDirectoryLoaderOptions = {
 	state: FsState
 	setExpanded: SetStoreFunction<Record<string, boolean>>
 	setSelectedPath: (path: string | undefined) => void
-	setError: (message: string | undefined) => void
 	setDirNode: (path: string, node: FsDirTreeNode) => void
 	runPrefetchTask: (
 		task: Promise<void> | undefined,
@@ -27,7 +28,6 @@ export const useDirectoryLoader = ({
 	state,
 	setExpanded,
 	setSelectedPath,
-	setError,
 	setDirNode,
 	runPrefetchTask,
 	treePrefetchClient,
@@ -79,11 +79,12 @@ export const useDirectoryLoader = ({
 					'Failed to sync prefetch worker'
 				)
 			} catch (error) {
-				setError(
+				const message =
 					error instanceof Error
 						? error.message
 						: 'Failed to load directory contents'
-				)
+				loggers.fs.error('[fs] Failed to load directory contents', error)
+				toast.error(message)
 			} finally {
 				subtreeLoads.delete(path)
 			}
@@ -145,11 +146,12 @@ export const useDirectoryLoader = ({
 				'Failed to sync prefetch worker after reload'
 			)
 		} catch (error) {
-			setError(
+			const message =
 				error instanceof Error
 					? error.message
 					: 'Failed to reload directory contents'
-			)
+			loggers.fs.error('[fs] Failed to reload directory contents', error)
+			toast.error(message)
 		}
 	}
 

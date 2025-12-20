@@ -31,8 +31,6 @@ export const createFsState = () => {
 		setSelectedFileContent,
 		selectedFileLoading,
 		setSelectedFileLoading,
-		error,
-		setError,
 		loading,
 		setLoading,
 	} = createFileDisplayState()
@@ -115,9 +113,6 @@ export const createFsState = () => {
 		get selectedFilePreviewBytes() {
 			return selectedFilePreviewBytes()
 		},
-		get error() {
-			return error()
-		},
 		get loading() {
 			return loading()
 		},
@@ -193,7 +188,6 @@ export const createFsState = () => {
 		setSelectedFilePreviewBytes,
 		setSelectedFileContent,
 		setSelectedFileLoading,
-		setError,
 		setLoading,
 		setBackgroundPrefetching,
 		setBackgroundIndexedFileCount,

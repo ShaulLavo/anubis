@@ -22,7 +22,6 @@ type FsMutationDeps = {
 			current: PieceTableSnapshot | undefined
 		) => PieceTableSnapshot | undefined
 	) => void
-	setError: Setter<string | undefined>
 	setLoading: Setter<boolean>
 	setDirtyPath: (path: string, isDirty: boolean) => void
 	getState: () => FsState
@@ -39,7 +38,6 @@ export const createFsMutations = ({
 	setSelectedFileSize,
 	setSelectedFileContent,
 	updateSelectedFilePieceTable,
-	setError,
 	setLoading,
 	setDirtyPath,
 	getState,
@@ -58,7 +56,8 @@ export const createFsMutations = ({
 			})
 			await refresh()
 		} catch (error) {
-			setError(
+			logger.withTag('fsMutations').error('Create directory failed', { error })
+			toast.error(
 				error instanceof Error ? error.message : 'Failed to create directory'
 			)
 		}
@@ -83,7 +82,8 @@ export const createFsMutations = ({
 			})
 			await refresh()
 		} catch (error) {
-			setError(error instanceof Error ? error.message : 'Failed to create file')
+			logger.withTag('fsMutations').error('Create file failed', { error })
+			toast.error(error instanceof Error ? error.message : 'Failed to create file')
 		}
 	}
 
@@ -104,9 +104,8 @@ export const createFsMutations = ({
 			})
 			await refresh()
 		} catch (error) {
-			setError(
-				error instanceof Error ? error.message : 'Failed to delete entry'
-			)
+			logger.withTag('fsMutations').error('Delete entry failed', { error })
+			toast.error(error instanceof Error ? error.message : 'Failed to delete entry')
 		}
 	}
 
@@ -164,7 +163,6 @@ export const createFsMutations = ({
 			toast.success('File saved')
 		} catch (error) {
 			logger.withTag('fsMutations').error('Save failed', { error })
-			setError(error instanceof Error ? error.message : 'Failed to save file')
 			toast.error('Failed to save file')
 		} finally {
 			setLoading(false)

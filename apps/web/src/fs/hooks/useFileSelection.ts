@@ -21,6 +21,7 @@ import { findNode } from '../runtime/tree'
 import type { FileCacheController } from '../cache/fileCacheController'
 import { parseBufferWithTreeSitter } from '../../treeSitter/workerClient'
 import { viewTransitionBatched } from '@repo/utils/viewTransition'
+import { toast } from '@repo/ui/toaster'
 
 const textDecoder = new TextDecoder()
 
@@ -31,7 +32,6 @@ type UseFileSelectionOptions = {
 	setSelectedFilePreviewBytes: (bytes: Uint8Array | undefined) => void
 	setSelectedFileContent: (content: string) => void
 	setSelectedFileLoading: (value: boolean) => void
-	setError: (message: string | undefined) => void
 	fileCache: FileCacheController
 }
 
@@ -44,15 +44,15 @@ export const useFileSelection = ({
 	setSelectedFilePreviewBytes,
 	setSelectedFileContent,
 	setSelectedFileLoading,
-	setError,
 	fileCache,
 }: UseFileSelectionOptions) => {
 	let selectRequestId = 0
 
 	const handleReadError = (error: unknown) => {
 		if (error instanceof DOMException && error.name === 'AbortError') return
-
-		setError(error instanceof Error ? error.message : 'Failed to read file')
+		const message = error instanceof Error ? error.message : 'Failed to read file'
+		loggers.fs.error('[fs] Failed to read file', error)
+		toast.error(message)
 	}
 
 	const selectPath = async (path: string, options?: SelectPathOptions) => {
@@ -179,7 +179,6 @@ export const useFileSelection = ({
 					timeSync('apply-selection-state', ({ timeSync }) => {
 						viewTransitionBatched(() => {
 							timeSync('set-selected-path', () => setSelectedPath(path))
-							timeSync('clear-error', () => setError(undefined))
 							timeSync('set-selected-file-size', () =>
 								setSelectedFileSize(fileSize)
 							)

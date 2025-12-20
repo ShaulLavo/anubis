@@ -10,13 +10,14 @@ import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsState, FsSource } from '../types'
 import type { TreePrefetchClient } from '../prefetch/treePrefetchClient'
 import { findNode } from '../runtime/tree'
+import { modal } from '@repo/ui/modal'
+import { loggers } from '@repo/logger'
 
 type UseFsRefreshOptions = {
 	state: FsState
 	setTree: SetStoreFunction<FsDirTreeNode>
 	setExpanded: SetStoreFunction<Record<string, boolean>>
 	setActiveSource: (source: FsSource) => void
-	setError: (message: string | undefined) => void
 	setLoading: (value: boolean) => void
 	clearParseResults: () => void
 	clearPieceTables: () => void
@@ -43,7 +44,6 @@ export const useFsRefresh = ({
 	setTree,
 	setExpanded,
 	setActiveSource,
-	setError,
 	setLoading,
 	clearParseResults,
 	clearPieceTables,
@@ -58,6 +58,38 @@ export const useFsRefresh = ({
 	runPrefetchTask,
 	selectPath,
 }: UseFsRefreshOptions) => {
+	let loadErrorModalId: string | null = null
+
+	const clearLoadError = () => {
+		if (!loadErrorModalId) return
+		modal.dismiss(loadErrorModalId)
+		loadErrorModalId = null
+	}
+
+	const showLoadError = (message: string, source: FsSource) => {
+		const actions = [
+			{
+				id: 'retry',
+				label: 'Retry',
+				variant: 'default',
+				autoClose: false,
+				onPress: () => {
+					void refresh(source)
+				},
+			},
+		]
+		if (loadErrorModalId) {
+			modal.update(loadErrorModalId, { body: message, actions })
+			return
+		}
+		loadErrorModalId = modal({
+			heading: 'Filesystem error',
+			body: message,
+			dismissable: false,
+			actions,
+		})
+	}
+
 	const getRestorableFilePath = (tree: FsDirTreeNode) => {
 		const candidates = [state.selectedPath, state.lastKnownFilePath].filter(
 			(path): path is string => typeof path === 'string'
@@ -102,8 +134,8 @@ export const useFsRefresh = ({
 						...expanded,
 						[built.path]: expanded[built.path] ?? true,
 					}))
-					setError(undefined)
 				})
+				clearLoadError()
 
 				await treePrefetchClient.init({
 					source,
@@ -131,14 +163,16 @@ export const useFsRefresh = ({
 					source = error.nextSource
 					continue
 				}
+				loggers.fs.error('[fs] Failed to refresh filesystem', error)
 				batch(() => {
-					setError(
-						error instanceof Error ? error.message : 'Failed to load filesystem'
-					)
 					setBackgroundPrefetching(false)
 					setBackgroundIndexedFileCount(0)
 					setLastPrefetchedPath(undefined)
 				})
+				showLoadError(
+					error instanceof Error ? error.message : 'Failed to load filesystem',
+					source
+				)
 				return
 			} finally {
 				setLoading(false)

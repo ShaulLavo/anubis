@@ -8,7 +8,7 @@ import {
 } from '@repo/fs'
 import { loggers } from '@repo/logger'
 import { trackOperation } from '@repo/perf'
-import { toast } from '@repo/ui/toaster'
+import { modal } from '@repo/ui/modal'
 import { OPFS_ROOT_NAME } from '../config/constants'
 import type { FsSource } from '../types'
 import { requestLocalDirectoryFallback } from '../fallback/localDirectoryFallbackCoordinator'
@@ -25,20 +25,22 @@ export class LocalDirectoryFallbackSwitchError extends Error {
 
 export const fileHandleCache = new Map<string, FileSystemFileHandle>()
 
-let awaitingPermissionToastId: string | number | null = null
+let awaitingPermissionModalId: string | null = null
 
-const showAwaitingPermissionToast = () => {
-	if (awaitingPermissionToastId !== null) return
-	awaitingPermissionToastId = toast('Waiting for permission', {
-		description: 'Click or press a key to continue the directory picker.',
-		duration: Infinity,
+const showAwaitingPermissionModal = () => {
+	if (awaitingPermissionModalId !== null) return
+	loggers.fs.info('[fs] Awaiting directory picker permission')
+	awaitingPermissionModalId = modal({
+		heading: 'Waiting for permission',
+		body: 'Click or press a key to continue the directory picker.',
+		dismissable: false,
 	})
 }
 
-const clearAwaitingPermissionToast = () => {
-	if (awaitingPermissionToastId === null) return
-	toast.dismiss(awaitingPermissionToastId)
-	awaitingPermissionToastId = null
+const clearAwaitingPermissionModal = () => {
+	if (awaitingPermissionModalId === null) return
+	modal.dismiss(awaitingPermissionModalId)
+	awaitingPermissionModalId = null
 }
 
 export function invalidateFs(source: FsSource) {
@@ -56,7 +58,7 @@ export async function ensureFs(source: FsSource): Promise<VfsContext> {
 				const rootHandle = await timeAsync('get-root', async () => {
 					try {
 						return await getRootDirectory(source, OPFS_ROOT_NAME, {
-							onAwaitingInteraction: showAwaitingPermissionToast,
+							onAwaitingInteraction: showAwaitingPermissionModal,
 						})
 					} catch (error) {
 						if (
@@ -74,7 +76,7 @@ export async function ensureFs(source: FsSource): Promise<VfsContext> {
 						throw error
 					}
 				}).finally(() => {
-					clearAwaitingPermissionToast()
+					clearAwaitingPermissionModal()
 				})
 				fsCache[source] = timeSync('create-fs', () => createFs(rootHandle))
 			},

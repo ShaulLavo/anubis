@@ -9,7 +9,6 @@ export const createFileDisplayState = () => {
 	>(undefined)
 	const [selectedFileContent, setSelectedFileContent] = createSignal('')
 	const [selectedFileLoading, setSelectedFileLoading] = createSignal(false)
-	const [error, setError] = createSignal<string | undefined>(undefined)
 	const [loading, setLoading] = createSignal(false)
 
 	return {
@@ -21,8 +20,6 @@ export const createFileDisplayState = () => {
 		setSelectedFileContent,
 		selectedFileLoading,
 		setSelectedFileLoading,
-		error,
-		setError,
 		loading,
 		setLoading,
 	}
