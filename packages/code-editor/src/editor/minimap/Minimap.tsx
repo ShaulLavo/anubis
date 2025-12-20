@@ -1,8 +1,12 @@
+import { AutoHideVisibility, AutoHideWrapper } from '@repo/ui/auto-hide-wrapper'
+import { clsx } from 'clsx'
 import { createEffect, createSignal, on, onCleanup, onMount } from 'solid-js'
 import { useCursor } from '../cursor'
 import type { MinimapProps } from './types'
 import { useMinimapWorker } from './useMinimapWorker'
 import type { MinimapLayout } from './workerTypes'
+
+const MINIMAP_VISIBILITY = AutoHideVisibility.SHOW
 
 const MINIMAP_ROW_HEIGHT_CSS = 2
 const MINIMAP_PADDING_X_CSS = 3
@@ -513,9 +517,18 @@ export const Minimap = (props: MinimapProps) => {
 		if (rafOverlay) cancelAnimationFrame(rafOverlay)
 	})
 
+	const computedVisibility = () =>
+		isDragging() ? AutoHideVisibility.SHOW : MINIMAP_VISIBILITY
+
 	return (
-		<div
-			class="absolute right-0 top-0 h-full w-[50px] z-50 opacity-0 hover:opacity-100 transition-all duration-300 data-[show=true]:opacity-100 group before:absolute before:-left-1 before:top-0 before:h-full before:w-[4px] before:content-[''] bg-zinc-950/20 hover:bg-zinc-950/90 border-l border-white/5"
+		<AutoHideWrapper
+			visibility={computedVisibility()}
+			class={clsx(
+				"absolute right-0 top-0 h-full w-[50px] z-50 group before:absolute before:-left-1 before:top-0 before:h-full before:w-[4px] before:content-[''] border-l border-white/5",
+				computedVisibility() === AutoHideVisibility.SHOW
+					? 'bg-zinc-950/90'
+					: 'bg-zinc-950/20 hover:bg-zinc-950/90'
+			)}
 			style={{ 'view-transition-name': 'minimap' }}
 			ref={setContainer}
 			onPointerDown={handlePointerDown}
@@ -524,7 +537,6 @@ export const Minimap = (props: MinimapProps) => {
 			onPointerCancel={handlePointerUp}
 			onLostPointerCapture={handlePointerUp}
 			onWheel={handleWheel}
-			data-show={isDragging()}
 		>
 			<canvas
 				ref={setBaseCanvas}
@@ -540,6 +552,6 @@ export const Minimap = (props: MinimapProps) => {
 					'pointer-events': 'none',
 				}}
 			/>
-		</div>
+		</AutoHideWrapper>
 	)
 }

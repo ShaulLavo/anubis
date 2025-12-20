@@ -23,6 +23,7 @@
     "@repo/logger": "*",
     "@repo/perf": "*",
     "@repo/utils": "*",
+    "@repo/ui": "*",
     "@solid-primitives/map": "^0.7.2",
     "@solid-primitives/set": "^0.7.2",
     "comlink": "^4.4.2",

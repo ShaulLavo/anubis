@@ -1,6 +1,12 @@
 import type { Accessor } from 'solid-js'
 import type { EditorError } from '../types'
 
+export type MinimapErrors = {
+	startIndex: number
+	endIndex: number
+	isMissing: boolean
+}[]
+
 /**
  * Minimap Props
  *
