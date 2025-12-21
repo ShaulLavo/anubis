@@ -107,3 +107,8 @@
 - Prefer consistency with Solid core + Solid Primitives conventions
 
 Effects are primarily intended for handling side effects that do not write to the reactive system. It's best to avoid setting signals within effects, as this can lead to additional rendering or even infinite loops if not managed carefully. Instead, it is recommended to use createMemo to compute new values that rely on other reactive values.
+
+## Props & Reactivity
+
+- **Never destructure props**: Destructuring `props` breaks reactivity. Use `splitProps` and `mergeProps` to separate or merge props while maintaining reactivity.
+- **Props are reactive getters**: Usually, there is no need to pass accessors (functions) as props. If you pass a signal or memo value like `<Comp value={mySignal()} />`, then `props.value` inside `Comp` is already a reactive getter—no need to wrap it in an accessor.

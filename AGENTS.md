@@ -35,6 +35,11 @@
 - **Never support backward compatibility**: We do not support backward compatibility. Remove any code that exists solely for this purpose.
 - Always fix ESLint and formatting issues before opening a PR.
 
+## SolidJS Props & Reactivity
+
+- **Never destructure props**: Destructuring `props` breaks reactivity. Use `splitProps` and `mergeProps` to separate or merge props while maintaining reactivity.
+- **Props are reactive getters**: Usually, there is no need to pass accessors (functions) as props. If you pass a signal or memo value like `<Comp value={mySignal()} />`, then `props.value` inside `Comp` is already a reactive getter—no need to wrap it in an accessor.
+
 ## Greenfield & Performance Philosophy
 
 - **Greenfield App**: This is a strictly greenfield project. Treat it as such.
