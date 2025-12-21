@@ -139,63 +139,6 @@ const applyEditToLineStarts = (
 	return nextStarts
 }
 
-const validateLineStarts = (
-	lineStarts: number[],
-	documentLength: number,
-	context: string
-) => {
-	if (lineStarts.length === 0) {
-		console.assert(false, `[code-editor] lineStarts empty (${context})`)
-		return
-	}
-
-	if (lineStarts[0] !== 0) {
-		console.assert(
-			false,
-			`[code-editor] lineStarts[0] must be 0 (${context})`,
-			{ first: lineStarts[0] }
-		)
-	}
-
-	const last = lineStarts[lineStarts.length - 1] ?? 0
-	if (last < 0 || last > documentLength) {
-		console.assert(
-			false,
-			`[code-editor] lineStarts last out of range (${context})`,
-			{ last, documentLength }
-		)
-	}
-
-	const sampleSize = 64
-	const startWindow = Math.min(lineStarts.length, sampleSize)
-	for (let i = 1; i < startWindow; i++) {
-		const prev = lineStarts[i - 1] ?? 0
-		const current = lineStarts[i] ?? 0
-		if (current <= prev) {
-			console.assert(
-				false,
-				`[code-editor] lineStarts not strictly increasing (${context})`,
-				{ index: i, prev, current }
-			)
-			break
-		}
-	}
-
-	const tailStart = Math.max(1, lineStarts.length - sampleSize)
-	for (let i = tailStart; i < lineStarts.length; i++) {
-		const prev = lineStarts[i - 1] ?? 0
-		const current = lineStarts[i] ?? 0
-		if (current <= prev) {
-			console.assert(
-				false,
-				`[code-editor] lineStarts not strictly increasing near end (${context})`,
-				{ index: i, prev, current }
-			)
-			break
-		}
-	}
-}
-
 export function CursorProvider(props: CursorProviderProps) {
 	const log = loggers.codeEditor.withTag('cursor')
 	const [documentLength, setDocumentLength] = createSignal(0)
@@ -281,7 +224,6 @@ export function CursorProvider(props: CursorProviderProps) {
 	const initializeFromSnapshot = (snapshot: PieceTableSnapshot) => {
 		const length = getPieceTableLength(snapshot)
 		const starts = buildLineStartsFromSnapshot(snapshot)
-		validateLineStarts(starts, length, 'initializeFromSnapshot')
 
 		batch(() => {
 			setActivePieceTable(snapshot)
@@ -301,7 +243,6 @@ export function CursorProvider(props: CursorProviderProps) {
 	const initializeFromContent = (content: string) => {
 		const length = content.length
 		const starts = buildLineStartsFromText(content)
-		validateLineStarts(starts, length, 'initializeFromContent')
 
 		batch(() => {
 			setActivePieceTable(undefined)

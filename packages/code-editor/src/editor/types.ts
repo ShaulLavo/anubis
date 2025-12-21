@@ -19,7 +19,6 @@ export type BracketDepthMap = Record<number, number>
 // Line bracket depth map: offset-in-line -> nesting depth
 export type LineBracketDepthMap = Record<number, number>
 
-// Re-exported from @repo/lexer: BracketInfo
 export type EditorSyntaxHighlight = {
 	startIndex: number
 	endIndex: number

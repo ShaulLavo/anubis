@@ -22,6 +22,9 @@ export const EXTENSION_MAP: Record<string, LanguageId> = {
 	md: 'markdown',
 	mdx: 'markdown',
 	markdown: 'markdown',
+	svg: 'html',
+	xml: 'html',
+	xhtml: 'html',
 }
 
 // Language configuration: wasm paths and query sources

@@ -30,7 +30,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 		const [enabled] = createSignal(true)
 		const [rowHeight] = createSignal(20)
 		const [charWidth] = createSignal(8)
-		const [lineLengths] = createSignal(new Map<number, number>())
+		const getLineLength = (_lineIndex: number) => 0
 
 		const { result, unmount } = renderHook(() =>
 			create2DVirtualizer({
@@ -40,7 +40,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 				rowHeight,
 				charWidth,
 				overscan: 2,
-				lineLengths,
+				getLineLength,
 			})
 		)
 
@@ -64,7 +64,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 		const [enabled] = createSignal(true)
 		const [rowHeight] = createSignal(20)
 		const [charWidth] = createSignal(8)
-		const [lengths] = createSignal(lineLengths)
+		const getLineLength = (lineIndex: number) => lineLengths.get(lineIndex) ?? 0
 
 		const { result, unmount } = renderHook(() =>
 			create2DVirtualizer({
@@ -74,7 +74,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 				rowHeight,
 				charWidth,
 				overscan: 2,
-				lineLengths: lengths,
+				getLineLength,
 			})
 		)
 
@@ -108,6 +108,48 @@ describe('create2DVirtualizer (DOM integration)', () => {
 		unmount()
 	})
 
+	it('queries line lengths only for visible rows', async () => {
+		const [count] = createSignal(200)
+		const [enabled] = createSignal(true)
+		const [rowHeight] = createSignal(20)
+		const [charWidth] = createSignal(8)
+
+		const calledIndices = new Set<number>()
+		const getLineLength = (lineIndex: number) => {
+			calledIndices.add(lineIndex)
+			return 120
+		}
+
+		const { result, unmount } = renderHook(() =>
+			create2DVirtualizer({
+				count,
+				enabled,
+				scrollElement: () => container,
+				rowHeight,
+				charWidth,
+				overscan: 2,
+				getLineLength,
+			})
+		)
+
+		await expect
+			.poll(() => result.current.virtualItems().length)
+			.toBeGreaterThan(0)
+
+		const items = result.current.virtualItems()
+		const startIndex = items[0]?.index ?? 0
+		const endIndex = items[items.length - 1]?.index ?? 0
+
+		expect(calledIndices.size).toBeGreaterThan(0)
+		expect(calledIndices.size).toBeLessThan(count())
+		for (const index of calledIndices) {
+			expect(index).toBeGreaterThanOrEqual(startIndex)
+			expect(index).toBeLessThanOrEqual(endIndex)
+		}
+
+		unmount()
+	})
+
 	it('tracks scroll position correctly', async () => {
 		const lineLengths = new Map<number, number>()
 		for (let i = 0; i < 100; i++) {
@@ -124,7 +166,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 		const [enabled] = createSignal(true)
 		const [rowHeight] = createSignal(20)
 		const [charWidth] = createSignal(8)
-		const [lengths] = createSignal(lineLengths)
+		const getLineLength = (lineIndex: number) => lineLengths.get(lineIndex) ?? 0
 
 		const { result, unmount } = renderHook(() =>
 			create2DVirtualizer({
@@ -134,7 +176,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 				rowHeight,
 				charWidth,
 				overscan: 2,
-				lineLengths: lengths,
+				getLineLength,
 			})
 		)
 
@@ -169,7 +211,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 		const [enabled] = createSignal(true)
 		const [rowHeight] = createSignal(20)
 		const [charWidth] = createSignal(8)
-		const [lengths] = createSignal(lineLengths)
+		const getLineLength = (lineIndex: number) => lineLengths.get(lineIndex) ?? 0
 
 		const { result, unmount } = renderHook(() =>
 			create2DVirtualizer({
@@ -180,7 +222,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 				charWidth,
 				overscan: 2,
 				horizontalOverscan: 10,
-				lineLengths: lengths,
+				getLineLength,
 			})
 		)
 
@@ -219,7 +261,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 		const [enabled, setEnabled] = createSignal(true)
 		const [rowHeight] = createSignal(20)
 		const [charWidth] = createSignal(8)
-		const [lineLengths] = createSignal(new Map<number, number>())
+		const getLineLength = (_lineIndex: number) => 0
 
 		const { result, unmount } = renderHook(() =>
 			create2DVirtualizer({
@@ -229,7 +271,7 @@ describe('create2DVirtualizer (DOM integration)', () => {
 				rowHeight,
 				charWidth,
 				overscan: 2,
-				lineLengths,
+				getLineLength,
 			})
 		)
 

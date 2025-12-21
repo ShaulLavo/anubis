@@ -1,3 +1,4 @@
+import { JSX, Show } from 'solid-js'
 import { VsChevronDown } from '@repo/icons/vs/VsChevronDown'
 import { VsChevronRight } from '@repo/icons/vs/VsChevronRight'
 import { DEFAULT_GUTTER_MODE } from '../../consts'
@@ -11,23 +12,26 @@ interface LineGutterProps {
 	onFoldClick?: () => void
 }
 
+const getGutterStyle = (lineHeight: number, lineNumber: number) => {
+	const styles: JSX.CSSProperties = { height: `${lineHeight}px` }
+
+	if (DEFAULT_GUTTER_MODE !== 'decimal') {
+		styles['counter-set'] = `line ${lineNumber}`
+		styles['--gutter-style'] = DEFAULT_GUTTER_MODE
+	}
+
+	return styles
+}
+
 export const LineGutter = (props: LineGutterProps) => {
 	return (
 		<span
-			class="w-10 shrink-0 select-none text-[11px] font-semibold tracking-[0.08em] tabular-nums flex items-center justify-between gap-1 pr-0.5"
+			class="shrink-0 select-none text-[11px] font-semibold tracking-[0.08em] tabular-nums flex items-center justify-between gap-1 "
 			classList={{
 				'text-white': props.isActive,
 				'text-zinc-500': !props.isActive,
 			}}
-			style={{
-				height: `${props.lineHeight}px`,
-				...(DEFAULT_GUTTER_MODE !== 'decimal'
-					? {
-							'counter-set': `line ${props.lineNumber}`,
-							'--gutter-style': DEFAULT_GUTTER_MODE,
-						}
-					: {}),
-			}}
+			style={getGutterStyle(props.lineHeight, props.lineNumber)}
 		>
 			<span
 				class="flex-1 text-right"
@@ -35,10 +39,10 @@ export const LineGutter = (props: LineGutterProps) => {
 			>
 				{DEFAULT_GUTTER_MODE === 'decimal' ? props.lineNumber : null}
 			</span>
-			{props.isFoldable ? (
+			<Show when={props.isFoldable} fallback={<span class="w-4 shrink-0" />}>
 				<button
 					type="button"
-					class="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/60 focus-visible:outline focus-visible:outline-1 focus-visible:outline-zinc-500"
+					class="flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/60 focus-visible:outline focus-visible:outline-zinc-500"
 					aria-label={props.isFolded ? 'Expand fold' : 'Collapse fold'}
 					onMouseDown={(event) => event.stopPropagation()}
 					onClick={(event) => {
@@ -46,15 +50,11 @@ export const LineGutter = (props: LineGutterProps) => {
 						props.onFoldClick?.()
 					}}
 				>
-					{props.isFolded ? (
+					<Show when={props.isFolded} fallback={<VsChevronDown size={12} />}>
 						<VsChevronRight size={12} />
-					) : (
-						<VsChevronDown size={12} />
-					)}
+					</Show>
 				</button>
-			) : (
-				<span class="w-4 shrink-0" />
-			)}
+			</Show>
 		</span>
 	)
 }

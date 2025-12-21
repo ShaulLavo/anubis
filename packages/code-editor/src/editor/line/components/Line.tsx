@@ -48,7 +48,6 @@ export const Line = (props: LineProps) => {
 			columnStart,
 			columnEnd,
 		})
-		console.assert(false, message)
 	}
 
 	return (

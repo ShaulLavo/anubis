@@ -7,7 +7,7 @@ import {
 	type Accessor,
 } from 'solid-js'
 import { loggers } from '@repo/logger'
-import type { VirtualItem, VirtualItem2D } from '../types'
+import type { VirtualItem2D } from '../types'
 
 export type Virtualizer2DOptions = {
 	count: Accessor<number>
@@ -17,8 +17,8 @@ export type Virtualizer2DOptions = {
 	charWidth: Accessor<number>
 	overscan: number
 	horizontalOverscan?: number
-	// Map of line index -> line length (in characters)
-	lineLengths: Accessor<Map<number, number>>
+	// On-demand line length lookup (in characters)
+	getLineLength: (lineIndex: number) => number
 }
 
 export type Virtualizer2D = {
@@ -29,7 +29,6 @@ export type Virtualizer2D = {
 	virtualItems: Accessor<VirtualItem2D[]>
 	visibleRange: Accessor<{ start: number; end: number }>
 	totalSize: Accessor<number>
-	totalWidth: Accessor<number>
 	isScrolling: Accessor<boolean>
 	scrollDirection: Accessor<'forward' | 'backward' | null>
 	scrollToIndex: (
@@ -76,7 +75,7 @@ export const computeVisibleRange2D = (options: {
 	scrollLeft: number
 	viewportHeight: number
 	viewportWidth: number
-	// We don't need lineLengths here, just viewport dimensions
+	// We don't need per-line data here, just viewport dimensions
 }): VisibleRange2D => {
 	const count = normalizeCount(options.count)
 	if (!options.enabled || count === 0)
@@ -243,15 +242,6 @@ export function create2DVirtualizer(
 		computeTotalHeight2D(options.count(), options.rowHeight())
 	)
 
-	const totalWidth = createMemo(() => {
-		// Calculate max line length * char width
-		let maxLen = 0
-		options.lineLengths().forEach((len) => {
-			if (len > maxLen) maxLen = len
-		})
-		return maxLen * normalizeCharWidth(options.charWidth())
-	})
-
 	const visibleRange = createMemo(() => {
 		const range = computeVisibleRange2D({
 			enabled: options.enabled(),
@@ -273,6 +263,7 @@ export function create2DVirtualizer(
 	const virtualItemCache = new Map<number, VirtualItem2D>()
 	let cachedRowHeight = 0
 	let cachedCharWidth = 0
+	let warnedInvalidLineLength = false
 
 	const virtualItems = createMemo<VirtualItem2D[]>(() => {
 		const enabled = options.enabled()
@@ -282,6 +273,7 @@ export function create2DVirtualizer(
 		const range = visibleRange() // Only vertical part exposed directly
 		const overscan = Math.max(0, options.overscan)
 		const horizontalOverscan = Math.max(0, options.horizontalOverscan ?? 20)
+		const getLineLength = options.getLineLength
 
 		// Re-calculate basic visible range values for horizontal slice
 		const left = scrollLeft()
@@ -307,7 +299,6 @@ export function create2DVirtualizer(
 
 		const startIndex = Math.max(0, range.start - overscan)
 		const endIndex = Math.min(count - 1, range.end + overscan)
-		const lineLengths = options.lineLengths()
 
 		// GC: Clean up cache for rows no longer visible
 		for (const index of virtualItemCache.keys()) {
@@ -323,7 +314,17 @@ export function create2DVirtualizer(
 		// We don't clamp hEnd here because it depends on line length, done per item
 
 		for (let i = startIndex; i <= endIndex; i++) {
-			const lineLen = lineLengths.get(i) ?? 0
+			const rawLineLen = getLineLength(i)
+			let lineLen = 0
+			if (Number.isFinite(rawLineLen) && rawLineLen > 0) {
+				lineLen = Math.floor(rawLineLen)
+			} else if (!warnedInvalidLineLength && rawLineLen !== 0) {
+				warnedInvalidLineLength = true
+				log.warn('Invalid line length reported', {
+					lineIndex: i,
+					lineLength: rawLineLen,
+				})
+			}
 
 			// THRESHOLD CHECK:
 			// If line is short, render everything (no horizontal virtualization overhead)
@@ -433,7 +434,6 @@ export function create2DVirtualizer(
 		virtualItems,
 		visibleRange,
 		totalSize,
-		totalWidth,
 		isScrolling,
 		scrollDirection,
 		scrollToIndex,

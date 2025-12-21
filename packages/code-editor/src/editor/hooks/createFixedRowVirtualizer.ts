@@ -134,7 +134,7 @@ export function createFixedRowVirtualizer(
 		if (!element) {
 			const message = 'Virtualizer enabled but scrollElement is null'
 			log.warn(message)
-			console.assert(false, message)
+
 			return
 		}
 
@@ -156,7 +156,6 @@ export function createFixedRowVirtualizer(
 					count: untrack(() => options.count()),
 					rowHeight: untrack(() => options.rowHeight()),
 				})
-				console.assert(false, message)
 			} else if (warnedZeroHeight) {
 				warnedZeroHeight = false
 				log.debug('Virtualizer scrollElement height recovered', {

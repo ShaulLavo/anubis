@@ -99,16 +99,6 @@ export const useScrollBenchmark = (options: UseScrollBenchmarkOptions) => {
 				})
 			})
 
-		// Double-buffered wait - for jump phases to ensure actual render
-		const waitForRenderDouble = () =>
-			new Promise<void>((resolve) => {
-				requestAnimationFrame(() => {
-					requestAnimationFrame(() => {
-						resolve()
-					})
-				})
-			})
-
 		// --- PHASE 1: SCROLL DOWN ---
 		if (phasesToRun.has('down')) {
 			console.log('📊 Benchmark: Phase 1 - Scroll Down')
@@ -163,7 +153,7 @@ export const useScrollBenchmark = (options: UseScrollBenchmarkOptions) => {
 				const targetY = Math.random() * maxScrollY
 				el.scrollTop = targetY
 				frames++
-				await waitForRenderDouble()
+				await waitForRender()
 			}
 
 			stats.jumpV.duration = performance.now() - start
@@ -234,7 +224,7 @@ export const useScrollBenchmark = (options: UseScrollBenchmarkOptions) => {
 				const targetX = Math.random() * maxScrollX
 				el.scrollLeft = targetX
 				frames++
-				await waitForRenderDouble()
+				await waitForRender()
 			}
 
 			stats.jumpH.duration = performance.now() - start

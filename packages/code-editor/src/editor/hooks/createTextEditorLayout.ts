@@ -121,16 +121,9 @@ export function createTextEditorLayout(
 		foldedStarts: () => options.foldedStarts?.() ?? new Set<number>(),
 	})
 
-	// Calculate line lengths for 2D virtualization
-	const lineLengths = createMemo(() => {
-		const lengths = new Map<number, number>()
-		// We can get lengths directly from line starts if available, or just use getLineLength
-		const count = cursor.lines.lineCount()
-		for (let i = 0; i < count; i++) {
-			lengths.set(i, cursor.lines.getLineLength(i))
-		}
-		return lengths
-	})
+	// On-demand line length lookup for 2D virtualization
+	const getLineLength = (displayIndex: number) =>
+		cursor.lines.getLineLength(foldMapping.displayToLine(displayIndex))
 
 	const rowVirtualizer = create2DVirtualizer({
 		// Use visible count from fold mapping instead of total line count
@@ -143,7 +136,7 @@ export function createTextEditorLayout(
 		rowHeight: lineHeight,
 		charWidth,
 		overscan: VERTICAL_VIRTUALIZER_OVERSCAN,
-		lineLengths,
+		getLineLength,
 	})
 
 	const virtualItems = rowVirtualizer.virtualItems
