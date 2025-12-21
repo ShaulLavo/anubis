@@ -5,7 +5,7 @@ import { page } from 'vitest/browser'
 import { expect } from 'vitest'
 import { primeFsCache } from './fs/runtime/fsRuntime'
 import App from './App'
-
+//TODO: remove before ci
 test('debug app render', async () => {
 	const root = new MemoryDirectoryHandle('mocked-root')
 

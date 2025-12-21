@@ -1,5 +1,11 @@
 import type { FsDirTreeNode } from '@repo/fs'
-import { createEffect, type JSX, onCleanup, onMount } from 'solid-js'
+import {
+	createEffect,
+	createSelector,
+	type JSX,
+	onCleanup,
+	onMount,
+} from 'solid-js'
 import { DEFAULT_SOURCE } from '../config/constants'
 import { createFsMutations } from '../fsMutations'
 import { restoreHandleCache } from '../runtime/handleCache'
@@ -230,6 +236,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 		clearDeferredMetadata()
 	})
 
+	const isSelectedPath = createSelector(() => state.selectedPath)
+
 	const value: FsContextValue = [
 		state,
 		{
@@ -237,6 +245,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 			setSource,
 			toggleDir,
 			selectPath,
+			isSelectedPath,
 			createDir,
 			createFile,
 			deleteNode,
