@@ -1,4 +1,5 @@
 import {
+	batch,
 	createEffect,
 	createMemo,
 	createSignal,
@@ -7,7 +8,12 @@ import {
 	type Accessor,
 } from 'solid-js'
 import { loggers } from '@repo/logger'
+import { trackMicro } from '@repo/perf'
 import type { VirtualItem2D } from '../types'
+import {
+	COLUMN_CHARS_PER_ITEM,
+	HORIZONTAL_VIRTUALIZER_OVERSCAN,
+} from '../consts'
 
 export type Virtualizer2DOptions = {
 	count: Accessor<number>
@@ -155,6 +161,15 @@ export function create2DVirtualizer(
 	options: Virtualizer2DOptions
 ): Virtualizer2D {
 	const log = loggers.codeEditor.withTag('virtualizer-2d')
+	const assert = (
+		condition: boolean,
+		message: string,
+		details?: Record<string, unknown>
+	) => {
+		if (condition) return true
+		log.warn(message, details)
+		return false
+	}
 	const [scrollTop, setScrollTop] = createSignal(0)
 	const [scrollLeft, setScrollLeft] = createSignal(0)
 	const [viewportHeight, setViewportHeight] = createSignal(0)
@@ -163,6 +178,12 @@ export function create2DVirtualizer(
 	const [scrollDirection, setScrollDirection] = createSignal<
 		'forward' | 'backward' | null
 	>(null)
+	const overscan = Math.max(0, options.overscan)
+	const horizontalOverscan = Math.max(
+		0,
+		options.horizontalOverscan ??
+			HORIZONTAL_VIRTUALIZER_OVERSCAN * COLUMN_CHARS_PER_ITEM
+	)
 
 	// Scroll handler setup
 	createEffect(() => {
@@ -195,29 +216,46 @@ export function create2DVirtualizer(
 			}
 		}
 
-		log.debug('2D Virtualizer attached')
+		log.debug('2D Virtualizer attached', {
+			overscan,
+			horizontalOverscan,
+		})
 
 		let rafId = 0
 		let scrollTimeoutId: ReturnType<typeof setTimeout>
+		let pendingScrollTop = 0
+		let pendingScrollLeft = 0
 
 		const onScroll = () => {
+			pendingScrollTop = normalizeNumber(element.scrollTop)
+			pendingScrollLeft = normalizeNumber(element.scrollLeft)
+
 			if (rafId) return
 
 			// Detect scrolling state
-			setIsScrolling(true)
+			if (!untrack(isScrolling)) {
+				setIsScrolling(true)
+			}
 			clearTimeout(scrollTimeoutId)
 			scrollTimeoutId = setTimeout(() => setIsScrolling(false), 150)
 
-			// Detect direction (vertical only for now as it's more critical)
-			const currentTop = normalizeNumber(element.scrollTop)
-			const prevTop = untrack(scrollTop)
-			if (currentTop > prevTop) setScrollDirection('forward')
-			else if (currentTop < prevTop) setScrollDirection('backward')
-
 			rafId = requestAnimationFrame(() => {
 				rafId = 0
-				setScrollTop(currentTop)
-				setScrollLeft(normalizeNumber(element.scrollLeft))
+
+				// Detect direction (vertical only for now as it's more critical)
+				const prevTop = untrack(scrollTop)
+				if (pendingScrollTop > prevTop) setScrollDirection('forward')
+				else if (pendingScrollTop < prevTop) setScrollDirection('backward')
+
+				const prevLeft = untrack(scrollLeft)
+				if (pendingScrollTop === prevTop && pendingScrollLeft === prevLeft) {
+					return
+				}
+
+				batch(() => {
+					setScrollTop(pendingScrollTop)
+					setScrollLeft(pendingScrollLeft)
+				})
 			})
 		}
 
@@ -242,23 +280,66 @@ export function create2DVirtualizer(
 		computeTotalHeight2D(options.count(), options.rowHeight())
 	)
 
-	const visibleRange = createMemo(() => {
-		const range = computeVisibleRange2D({
-			enabled: options.enabled(),
-			count: options.count(),
-			rowHeight: options.rowHeight(),
-			charWidth: options.charWidth(),
-			scrollTop: scrollTop(),
-			scrollLeft: scrollLeft(),
-			viewportHeight: viewportHeight(),
-			viewportWidth: viewportWidth(),
-		})
+	const visibleRange = createMemo(
+		() => {
+			const enabled = options.enabled()
+			const count = options.count()
+			const range = computeVisibleRange2D({
+				enabled,
+				count,
+				rowHeight: options.rowHeight(),
+				charWidth: options.charWidth(),
+				scrollTop: scrollTop(),
+				scrollLeft: scrollLeft(),
+				viewportHeight: viewportHeight(),
+				viewportWidth: viewportWidth(),
+			})
 
-		return {
-			start: range.rowStart,
-			end: range.rowEnd,
+			if (
+				enabled &&
+				count > 0 &&
+				!assert(
+					range.rowStart <= range.rowEnd,
+					'Virtualizer row range is invalid',
+					{
+						rowStart: range.rowStart,
+						rowEnd: range.rowEnd,
+						count,
+					}
+				)
+			) {
+				return { start: 0, end: 0 }
+			}
+
+			return {
+				start: range.rowStart,
+				end: range.rowEnd,
+			}
+		},
+		{ start: 0, end: 0 },
+		{
+			equals: (prev, next) =>
+				prev.start === next.start && prev.end === next.end,
 		}
-	})
+	)
+
+	const columnWindow = createMemo(
+		() => {
+			const charWidth = normalizeCharWidth(options.charWidth())
+			const left = normalizeNumber(scrollLeft())
+			const width = normalizeNumber(viewportWidth())
+			const colStartBase = Math.max(0, Math.floor(left / charWidth))
+			const visibleCols = Math.max(1, Math.ceil(width / charWidth))
+			return { charWidth, colStartBase, visibleCols }
+		},
+		{ charWidth: 0, colStartBase: 0, visibleCols: 0 },
+		{
+			equals: (prev, next) =>
+				prev.charWidth === next.charWidth &&
+				prev.colStartBase === next.colStartBase &&
+				prev.visibleCols === next.visibleCols,
+		}
+	)
 
 	const virtualItemCache = new Map<number, VirtualItem2D>()
 	let cachedRowHeight = 0
@@ -269,114 +350,152 @@ export function create2DVirtualizer(
 		const enabled = options.enabled()
 		const count = normalizeCount(options.count())
 		const rowHeight = normalizeRowHeight(options.rowHeight())
-		const charWidth = normalizeCharWidth(options.charWidth())
-		const range = visibleRange() // Only vertical part exposed directly
-		const overscan = Math.max(0, options.overscan)
-		const horizontalOverscan = Math.max(0, options.horizontalOverscan ?? 20)
-		const getLineLength = options.getLineLength
-
-		// Re-calculate basic visible range values for horizontal slice
-		const left = scrollLeft()
-		const width = viewportWidth()
-
-		const colStartBase = Math.max(0, Math.floor(left / charWidth))
-		const visibleCols = Math.max(1, Math.ceil(width / charWidth))
-		// const colEndBase = colStartBase + visibleCols // Unused here, we add overscan immediately
-
 		if (!enabled || count === 0) {
 			virtualItemCache.clear()
 			cachedRowHeight = rowHeight
-			cachedCharWidth = charWidth
+			cachedCharWidth = normalizeCharWidth(options.charWidth())
 			return []
 		}
 
-		// Invalidate cache if metrics change
-		if (cachedRowHeight !== rowHeight || cachedCharWidth !== charWidth) {
-			virtualItemCache.clear()
-			cachedRowHeight = rowHeight
-			cachedCharWidth = charWidth
-		}
+		const range = visibleRange() // Only vertical part exposed directly
+		const { charWidth, colStartBase, visibleCols } = columnWindow()
+		const getLineLength = options.getLineLength
 
-		const startIndex = Math.max(0, range.start - overscan)
-		const endIndex = Math.min(count - 1, range.end + overscan)
-
-		// GC: Clean up cache for rows no longer visible
-		for (const index of virtualItemCache.keys()) {
-			if (index < startIndex || index > endIndex) {
-				virtualItemCache.delete(index)
-			}
-		}
-
-		const items: VirtualItem2D[] = []
-
-		// Horizontal start/end with overscan
-		const hStart = Math.max(0, colStartBase - horizontalOverscan)
-		// We don't clamp hEnd here because it depends on line length, done per item
-
-		for (let i = startIndex; i <= endIndex; i++) {
-			const rawLineLen = getLineLength(i)
-			let lineLen = 0
-			if (Number.isFinite(rawLineLen) && rawLineLen > 0) {
-				lineLen = Math.floor(rawLineLen)
-			} else if (!warnedInvalidLineLength && rawLineLen !== 0) {
-				warnedInvalidLineLength = true
-				log.warn('Invalid line length reported', {
-					lineIndex: i,
-					lineLength: rawLineLen,
-				})
-			}
-
-			// THRESHOLD CHECK:
-			// If line is short, render everything (no horizontal virtualization overhead)
-			// If line is long, slice it
-			let cStart = 0
-			let cEnd = lineLen // Render full line by default
-
-			if (lineLen > VIRTUALIZATION_THRESHOLD) {
-				cStart = hStart
-				cEnd = Math.min(
-					lineLen,
-					colStartBase + visibleCols + horizontalOverscan
-				)
-
-				// If we scrolled past the end of this specific line
-				if (cStart >= lineLen) {
-					cStart = 0
-					cEnd = 0 // Line not visible horizontally
+		return trackMicro(
+			'virtualizer-2d.virtualItems',
+			() => {
+				// Invalidate cache if metrics change
+				if (cachedRowHeight !== rowHeight || cachedCharWidth !== charWidth) {
+					virtualItemCache.clear()
+					cachedRowHeight = rowHeight
+					cachedCharWidth = charWidth
 				}
-			}
 
-			// Cache check
-			// We need to invalidate item if column range changed significantly
-			let item = virtualItemCache.get(i)
-			if (item) {
-				if (item.columnStart !== cStart || item.columnEnd !== cEnd) {
-					// Update existing item in place or create new?
-					// Creating new is safer for reactivity
-					item = {
-						index: i,
-						start: i * rowHeight,
-						size: rowHeight,
-						columnStart: cStart,
-						columnEnd: cEnd,
+				if (
+					!assert(
+						range.start <= range.end,
+						'Virtualizer row range is invalid',
+						{
+							start: range.start,
+							end: range.end,
+							count,
+						}
+					)
+				) {
+					virtualItemCache.clear()
+					return []
+				}
+
+				const startIndex = Math.max(0, range.start - overscan)
+				const endIndex = Math.min(count - 1, range.end + overscan)
+
+				if (
+					!assert(
+						startIndex <= endIndex,
+						'Virtualizer overscan range is invalid',
+						{
+							startIndex,
+							endIndex,
+							count,
+							overscan,
+						}
+					)
+				) {
+					virtualItemCache.clear()
+					return []
+				}
+
+				// GC: Clean up cache for rows no longer visible
+				for (const index of virtualItemCache.keys()) {
+					if (index < startIndex || index > endIndex) {
+						virtualItemCache.delete(index)
 					}
-					virtualItemCache.set(i, item)
 				}
-			} else {
-				item = {
-					index: i,
-					start: i * rowHeight,
-					size: rowHeight,
-					columnStart: cStart,
-					columnEnd: cEnd,
+
+				const items: VirtualItem2D[] = []
+
+				// Horizontal start/end with overscan
+				const hStart = Math.max(0, colStartBase - horizontalOverscan)
+				// We don't clamp hEnd here because it depends on line length, done per item
+
+				for (let i = startIndex; i <= endIndex; i++) {
+					const rawLineLen = getLineLength(i)
+					let lineLen = 0
+					if (Number.isFinite(rawLineLen) && rawLineLen > 0) {
+						lineLen = Math.floor(rawLineLen)
+					} else if (!warnedInvalidLineLength && rawLineLen !== 0) {
+						warnedInvalidLineLength = true
+						log.warn('Invalid line length reported', {
+							lineIndex: i,
+							lineLength: rawLineLen,
+						})
+					}
+
+					// THRESHOLD CHECK:
+					// If line is short, render everything (no horizontal virtualization overhead)
+					// If line is long, slice it
+					let cStart = 0
+					let cEnd = lineLen // Render full line by default
+
+					if (lineLen > VIRTUALIZATION_THRESHOLD) {
+						cStart = hStart
+						cEnd = Math.min(
+							lineLen,
+							colStartBase + visibleCols + horizontalOverscan
+						)
+
+						// If we scrolled past the end of this specific line
+						if (cStart >= lineLen) {
+							cStart = 0
+							cEnd = 0 // Line not visible horizontally
+						}
+					}
+
+					// Cache check
+					// We need to invalidate item if column range changed significantly
+					let item = virtualItemCache.get(i)
+					if (item) {
+						if (item.columnStart !== cStart || item.columnEnd !== cEnd) {
+							// Update existing item in place or create new?
+							// Creating new is safer for reactivity
+							item = {
+								index: i,
+								start: i * rowHeight,
+								size: rowHeight,
+								columnStart: cStart,
+								columnEnd: cEnd,
+							}
+							virtualItemCache.set(i, item)
+						}
+					} else {
+						item = {
+							index: i,
+							start: i * rowHeight,
+							size: rowHeight,
+							columnStart: cStart,
+							columnEnd: cEnd,
+						}
+						virtualItemCache.set(i, item)
+					}
+
+					items.push(item)
 				}
-				virtualItemCache.set(i, item)
+
+				return items
+			},
+			{
+				logger: log,
+				threshold: 8,
+				metadata: {
+					count,
+					start: range.start,
+					end: range.end,
+					overscan,
+					colStart: colStartBase,
+					visibleCols,
+				},
 			}
-
-			items.push(item)
-		}
-
-		return items
+		)
 	})
 
 	const scrollToBehavior = (

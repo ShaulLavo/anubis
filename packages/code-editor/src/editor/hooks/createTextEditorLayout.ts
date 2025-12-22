@@ -6,7 +6,12 @@ import {
 	untrack,
 	type Accessor,
 } from 'solid-js'
-import { LINE_NUMBER_WIDTH, VERTICAL_VIRTUALIZER_OVERSCAN } from '../consts'
+import {
+	COLUMN_CHARS_PER_ITEM,
+	HORIZONTAL_VIRTUALIZER_OVERSCAN,
+	LINE_NUMBER_WIDTH,
+	VERTICAL_VIRTUALIZER_OVERSCAN,
+} from '../consts'
 import {
 	calculateColumnOffset,
 	calculateVisualColumnCount,
@@ -136,6 +141,7 @@ export function createTextEditorLayout(
 		rowHeight: lineHeight,
 		charWidth,
 		overscan: VERTICAL_VIRTUALIZER_OVERSCAN,
+		horizontalOverscan: HORIZONTAL_VIRTUALIZER_OVERSCAN * COLUMN_CHARS_PER_ITEM,
 		getLineLength,
 	})
 
