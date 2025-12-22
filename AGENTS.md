@@ -57,7 +57,7 @@
 
 ## Commit & Pull Request Guidelines
 
-- Commits: short, present-tense summaries, optionally scoped, e.g. `web: improve terminal resizing`.
+- **Commits**: Use [Conventional Commits](https://www.conventionalcommits.org/). Keep the title (subject line) short and concise; use the commit description for detailed context, rationale, and technical explanations.
 - Group related changes; avoid large, mixed-topic commits.
 - PRs should include:
   - A clear description of the change and motivation.
