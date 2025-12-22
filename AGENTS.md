@@ -1,5 +1,6 @@
 > [!IMPORTANT]
 > **Before writing code: write logs, asserts, and tests.**
+> **Always opt in for adding logs and other debug tools and asking the user for input when not sure.**
 
 # Repository Guidelines
 
@@ -34,6 +35,7 @@
 - **One hook/component per file**: Each hook and component should have its own file; do not define multiple components or hooks in a single file.
 - **Never support backward compatibility**: We do not support backward compatibility. Remove any code that exists solely for this purpose.
 - Always fix ESLint and formatting issues before opening a PR.
+- **Enums & Constants**: Avoid regular `enum`. Use `const enum` (for inlining) or `object as const` (for runtime access) instead. While strings with strong TypeScript typing are fine, the `enum` semantic is preferred for clarity.
 
 ## SolidJS Props & Reactivity
 
