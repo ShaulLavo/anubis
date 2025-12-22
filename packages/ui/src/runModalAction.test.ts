@@ -3,7 +3,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { createModalStore } from './createModalStore'
 import { runModalAction } from './runModalAction'
 
-const withStore = async <T,>(
+const { mockLogger } = vi.hoisted(() => ({
+	mockLogger: {
+		info: vi.fn(),
+		error: vi.fn(),
+	},
+}))
+
+vi.mock('@repo/logger', () => ({
+	loggers: {
+		app: {
+			withTag: () => mockLogger,
+		},
+	},
+}))
+
+const withStore = async <T>(
 	run: (store: ReturnType<typeof createModalStore>) => Promise<T> | T
 ) => {
 	return createRoot(async (dispose) => {
@@ -31,13 +46,12 @@ describe('runModalAction', () => {
 					reject = rejectPromise
 				})
 			const error = new Error('nope')
-			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+			mockLogger.error.mockClear()
 			runModalAction(store, { label: 'Ok', onPress }, id)
 			reject(error)
 			await flushPromises()
-			expect(errorSpy).toHaveBeenCalledWith('[modal] action failed', error)
+			expect(mockLogger.error).toHaveBeenCalledWith('action failed', error)
 			expect(store.state()).toBeNull()
-			errorSpy.mockRestore()
 		})
 	})
 
@@ -50,13 +64,12 @@ describe('runModalAction', () => {
 					reject = rejectPromise
 				})
 			const error = new Error('nope')
-			const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+			mockLogger.error.mockClear()
 			runModalAction(store, { label: 'Ok', onPress, autoClose: false }, id)
 			reject(error)
 			await flushPromises()
-			expect(errorSpy).toHaveBeenCalledWith('[modal] action failed', error)
+			expect(mockLogger.error).toHaveBeenCalledWith('action failed', error)
 			expect(store.state()?.id).toBe(id)
-			errorSpy.mockRestore()
 		})
 	})
 })
