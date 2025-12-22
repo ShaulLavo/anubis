@@ -1,5 +1,5 @@
 import { For, Show, createMemo } from 'solid-js'
-import { EDITOR_PADDING_LEFT, LINE_NUMBER_WIDTH } from '../../consts'
+import { EDITOR_PADDING_LEFT } from '../../consts'
 import { useCursor } from '../../cursor'
 import type { FoldRange, LineGuttersProps } from '../../types'
 import { LineGutter } from './LineGutter'
@@ -42,7 +42,7 @@ export const LineGutters = (props: LineGuttersProps) => {
 		<div
 			class="editor-gutter-wrapper"
 			style={{
-				width: `${LINE_NUMBER_WIDTH}px`,
+				width: `${props.gutterWidth()}px`,
 			}}
 		>
 			<div

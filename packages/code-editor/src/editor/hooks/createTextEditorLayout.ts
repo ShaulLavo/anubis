@@ -6,14 +6,17 @@ import {
 	untrack,
 	type Accessor,
 } from 'solid-js'
+import { loggers } from '@repo/logger'
+import { trackMicro } from '@repo/perf'
 import {
 	COLUMN_CHARS_PER_ITEM,
+	DEFAULT_GUTTER_MODE,
 	HORIZONTAL_VIRTUALIZER_OVERSCAN,
-	LINE_NUMBER_WIDTH,
 	VERTICAL_VIRTUALIZER_OVERSCAN,
 } from '../consts'
 import {
 	calculateColumnOffset,
+	calculateGutterWidth,
 	calculateVisualColumnCount,
 	estimateLineHeight,
 	measureCharWidth,
@@ -39,6 +42,7 @@ export type TextEditorLayout = {
 	charWidth: Accessor<number>
 	lineHeight: Accessor<number>
 	contentWidth: Accessor<number>
+	gutterWidth: Accessor<number>
 	inputX: Accessor<number>
 	inputY: Accessor<number>
 	getColumnOffset: (lineIndex: number, columnIndex: number) => number
@@ -80,9 +84,72 @@ const measureLineHeight = (
 		: estimateLineHeight(fontSize)
 }
 
+const WIDTH_SCAN_BUDGET_MS = 6
+
+export type WidthScanSliceResult = {
+	nextIndex: number
+	maxColumns: number
+	done: boolean
+	linesProcessed: number
+}
+
+export const scanLineWidthSlice = (options: {
+	startIndex: number
+	endIndex: number
+	nextIndex: number
+	maxColumns: number
+	tabSize: number
+	getLineText: (lineIndex: number) => string
+	shouldYield: () => boolean
+}): WidthScanSliceResult => {
+	const startIndex = Math.min(options.startIndex, options.endIndex)
+	const endIndex = Math.max(options.startIndex, options.endIndex)
+
+	if (endIndex < startIndex) {
+		return {
+			nextIndex: startIndex,
+			maxColumns: options.maxColumns,
+			done: true,
+			linesProcessed: 0,
+		}
+	}
+
+	let nextIndex = Math.max(startIndex, Math.min(options.nextIndex, endIndex))
+	let maxColumns = options.maxColumns
+	let linesProcessed = 0
+
+	while (nextIndex <= endIndex) {
+		if (linesProcessed > 0 && options.shouldYield()) break
+
+		const text = options.getLineText(nextIndex)
+		const visualWidth = calculateVisualColumnCount(text, options.tabSize)
+		if (visualWidth > maxColumns) maxColumns = visualWidth
+
+		linesProcessed += 1
+		nextIndex += 1
+	}
+
+	return {
+		nextIndex,
+		maxColumns,
+		done: nextIndex > endIndex,
+		linesProcessed,
+	}
+}
+
 export function createTextEditorLayout(
 	options: TextEditorLayoutOptions
 ): TextEditorLayout {
+	const log = loggers.codeEditor.withTag('virtualizer')
+	const assert = (
+		condition: boolean,
+		message: string,
+		details?: Record<string, unknown>
+	) => {
+		if (condition) return true
+		log.warn(message, details)
+		return false
+	}
 	const cursor = useCursor()
 
 	const hasLineEntries = createMemo(() => cursor.lines.lineCount() > 0)
@@ -154,16 +221,24 @@ export function createTextEditorLayout(
 	})
 
 	const [maxColumnsSeen, setMaxColumnsSeen] = createSignal(0)
+	type WidthScanRange = {
+		start: number
+		end: number
+		next: number
+	}
 	let lastWidthScanStart = 0
 	let lastWidthScanEnd = -1
-	let pendingWidthScanStart: number | null = null
-	let pendingWidthScanEnd: number | null = null
+	let activeWidthScan: WidthScanRange | null = null
 	let scheduledWidthScan = false
 	let idleScanId: number | undefined
 	let timeoutScanId: ReturnType<typeof setTimeout> | undefined
 
+	type IdleDeadline = {
+		timeRemaining: () => number
+		didTimeout: boolean
+	}
 	type RequestIdleCallback = (
-		callback: () => void,
+		callback: (deadline: IdleDeadline) => void,
 		options?: { timeout?: number }
 	) => number
 	type CancelIdleCallback = (handle: number) => void
@@ -179,6 +254,155 @@ export function createTextEditorLayout(
 		}
 	).cancelIdleCallback
 
+	const createYieldChecker = (deadline?: IdleDeadline) => {
+		const budget = Math.min(
+			WIDTH_SCAN_BUDGET_MS,
+			deadline ? deadline.timeRemaining() : WIDTH_SCAN_BUDGET_MS
+		)
+		const start = performance.now()
+		return () => performance.now() - start >= Math.max(0, budget)
+	}
+
+	const runWidthScan = (deadline?: IdleDeadline) => {
+		scheduledWidthScan = false
+
+		if (!activeWidthScan) return
+
+		if (rowVirtualizer.isScrolling()) {
+			scheduleWidthScan()
+			return
+		}
+
+		const lineCount = cursor.lines.lineCount()
+		if (lineCount === 0) {
+			activeWidthScan = null
+			return
+		}
+
+		const start = Math.max(0, Math.min(activeWidthScan.start, lineCount - 1))
+		const end = Math.max(start, Math.min(activeWidthScan.end, lineCount - 1))
+		const nextIndex = Math.max(start, Math.min(activeWidthScan.next, end))
+
+		if (
+			!assert(
+				start <= end && nextIndex >= start && nextIndex <= end,
+				'Width scan cursor is invalid',
+				{
+					start,
+					end,
+					nextIndex,
+				}
+			)
+		) {
+			activeWidthScan = null
+			return
+		}
+
+		const previousMax = untrack(() => maxColumnsSeen())
+		const shouldYield = createYieldChecker(deadline)
+		const result = trackMicro(
+			'layout.width-scan',
+			() =>
+				scanLineWidthSlice({
+					startIndex: start,
+					endIndex: end,
+					nextIndex,
+					maxColumns: previousMax,
+					tabSize: options.tabSize(),
+					getLineText: cursor.lines.getLineText,
+					shouldYield,
+				}),
+			{
+				logger: log,
+				threshold: 8,
+				metadata: {
+					start,
+					end,
+					next: nextIndex,
+				},
+			}
+		)
+
+		if (result.linesProcessed > 0 && result.maxColumns !== previousMax) {
+			setMaxColumnsSeen(result.maxColumns)
+		}
+
+		if (result.done) {
+			activeWidthScan = null
+		} else {
+			activeWidthScan = {
+				start,
+				end,
+				next: result.nextIndex,
+			}
+		}
+
+		if (activeWidthScan) {
+			scheduleWidthScan()
+		}
+	}
+
+	const scheduleWidthScan = () => {
+		if (scheduledWidthScan || !activeWidthScan) return
+
+		scheduledWidthScan = true
+		if (requestIdleCallback) {
+			idleScanId = requestIdleCallback((deadline) => runWidthScan(deadline), {
+				timeout: 60,
+			})
+		} else {
+			timeoutScanId = globalThis.setTimeout(() => runWidthScan(), 0)
+		}
+	}
+
+	const queueWidthScan = (
+		from: number,
+		to: number,
+		options?: { replace?: boolean }
+	) => {
+		if (from > to) return
+		if (!Number.isFinite(from) || !Number.isFinite(to)) {
+			assert(false, 'Width scan range is not finite', { from, to })
+			return
+		}
+
+		const lineCount = cursor.lines.lineCount()
+		if (!assert(lineCount > 0, 'Width scan requires lines', { lineCount })) {
+			return
+		}
+
+		const clampedStart = Math.max(0, Math.min(from, lineCount - 1))
+		const clampedEnd = Math.max(clampedStart, Math.min(to, lineCount - 1))
+
+		if (
+			!assert(clampedStart <= clampedEnd, 'Width scan range is invalid', {
+				from,
+				to,
+				clampedStart,
+				clampedEnd,
+				lineCount,
+			})
+		) {
+			return
+		}
+
+		if (!activeWidthScan || options?.replace) {
+			activeWidthScan = {
+				start: clampedStart,
+				end: clampedEnd,
+				next: clampedStart,
+			}
+		} else {
+			activeWidthScan = {
+				start: Math.min(activeWidthScan.start, clampedStart),
+				end: Math.max(activeWidthScan.end, clampedEnd),
+				next: Math.min(activeWidthScan.next, clampedStart),
+			}
+		}
+
+		scheduleWidthScan()
+	}
+
 	// *Approved*
 	createEffect(() => {
 		options.tabSize()
@@ -186,8 +410,7 @@ export function createTextEditorLayout(
 		setMaxColumnsSeen(0)
 		lastWidthScanStart = 0
 		lastWidthScanEnd = -1
-		pendingWidthScanStart = null
-		pendingWidthScanEnd = null
+		activeWidthScan = null
 		scheduledWidthScan = false
 
 		if (idleScanId != null && cancelIdleCallback) {
@@ -203,11 +426,12 @@ export function createTextEditorLayout(
 	// *Approved*
 	createEffect(() => {
 		const items = virtualItems()
-		const tabSize = options.tabSize()
+		options.tabSize()
 
 		if (items.length === 0) {
 			lastWidthScanStart = 0
 			lastWidthScanEnd = -1
+			activeWidthScan = null
 			return
 		}
 
@@ -219,70 +443,31 @@ export function createTextEditorLayout(
 			endIndex >= lastWidthScanStart &&
 			startIndex <= lastWidthScanEnd
 
-		const enqueueScan = (from: number, to: number) => {
-			if (from > to) return
-			pendingWidthScanStart =
-				pendingWidthScanStart == null
-					? from
-					: Math.min(pendingWidthScanStart, from)
-			pendingWidthScanEnd =
-				pendingWidthScanEnd == null ? to : Math.max(pendingWidthScanEnd, to)
-		}
-
-		if (!overlaps) enqueueScan(startIndex, endIndex)
+		if (!overlaps) queueWidthScan(startIndex, endIndex, { replace: true })
 		else {
 			if (startIndex < lastWidthScanStart) {
-				enqueueScan(startIndex, lastWidthScanStart - 1)
+				queueWidthScan(startIndex, lastWidthScanStart - 1)
 			}
 			if (endIndex > lastWidthScanEnd) {
-				enqueueScan(lastWidthScanEnd + 1, endIndex)
+				queueWidthScan(lastWidthScanEnd + 1, endIndex)
 			}
 		}
 
 		lastWidthScanStart = startIndex
 		lastWidthScanEnd = endIndex
-
-		if (
-			pendingWidthScanStart == null ||
-			pendingWidthScanEnd == null ||
-			scheduledWidthScan
-		) {
-			return
-		}
-
-		scheduledWidthScan = true
-		const from = pendingWidthScanStart
-		const to = pendingWidthScanEnd
-		pendingWidthScanStart = null
-		pendingWidthScanEnd = null
-
-		const runScan = () => {
-			scheduledWidthScan = false
-
-			const previousMax = untrack(() => maxColumnsSeen())
-			let max = previousMax
-			for (let lineIndex = from; lineIndex <= to; lineIndex++) {
-				const text = cursor.lines.getLineText(lineIndex)
-				const visualWidth = calculateVisualColumnCount(text, tabSize)
-				if (visualWidth > max) max = visualWidth
-			}
-			if (max !== previousMax) setMaxColumnsSeen(max)
-		}
-
-		if (requestIdleCallback) {
-			idleScanId = requestIdleCallback(() => runScan(), { timeout: 60 })
-		} else {
-			timeoutScanId = globalThis.setTimeout(runScan, 0)
-		}
 	})
 
 	onCleanup(() => {
 		if (idleScanId != null && cancelIdleCallback) {
 			cancelIdleCallback(idleScanId)
+			idleScanId = undefined
 		}
 		if (timeoutScanId != null) {
 			globalThis.clearTimeout(timeoutScanId)
+			timeoutScanId = undefined
 		}
+		activeWidthScan = null
+		scheduledWidthScan = false
 	})
 
 	const contentWidth = createMemo(() => {
@@ -306,9 +491,18 @@ export function createTextEditorLayout(
 	const cursorLineIndex = createMemo(() => cursor.state.position.line)
 	const cursorColumnIndex = createMemo(() => cursor.state.position.column)
 
+	// Calculate dynamic gutter width based on line count and mode
+	const gutterWidth = createMemo(() =>
+		calculateGutterWidth(
+			cursor.lines.lineCount(),
+			DEFAULT_GUTTER_MODE,
+			options.fontSize(),
+			options.fontFamily()
+		)
+	)
+
 	const inputX = createMemo(
-		() =>
-			LINE_NUMBER_WIDTH + columnOffset(cursorLineIndex(), cursorColumnIndex())
+		() => gutterWidth() + columnOffset(cursorLineIndex(), cursorColumnIndex())
 	)
 
 	const inputY = createMemo(() => {
@@ -329,6 +523,7 @@ export function createTextEditorLayout(
 		charWidth,
 		lineHeight,
 		contentWidth,
+		gutterWidth,
 		inputX,
 		inputY,
 		getColumnOffset: columnOffset,

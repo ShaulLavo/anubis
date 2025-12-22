@@ -4,7 +4,6 @@ import { Cursor } from '../cursor/components/Cursor'
 import { SelectionLayer } from '../selection/components/SelectionLayer'
 import { LineGutters } from '../line/components/LineGutters'
 import { Input } from './Input'
-import { LINE_NUMBER_WIDTH } from '../consts'
 import type { TextEditorLayout, TextEditorInputHandlers } from '../hooks'
 import type {
 	CursorMode,
@@ -67,7 +66,7 @@ export const EditorViewport = (props: EditorViewportProps) => {
 				<SelectionLayer
 					virtualItems={props.layout.virtualItems}
 					lineHeight={props.layout.lineHeight}
-					lineNumberWidth={LINE_NUMBER_WIDTH}
+					lineNumberWidth={props.layout.gutterWidth()}
 					paddingLeft={0}
 					charWidth={props.layout.charWidth}
 					tabSize={props.tabSize}
@@ -80,7 +79,7 @@ export const EditorViewport = (props: EditorViewportProps) => {
 						fontSize={props.fontSize()}
 						fontFamily={props.fontFamily()}
 						charWidth={props.layout.charWidth()}
-						lineNumberWidth={LINE_NUMBER_WIDTH}
+						lineNumberWidth={props.layout.gutterWidth()}
 						paddingLeft={0}
 						visibleLineStart={props.layout.visibleLineRange().start}
 						visibleLineEnd={props.layout.visibleLineRange().end}
@@ -94,6 +93,7 @@ export const EditorViewport = (props: EditorViewportProps) => {
 					<LineGutters
 						rows={props.layout.virtualItems}
 						lineHeight={props.layout.lineHeight}
+						gutterWidth={props.layout.gutterWidth}
 						onRowClick={props.input.handleRowClick}
 						activeLineIndex={props.layout.activeLineIndex}
 						folds={props.folds}
