@@ -1,5 +1,8 @@
 import type { ModalAction } from './createModalStore'
 import type { createModalStore } from './createModalStore'
+import { loggers } from '@repo/logger'
+
+const log = loggers.app.withTag('modal')
 
 type ModalStore = ReturnType<typeof createModalStore>
 
@@ -12,9 +15,7 @@ const isPromise = (value: unknown): value is Promise<unknown> => {
 
 const runModalAction = (store: ModalStore, action: ModalAction, id: string) => {
 	try {
-		const current = store.state()
-
-		console.info('[modal] action', { id, actionId: action.id })
+		log.info('action', { id, actionId: action.id })
 		const result = action.onPress?.()
 		const shouldAutoClose = action.autoClose !== false
 		if (isPromise(result)) {
@@ -25,7 +26,7 @@ const runModalAction = (store: ModalStore, action: ModalAction, id: string) => {
 					}
 				})
 				.catch((error) => {
-					console.error('[modal] action failed', error)
+					log.error('action failed', error)
 					if (shouldAutoClose) {
 						store.dismiss(id)
 					}
@@ -36,7 +37,7 @@ const runModalAction = (store: ModalStore, action: ModalAction, id: string) => {
 		if (!shouldAutoClose) return
 		store.dismiss(id)
 	} catch (error) {
-		console.error('[modal] action failed', error)
+		log.error('action failed', error)
 	}
 }
 

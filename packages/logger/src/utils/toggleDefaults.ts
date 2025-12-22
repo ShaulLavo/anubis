@@ -7,12 +7,18 @@ const LOGGER_TOGGLE_TREE = {
 	app: false,
 	'code-editor': {
 		$self: false,
+		'benchmark-content': false,
 		clipboard: false,
 		cursor: false,
 		history: false,
+		line: false,
 		minimap: false,
+		'minimap-render': false,
+		'minimap-selection': false,
 		scmParser: false,
-		virtualizer: false
+		scrollbar: false,
+		virtualizer: false,
+		'virtualizer-2d': false
 	},
 	desktop: false,
 	fs: false,
