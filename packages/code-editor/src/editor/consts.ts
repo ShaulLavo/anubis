@@ -13,22 +13,16 @@ export const GUTTER_MODES = [
 	'cjk-ideographic',
 ] as const
 export type GutterMode = (typeof GUTTER_MODES)[number]
-export const DEFAULT_GUTTER_MODE: GutterMode = 'hebrew'
+export const DEFAULT_GUTTER_MODE: GutterMode = 'cjk-ideographic'
 export const MIN_ESTIMATED_LINE_HEIGHT = 18
-export const VERTICAL_VIRTUALIZER_OVERSCAN = 10
 // JetBrains Mono character width ratio (monospace)
 // Measured: 0.6 * fontSize gives accurate character cell width
 export const CHAR_WIDTH_RATIO = 0.6
 export const DEFAULT_TAB_SIZE = 4
 export const COLUMN_CHARS_PER_ITEM = 80
 export const HORIZONTAL_VIRTUALIZER_OVERSCAN = 6
-
-// TODO: Horizontal (column) virtualization
-// - Map `scrollLeft` (px) <-> visual columns <-> char indices (tab-aware; tabs can straddle viewport edges)
-// - Render a sliced text window but keep the correct X offset so cursor/selection/highlights still align
-// - Clamp/shift highlight segments + bracket depth indices for the slice (`BracketizedLineText` walks full lines today)
-// - Ensure click/drag hit-testing uses the same mapping (`calculateColumnFromClick`, mouse selection)
-// - Keep selection overlay (rects + whitespace markers) consistent with horizontal windowing
+export const VIRTUALIZER_OVERSCAN = 20
+export const VERTICAL_VIRTUALIZER_OVERSCAN = VIRTUALIZER_OVERSCAN
 
 // Scroll context: number of rows to keep visible above/below cursor
 export const SCROLL_CONTEXT_ROWS = 4
