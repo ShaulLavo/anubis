@@ -35,4 +35,6 @@ export {
 export {
 	useScrollBenchmark,
 	type UseScrollBenchmarkOptions,
+	type BenchmarkResults,
+	type PhaseStats,
 } from './useScrollBenchmark'

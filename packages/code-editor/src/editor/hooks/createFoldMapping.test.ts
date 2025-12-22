@@ -17,7 +17,7 @@ const runWithMapping = <T>(
 	return createRoot((dispose) => {
 		const [totalLines] = createSignal(options.totalLines)
 		const [folds] = createSignal(options.folds)
-		const [foldedStarts] = createSignal<Set<number>>(
+		const [foldedStarts] = createSignal(
 			options.foldedStarts ?? new Set<number>()
 		)
 

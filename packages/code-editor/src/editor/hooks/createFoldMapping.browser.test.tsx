@@ -15,9 +15,7 @@ describe('createFoldMapping (browser)', () => {
 				const folds: FoldRange[] = [
 					{ startLine: 2, endLine: 5, type: 'function' },
 				]
-				const [foldedStarts, setFoldedStarts] = createSignal<Set<number>>(
-					new Set<number>()
-				)
+				const [foldedStarts, setFoldedStarts] = createSignal(new Set<number>())
 
 				const mapping = createFoldMapping({
 					totalLines: () => 10,
