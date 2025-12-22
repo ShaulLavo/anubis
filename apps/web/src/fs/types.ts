@@ -1,5 +1,6 @@
 import type { FsDirTreeNode, FsFileTreeNode, FsTreeNode } from '@repo/fs'
 import type { ParseResult, PieceTableSnapshot } from '@repo/utils'
+import type { VisibleContentSnapshot } from '@repo/code-editor'
 import type {
 	TreeSitterCapture,
 	BracketInfo,
@@ -48,4 +49,7 @@ export type FsState = {
 	dirtyPaths: Record<string, boolean>
 	scrollPositions: Record<string, ScrollPosition | undefined>
 	selectedFileScrollPosition?: ScrollPosition
+	/** Pre-computed visible content for instant tab switching */
+	visibleContents: Record<string, VisibleContentSnapshot | undefined>
+	selectedFileVisibleContent?: VisibleContentSnapshot
 }

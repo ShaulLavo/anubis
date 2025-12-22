@@ -20,6 +20,7 @@ import {
 	createLineHighlights,
 	useFoldedStarts,
 	useScrollBenchmark,
+	useVisibleContentCache,
 } from '../hooks'
 import { EditorViewport } from './EditorViewport'
 import { Minimap } from '../minimap'
@@ -258,6 +259,40 @@ export const TextEditorView = (props: EditorProps) => {
 		lexerStates,
 	})
 
+	// Helper to get line entry for caching
+	const getLineEntry = (lineIndex: number) => {
+		if (lineIndex < 0 || lineIndex >= cursor.lines.lineCount()) {
+			return null
+		}
+		return {
+			index: lineIndex,
+			start: cursor.lines.getLineStart(lineIndex),
+			length: cursor.lines.getLineLength(lineIndex),
+			text: cursor.lines.getLineText(lineIndex),
+		}
+	}
+
+	// Visible content caching for instant tab switching
+	const { markLiveContentAvailable, getCachedRuns } = useVisibleContentCache({
+		filePath: () => props.document.filePath(),
+		scrollElement,
+		virtualItems: layout.virtualItems,
+		getLineEntry,
+		getLineBracketDepths,
+		getLineHighlights,
+		initialVisibleContent: props.initialVisibleContent,
+		onCaptureVisibleContent: props.onCaptureVisibleContent,
+	})
+
+	// Mark live content as available when we have highlights (or when file is ready)
+	createEffect(() => {
+		const hasHighlights = props.highlights?.()?.length ?? 0
+		const hasContent = cursor.lines.lineCount() > 0
+		if (hasContent && (hasHighlights > 0 || props.isFileSelected())) {
+			markLiveContentAvailable()
+		}
+	})
+
 	return (
 		<Show
 			when={layout.hasLineEntries()}
@@ -283,6 +318,7 @@ export const TextEditorView = (props: EditorProps) => {
 					tabSize={tabSize}
 					getLineBracketDepths={getLineBracketDepths}
 					getLineHighlights={getLineHighlights}
+					getCachedRuns={getCachedRuns}
 					folds={props.folds}
 					foldedStarts={foldedStarts}
 					onToggleFold={toggleFold}

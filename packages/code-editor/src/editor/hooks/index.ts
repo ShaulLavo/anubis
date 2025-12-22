@@ -38,3 +38,7 @@ export {
 	type BenchmarkResults,
 	type PhaseStats,
 } from './useScrollBenchmark'
+export {
+	useVisibleContentCache,
+	type UseVisibleContentCacheOptions,
+} from './useVisibleContentCache'

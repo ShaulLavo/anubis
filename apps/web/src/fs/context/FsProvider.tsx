@@ -54,6 +54,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 		registerDeferredMetadata,
 		clearDeferredMetadata,
 		setScrollPosition,
+		setVisibleContent,
 	} = createFsState()
 
 	const fileCache = createFileCacheController({
@@ -65,6 +66,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setBrackets,
 		setErrors,
 		setScrollPosition,
+		setVisibleContent,
 	})
 
 	const setDirNode = (path: string, node: FsDirTreeNode) => {
@@ -110,6 +112,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 		updateSelectedFileBrackets,
 		updateSelectedFileErrors,
 		updateSelectedFileScrollPosition,
+		updateSelectedFileVisibleContent,
 	} = useFileSelection({
 		state,
 		setSelectedPath,
@@ -264,6 +267,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 			updateSelectedFileBrackets,
 			updateSelectedFileErrors,
 			updateSelectedFileScrollPosition,
+			updateSelectedFileVisibleContent,
 			fileCache,
 			saveFile,
 			setDirtyPath,

@@ -38,6 +38,16 @@ export const Lines = (props: LinesProps) => {
 						return e ? props.getLineBracketDepths(e) : undefined
 					})
 
+					// Try to get cached runs for instant rendering
+					const cachedRuns = createMemo(() => {
+						const idx = lineIndex()
+						return props.getCachedRuns?.(
+							idx,
+							virtualRow.columnStart,
+							virtualRow.columnEnd
+						)
+					})
+
 					return (
 						<Show when={entry()}>
 							{(validEntry) => (
@@ -54,6 +64,7 @@ export const Lines = (props: LinesProps) => {
 									isActive={props.activeLineIndex() === lineIndex()}
 									lineBracketDepths={lineBracketDepths()}
 									highlights={highlights()}
+									cachedRuns={cachedRuns()}
 								/>
 							)}
 						</Show>

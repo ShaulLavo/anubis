@@ -1,5 +1,6 @@
 import { batch } from 'solid-js'
 import type { ParseResult, PieceTableSnapshot } from '@repo/utils'
+import type { VisibleContentSnapshot } from '@repo/code-editor'
 import type {
 	TreeSitterCapture,
 	BracketInfo,
@@ -38,6 +39,8 @@ export type FileCacheEntry = {
 	brackets?: BracketInfo[]
 	errors?: TreeSitterError[]
 	scrollPosition?: ScrollPosition
+	/** Pre-computed visible content for instant tab switching */
+	visibleContent?: VisibleContentSnapshot
 }
 
 export type FileCacheController = {
@@ -58,6 +61,7 @@ type FileCacheControllerOptions = {
 		| 'fileBrackets'
 		| 'fileErrors'
 		| 'scrollPositions'
+		| 'visibleContents'
 	>
 	setPieceTable: (path: string, snapshot?: PieceTableSnapshot) => void
 	setFileStats: (path: string, stats?: ParseResult) => void
@@ -66,6 +70,7 @@ type FileCacheControllerOptions = {
 	setBrackets: (path: string, brackets?: BracketInfo[]) => void
 	setErrors: (path: string, errors?: TreeSitterError[]) => void
 	setScrollPosition: (path: string, position?: ScrollPosition) => void
+	setVisibleContent: (path: string, content?: VisibleContentSnapshot) => void
 }
 
 export const createFileCacheController = ({
@@ -77,6 +82,7 @@ export const createFileCacheController = ({
 	setBrackets,
 	setErrors,
 	setScrollPosition,
+	setVisibleContent,
 }: FileCacheControllerOptions): FileCacheController => {
 	// TODO: add eviction and persistence so all artifacts are released together.
 	const previews: Record<string, Uint8Array | undefined> = {}
@@ -92,6 +98,7 @@ export const createFileCacheController = ({
 			brackets: state.fileBrackets[path],
 			errors: state.fileErrors[path],
 			scrollPosition: state.scrollPositions[path],
+			visibleContent: state.visibleContents[path],
 		}
 	}
 
@@ -122,6 +129,9 @@ export const createFileCacheController = ({
 			if (entry.scrollPosition !== undefined) {
 				setScrollPosition(path, entry.scrollPosition)
 			}
+			if (entry.visibleContent !== undefined) {
+				setVisibleContent(path, entry.visibleContent)
+			}
 		})
 	}
 
@@ -140,6 +150,7 @@ export const createFileCacheController = ({
 			setBrackets(path, undefined)
 			setErrors(path, undefined)
 			setScrollPosition(path, undefined)
+			setVisibleContent(path, undefined)
 			delete previews[path]
 		})
 	}
@@ -166,6 +177,9 @@ export const createFileCacheController = ({
 			}
 			for (const path of Object.keys(state.scrollPositions)) {
 				setScrollPosition(path, undefined)
+			}
+			for (const path of Object.keys(state.visibleContents)) {
+				setVisibleContent(path, undefined)
 			}
 			for (const path of Object.keys(previews)) {
 				delete previews[path]

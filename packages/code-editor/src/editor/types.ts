@@ -2,6 +2,8 @@ import type { Accessor } from 'solid-js'
 import type { ParseResult } from '@repo/utils/parse'
 import type { PieceTableSnapshot } from '@repo/utils'
 import type { BracketInfo, Lexer } from '@repo/lexer'
+import type { VisibleContentSnapshot } from './types/visibleContentCache'
+import type { TextRun } from './line/utils/textRuns'
 
 export type VirtualItem = {
 	index: number
@@ -104,6 +106,10 @@ export type EditorProps = {
 	initialScrollPosition?: Accessor<ScrollPosition | undefined>
 	/** Called when scroll position changes to save for later restoration */
 	onScrollPositionChange?: (position: ScrollPosition) => void
+	/** Initial visible content snapshot for instant rendering on tab switch */
+	initialVisibleContent?: Accessor<VisibleContentSnapshot | undefined>
+	/** Called to capture visible content when switching away from this file */
+	onCaptureVisibleContent?: (snapshot: VisibleContentSnapshot) => void
 }
 
 export type ScrollPosition = {
@@ -140,6 +146,8 @@ export type LineProps = {
 	isActive: boolean
 	lineBracketDepths?: LineBracketDepthMap
 	highlights?: LineHighlightSegment[]
+	/** Pre-computed TextRuns from cache for instant rendering */
+	cachedRuns?: TextRun[]
 }
 
 export type LinesProps = {
@@ -163,6 +171,12 @@ export type LinesProps = {
 	activeLineIndex: Accessor<number | null>
 	getLineBracketDepths: (entry: LineEntry) => LineBracketDepthMap | undefined
 	getLineHighlights?: (entry: LineEntry) => LineHighlightSegment[] | undefined
+	/** Get cached TextRuns for a line (for instant rendering on tab switch) */
+	getCachedRuns?: (
+		lineIndex: number,
+		columnStart: number,
+		columnEnd: number
+	) => TextRun[] | undefined
 	/** Convert display row index to actual document line index */
 	displayToLine?: (displayIndex: number) => number
 }

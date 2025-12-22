@@ -51,6 +51,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			updateSelectedFileBrackets,
 			updateSelectedFileErrors,
 			updateSelectedFileScrollPosition,
+			updateSelectedFileVisibleContent,
 			saveFile,
 		},
 	] = useFs()
@@ -176,6 +177,8 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 							onSave={() => void saveFile()}
 							initialScrollPosition={() => state.selectedFileScrollPosition}
 							onScrollPositionChange={updateSelectedFileScrollPosition}
+							initialVisibleContent={() => state.selectedFileVisibleContent}
+							onCaptureVisibleContent={updateSelectedFileVisibleContent}
 						/>
 					}
 				>

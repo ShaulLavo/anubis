@@ -12,6 +12,7 @@ import type {
 	LineHighlightSegment,
 	LineBracketDepthMap,
 } from '../types'
+import type { TextRun } from '../line/utils/textRuns'
 
 type EditorViewportProps = {
 	setScrollElement: (element: HTMLDivElement) => void
@@ -25,6 +26,11 @@ type EditorViewportProps = {
 	tabSize: Accessor<number>
 	getLineBracketDepths: (entry: LineEntry) => LineBracketDepthMap | undefined
 	getLineHighlights: (entry: LineEntry) => LineHighlightSegment[] | undefined
+	getCachedRuns?: (
+		lineIndex: number,
+		columnStart: number,
+		columnEnd: number
+	) => TextRun[] | undefined
 	folds?: Accessor<FoldRange[] | undefined>
 	foldedStarts: Accessor<Set<number>>
 	onToggleFold: (startLine: number) => void
@@ -114,6 +120,7 @@ export const EditorViewport = (props: EditorViewportProps) => {
 						activeLineIndex={props.layout.activeLineIndex}
 						getLineBracketDepths={props.getLineBracketDepths}
 						getLineHighlights={props.getLineHighlights}
+						getCachedRuns={props.getCachedRuns}
 						displayToLine={props.layout.displayToLine}
 					/>
 				</div>

@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'solid-js'
 import type { FsDirTreeNode } from '@repo/fs'
 import type { PieceTableSnapshot } from '@repo/utils'
+import type { VisibleContentSnapshot } from '@repo/code-editor'
 import type {
 	TreeSitterCapture,
 	BracketInfo,
@@ -44,6 +45,9 @@ export type FsActions = {
 	updateSelectedFileErrors: (errors: TreeSitterError[] | undefined) => void
 	updateSelectedFileScrollPosition: (
 		scrollPosition: ScrollPosition | undefined
+	) => void
+	updateSelectedFileVisibleContent: (
+		visibleContent: VisibleContentSnapshot | undefined
 	) => void
 	fileCache: FileCacheController
 	saveFile: (path?: string) => Promise<void>

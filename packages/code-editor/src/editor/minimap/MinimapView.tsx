@@ -16,7 +16,7 @@ import { useMinimapCore } from './useMinimapCore'
 import { useMinimapInteraction } from './useMinimapInteraction'
 import { useMinimapOverlay } from './useMinimapOverlay'
 
-const MINIMAP_VISIBILITY = AutoHideVisibility.SHOW
+const MINIMAP_VISIBILITY = AutoHideVisibility.AUTO
 
 /**
  * Main minimap view component.

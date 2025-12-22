@@ -74,6 +74,7 @@ export const Line = (props: LineProps) => {
 				highlightSegments={props.highlights}
 				columnStart={columnStart}
 				columnEnd={columnEnd}
+				cachedRuns={props.cachedRuns}
 			/>
 		</div>
 	)
