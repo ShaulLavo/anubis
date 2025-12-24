@@ -13,7 +13,8 @@
     "./dom": "./src/dom.ts",
     "./hooks": "./src/hooks/index.ts",
     "./safeLocalStorage": "./src/safeLocalStorage.ts",
-    "./viewTransition": "./src/viewTransition.ts"
+    "./viewTransition": "./src/viewTransition.ts",
+    "./highlightShift": "./src/highlightShift.ts"
   },
   "dependencies": {
     "@repo/perf": "*",
