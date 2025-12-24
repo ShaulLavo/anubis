@@ -1,9 +1,9 @@
 import { createMemo, type Accessor } from 'solid-js'
 import type { LineBracketDepthMap, LineHighlightSegment } from '../../types'
 import {
-	type TextRun,
-	normalizeHighlightSegments,
 	buildTextRuns,
+	normalizeHighlightSegments,
+	type TextRun,
 } from '../utils/textRuns'
 
 export type UseTextRunsOptions = {

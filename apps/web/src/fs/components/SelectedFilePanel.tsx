@@ -150,7 +150,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 				return undefined
 			}
 			// IMPORTANT: Unwrap the proxy to ensure downstream sorting is fast
-			return unwrap(captures) as unknown as EditorSyntaxHighlight[]
+			return unwrap(captures)
 		}
 	)
 

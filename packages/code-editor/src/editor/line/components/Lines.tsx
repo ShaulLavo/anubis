@@ -54,10 +54,8 @@ export const Lines = (props: LinesProps) => {
 							equals: (a, b) => {
 								if (a === b) return true
 								if (!a || !b) return false
-								if (a.length !== b.length) {
-									// console.log('Length mismatch', a.length, b.length)
-									return false
-								}
+								if (a.length !== b.length) return false
+
 								for (let i = 0; i < a.length; i++) {
 									const sA = a[i]
 									const sB = b[i]
@@ -68,7 +66,6 @@ export const Lines = (props: LinesProps) => {
 										sA.end !== sB.end ||
 										sA.className !== sB.className
 									) {
-										// console.log('Segment mismatch', i, sA, sB)
 										return false
 									}
 								}
@@ -93,7 +90,7 @@ export const Lines = (props: LinesProps) => {
 
 								for (let i = 0; i < keysA.length; i++) {
 									const key = keysA[i]!
-									// @ts-ignore - keys are numbers in type but strings in Object.keys
+									// @ts-expect-error - keys are numbers in type but strings in Object.keys
 									if (a[key] !== b[key]) return false
 								}
 								return true
