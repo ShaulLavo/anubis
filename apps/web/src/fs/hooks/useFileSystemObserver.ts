@@ -1,13 +1,12 @@
-import { onCleanup } from 'solid-js'
-import type { FsDirTreeNode, FsTreeNode } from '@repo/fs'
 import {
 	createFileSystemObserver,
 	type FileSystemChangeRecord,
 	type FileSystemObserverPolyfill,
 } from '@repo/fs'
 import { loggers } from '@repo/logger'
-import type { FsState, FsSource } from '../types'
+import { onCleanup } from 'solid-js'
 import { findNode } from '../runtime/tree'
+import type { FsState } from '../types'
 
 type UseFileSystemObserverOptions = {
 	state: FsState
@@ -53,8 +52,7 @@ export const useFileSystemObserver = ({
 		const processedPaths = new Set<string>()
 
 		for (const record of records) {
-			const relativePath = record.relativePathComponents.join('/')
-			const fullPath = relativePath
+			const fullPath = record.relativePathComponents.join('/')
 
 			// Skip if we already processed this path in this batch
 			if (processedPaths.has(fullPath)) continue

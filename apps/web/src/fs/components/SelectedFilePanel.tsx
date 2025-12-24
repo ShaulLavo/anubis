@@ -1,8 +1,11 @@
 import type {
 	EditorSyntaxHighlight,
+	HighlightOffset,
 	TextEditorDocument,
 } from '@repo/code-editor'
 import { Editor, Lexer } from '@repo/code-editor'
+import { getEditCharDelta, getEditLineDelta } from '@repo/utils/highlightShift'
+
 import {
 	Accessor,
 	Match,
@@ -20,6 +23,7 @@ import { getTreeSitterWorker } from '../../treeSitter/workerClient'
 import { detectLanguage } from '../../workers/treeSitter/constants'
 import { useTabs } from '../hooks/useTabs'
 import { Tabs } from './Tabs'
+import { unwrap } from 'solid-js/store'
 
 const FONT_OPTIONS = [
 	{
@@ -47,6 +51,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			selectPath,
 			updateSelectedFilePieceTable,
 			updateSelectedFileHighlights,
+			applySelectedFileHighlightOffset,
 			updateSelectedFileFolds,
 			updateSelectedFileBrackets,
 			updateSelectedFileErrors,
@@ -100,14 +105,26 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			const parsePromise = sendIncrementalTreeEdit(path, edit)
 			if (!parsePromise) return
 
-			// Tree-sitter artifacts are async and can briefly go stale vs the live piece table.
-			// Clear highlights and brackets immediately so the editor falls back to the lexer
-			// until the next worker result arrives.
-			// TODO make tree sitter table like zed editor
-			batch(() => {
-				updateSelectedFileHighlights(undefined)
-				updateSelectedFileBrackets([])
+			// Apply offset immediately for ALL edits (O(1) operation)
+			applySelectedFileHighlightOffset({
+				charDelta: getEditCharDelta(edit),
+				lineDelta: getEditLineDelta(edit),
+				fromCharIndex: edit.startIndex,
+				fromLineRow: edit.startPosition.row,
 			})
+
+			// For whitespace/newline insertions (shiftable), offset is accurate
+			// so we skip the tree-sitter update to avoid double-render.
+			// For other edits, tree-sitter will return accurate results.
+			const isShiftable =
+				edit.oldEndIndex === edit.startIndex && // Pure insertion
+				/^\s*$/.test(edit.insertedText) && // Whitespace only
+				edit.insertedText.length > 0
+
+			if (isShiftable) {
+				// Shiftable: offset is correct, skip tree-sitter update
+				return
+			}
 
 			void parsePromise.then((result) => {
 				if (result && path === state.lastKnownFilePath) {
@@ -124,19 +141,30 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		},
 	}
 
+	// TreeSitterCapture already has { startIndex, endIndex, scope } which matches EditorSyntaxHighlight
+	// No .map() needed - just pass through directly!
 	const editorHighlights = createMemo<EditorSyntaxHighlight[] | undefined>(
 		() => {
 			const captures = state.selectedFileHighlights
 			if (!captures || captures.length === 0) {
 				return undefined
 			}
-			return captures.map((capture) => ({
-				startIndex: capture.startIndex,
-				endIndex: capture.endIndex,
-				scope: capture.captureName,
-			}))
+			// IMPORTANT: Unwrap the proxy to ensure downstream sorting is fast
+			return unwrap(captures) as unknown as EditorSyntaxHighlight[]
 		}
 	)
+
+	// Convert internal offset to editor HighlightOffset type
+	const editorHighlightOffset = createMemo<HighlightOffset | undefined>(() => {
+		const offset = state.selectedFileHighlightOffset
+		if (!offset) return undefined
+		return {
+			charDelta: offset.charDelta,
+			lineDelta: offset.lineDelta,
+			fromCharIndex: offset.fromCharIndex,
+			fromLineRow: offset.fromLineRow,
+		}
+	})
 
 	const editorErrors = createMemo(() => state.selectedFileErrors)
 
@@ -168,6 +196,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 							activeScopes={focus.activeScopes}
 							previewBytes={() => state.selectedFilePreviewBytes}
 							highlights={editorHighlights}
+							highlightOffset={editorHighlightOffset}
 							folds={() => state.selectedFileFolds}
 							brackets={() => state.selectedFileBrackets}
 							errors={editorErrors}

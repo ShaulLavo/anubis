@@ -9,6 +9,7 @@ import type {
 } from '../workers/treeSitterWorkerTypes'
 import type { DeferredDirMetadata } from './prefetch/treePrefetchWorkerTypes'
 import type { ScrollPosition } from './cache/fileCacheController'
+import type { HighlightTransform } from './hooks/createHighlightState'
 
 export type FsSource = 'memory' | 'local' | 'opfs'
 
@@ -35,7 +36,10 @@ export type FsState = {
 	pieceTables: Record<string, PieceTableSnapshot | undefined>
 	selectedFilePieceTable?: PieceTableSnapshot
 	fileHighlights: Record<string, TreeSitterCapture[] | undefined>
+	/** Pending offset transforms for optimistic updates (O(1) instead of O(n)) */
+	highlightOffsets: Record<string, HighlightTransform | undefined>
 	selectedFileHighlights?: TreeSitterCapture[]
+	selectedFileHighlightOffset?: HighlightTransform
 	fileFolds: Record<string, FoldRange[] | undefined>
 	selectedFileFolds?: FoldRange[]
 	fileBrackets: Record<string, BracketInfo[] | undefined>

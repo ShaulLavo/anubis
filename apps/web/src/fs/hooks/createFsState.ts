@@ -60,8 +60,13 @@ export const createFsState = () => {
 	const { fileStats, setFileStats, clearParseResults } = createFileStatsState()
 	const { pieceTables, setPieceTable, clearPieceTables } =
 		createPieceTableState()
-	const { fileHighlights, setHighlights, clearHighlights } =
-		createHighlightState()
+	const {
+		fileHighlights,
+		highlightOffsets,
+		setHighlights,
+		applyHighlightOffset,
+		clearHighlights,
+	} = createHighlightState()
 	const { fileFolds, setFolds, clearFolds } = createFoldState()
 	const { fileBrackets, setBrackets, clearBrackets } = createBracketState()
 	const { fileErrors, setErrors, clearErrors } = createErrorState()
@@ -89,6 +94,7 @@ export const createFsState = () => {
 		fileStats,
 		pieceTables,
 		fileHighlights,
+		highlightOffsets,
 		fileFolds,
 		fileBrackets,
 		fileErrors,
@@ -165,6 +171,10 @@ export const createFsState = () => {
 			const path = lastKnownFilePath()
 			return path ? fileHighlights[path] : undefined
 		},
+		get selectedFileHighlightOffset() {
+			const path = lastKnownFilePath()
+			return path ? highlightOffsets[path] : undefined
+		},
 		get selectedFileFolds() {
 			const path = lastKnownFilePath()
 			return path ? fileFolds[path] : undefined
@@ -225,6 +235,7 @@ export const createFsState = () => {
 		setPieceTable,
 		clearPieceTables,
 		setHighlights,
+		applyHighlightOffset,
 		clearHighlights,
 		setFolds,
 		clearFolds,

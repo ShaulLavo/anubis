@@ -40,6 +40,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setPieceTable,
 		clearPieceTables,
 		setHighlights,
+		applyHighlightOffset,
 		setFolds,
 		setBrackets,
 		setErrors,
@@ -122,6 +123,15 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setSelectedFileLoading,
 		fileCache,
 	})
+
+	// Optimistic highlight offset - O(1) update instead of O(n) array recreation
+	const applySelectedFileHighlightOffset = (
+		transform: Parameters<typeof applyHighlightOffset>[1]
+	) => {
+		const path = state.lastKnownFilePath
+		if (!path) return
+		applyHighlightOffset(path, transform)
+	}
 
 	const { refresh } = useFsRefresh({
 		state,
@@ -263,6 +273,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 			ensureDirPathLoaded,
 			updateSelectedFilePieceTable,
 			updateSelectedFileHighlights,
+			applySelectedFileHighlightOffset,
 			updateSelectedFileFolds,
 			updateSelectedFileBrackets,
 			updateSelectedFileErrors,

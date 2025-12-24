@@ -13,6 +13,7 @@ import type {
 	ScrollPosition,
 } from '../cache/fileCacheController'
 import type { FsState, FsSource } from '../types'
+import type { HighlightTransform } from '../hooks/createHighlightState'
 
 export type SelectPathOptions = {
 	forceReload?: boolean
@@ -40,6 +41,8 @@ export type FsActions = {
 	updateSelectedFileHighlights: (
 		highlights: TreeSitterCapture[] | undefined
 	) => void
+	/** Apply an offset transformation for optimistic updates (O(1) instead of O(n)) */
+	applySelectedFileHighlightOffset: (transform: HighlightTransform) => void
 	updateSelectedFileFolds: (folds: FoldRange[] | undefined) => void
 	updateSelectedFileBrackets: (brackets: BracketInfo[] | undefined) => void
 	updateSelectedFileErrors: (errors: TreeSitterError[] | undefined) => void
