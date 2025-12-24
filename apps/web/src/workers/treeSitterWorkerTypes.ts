@@ -6,7 +6,7 @@ export type { FoldRange, MinimapTokenSummary }
 export type TreeSitterCapture = {
 	startIndex: number
 	endIndex: number
-	captureName: string
+	scope: string // Renamed from captureName to match EditorSyntaxHighlight
 }
 
 export type BracketInfo = {

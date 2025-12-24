@@ -14,16 +14,16 @@ export const runHighlightQueries = (
 	for (const query of queries) {
 		for (const match of query.matches(tree.rootNode)) {
 			for (const capture of match.captures) {
-				const captureName = capture.name ?? ''
+				const scope = capture.name ?? ''
 				const startIndex = capture.node.startIndex
 				const endIndex = capture.node.endIndex
-				const key = `${startIndex}:${endIndex}:${captureName}`
+				const key = `${startIndex}:${endIndex}:${scope}`
 				if (seen.has(key)) continue
 				seen.add(key)
 				results.push({
 					startIndex,
 					endIndex,
-					captureName,
+					scope,
 				})
 			}
 		}

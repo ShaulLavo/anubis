@@ -58,7 +58,7 @@ const buildMinimapTokens = (
 		let idx = captureIndex
 		while (idx < captures.length && captures[idx]!.startIndex < lineEnd) {
 			const capture = captures[idx]!
-			const colorId = getScopeColorId(capture.captureName)
+			const colorId = getScopeColorId(capture.scope)
 
 			// Calculate intersection with clamped line range [lineStart, lineStart + sampleLength]
 			const sampleEndGlobal = lineStart + sampleLength
