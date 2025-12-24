@@ -104,7 +104,9 @@ const PREFIX_SCOPE_CLASS: Record<string, string> = {
 	namespace: 'text-cyan-200',
 }
 
-export const getHighlightClassForScope = (scope: string): string | undefined => {
+export const getHighlightClassForScope = (
+	scope: string
+): string | undefined => {
 	if (!scope) return undefined
 	if (EXACT_SCOPE_CLASS[scope]) {
 		return EXACT_SCOPE_CLASS[scope]
@@ -141,10 +143,7 @@ const clampToLineMeta = (
 	const lineAbsoluteEnd = lineStart + lineLength
 	const start = Math.max(absoluteStart, lineStart)
 	const end = Math.min(absoluteEnd, lineAbsoluteEnd)
-	const relativeStart = Math.max(
-		0,
-		Math.min(lineTextLength, start - lineStart)
-	)
+	const relativeStart = Math.max(0, Math.min(lineTextLength, start - lineStart))
 	const relativeEnd = Math.max(0, Math.min(lineTextLength, end - lineStart))
 	if (relativeStart >= relativeEnd) {
 		return null
@@ -152,11 +151,21 @@ const clampToLineMeta = (
 	return [relativeStart, relativeEnd]
 }
 
+/**
+ * Offset transformation to apply to highlights.
+ * Applied inline during segment creation to avoid object allocation.
+ */
+type HighlightShiftOffset = {
+	charDelta: number
+	fromCharIndex: number
+}
+
 export const toLineHighlightSegmentsForLine = (
 	lineStart: number,
 	lineLength: number,
 	lineTextLength: number,
-	highlights: EditorSyntaxHighlight[] | undefined
+	highlights: EditorSyntaxHighlight[] | undefined,
+	offset?: HighlightShiftOffset
 ): LineHighlightSegment[] => {
 	if (!highlights?.length) {
 		return []
@@ -174,11 +183,23 @@ export const toLineHighlightSegmentsForLine = (
 			continue
 		}
 
-		if (highlight.endIndex <= lineStart) {
+		// Apply offset inline if present (optimistic update)
+		let startIndex = highlight.startIndex
+		let endIndex = highlight.endIndex
+		if (offset) {
+			if (startIndex >= offset.fromCharIndex) {
+				startIndex += offset.charDelta
+			}
+			if (endIndex > offset.fromCharIndex) {
+				endIndex += offset.charDelta
+			}
+		}
+
+		if (endIndex <= lineStart) {
 			continue
 		}
 
-		if (highlight.startIndex >= lineEnd) {
+		if (startIndex >= lineEnd) {
 			break
 		}
 
@@ -189,8 +210,8 @@ export const toLineHighlightSegmentsForLine = (
 			lineStart,
 			lineLength,
 			lineTextLength,
-			highlight.startIndex,
-			highlight.endIndex
+			startIndex,
+			endIndex
 		)
 		if (!clamped) continue
 

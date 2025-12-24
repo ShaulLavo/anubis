@@ -9,6 +9,7 @@ import {
 import type {
 	EditorError,
 	EditorSyntaxHighlight,
+	HighlightOffset,
 	LineEntry,
 	LineHighlightSegment,
 } from '../types'
@@ -23,6 +24,8 @@ type CachedLineHighlights = {
 	bracketDepth: number
 	offset: number
 	segments: LineHighlightSegment[]
+	/** Char offset applied when this cache entry was created */
+	appliedCharDelta?: number
 }
 
 export type CreateLineHighlightsOptions = {
@@ -30,6 +33,8 @@ export type CreateLineHighlightsOptions = {
 	highlights?: Accessor<EditorSyntaxHighlight[] | undefined>
 	errors?: Accessor<EditorError[] | undefined>
 	lexerStates?: Accessor<LineState[] | undefined>
+	/** Offset for optimistic updates - applied lazily per-line */
+	highlightOffset?: Accessor<HighlightOffset | undefined>
 }
 
 export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
@@ -39,7 +44,17 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	const sortedHighlights = createMemo(() => {
 		const highlights = options.highlights?.()
 		if (!highlights?.length) return EMPTY_HIGHLIGHTS
-		return highlights.slice().sort((a, b) => a.startIndex - b.startIndex)
+		const start = performance.now()
+		const result = highlights
+			.slice()
+			.sort((a, b) => a.startIndex - b.startIndex)
+		const duration = performance.now() - start
+		if (duration > 1) {
+			console.log(
+				`📊 sortedHighlights.sort: ${duration.toFixed(1)}ms (${highlights.length} items)`
+			)
+		}
+		return result
 	})
 
 	const sortedErrorHighlights = createMemo<ErrorHighlight[]>(() => {
@@ -142,9 +157,23 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 		let highlightSegments: LineHighlightSegment[]
 		if (highlights.length > 0) {
-			const startChunk = Math.floor(lineStart / SPATIAL_CHUNK_SIZE)
+			// Get offset for optimistic updates
+			const offset = options.highlightOffset?.()
+
+			// Calculate the lookup position for the spatial index.
+			// If we have an offset and this line is after the edit point,
+			// we need to look up highlights at their OLD positions.
+			let lookupStart = lineStart
+			let charDelta = 0
+			if (offset && lineStart >= offset.fromCharIndex) {
+				// This line is after the edit point, so adjust lookup to old position
+				lookupStart = lineStart - offset.charDelta
+				charDelta = offset.charDelta
+			}
+
+			const startChunk = Math.floor(lookupStart / SPATIAL_CHUNK_SIZE)
 			const endChunk = Math.floor(
-				(lineStart + lineLength - 1) / SPATIAL_CHUNK_SIZE
+				(lookupStart + lineLength - 1) / SPATIAL_CHUNK_SIZE
 			)
 
 			// 2. Gather candidates
@@ -184,11 +213,17 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 				candidatesBuffer.length = uniqueCount
 			}
 
+			// 5. Apply offset to candidates if needed (shift to new positions)
+			// We pass the offset info to toLineHighlightSegmentsForLine to adjust
+			// positions inline, avoiding object creation per-line.
 			highlightSegments = toLineHighlightSegmentsForLine(
 				lineStart,
 				lineLength,
 				lineTextLength,
-				candidatesBuffer
+				candidatesBuffer,
+				charDelta !== 0
+					? { charDelta, fromCharIndex: offset!.fromCharIndex }
+					: undefined
 			)
 		} else if (ENABLE_LEXER) {
 			const lineState =

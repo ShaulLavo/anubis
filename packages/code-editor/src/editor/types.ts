@@ -33,6 +33,17 @@ export type LineHighlightSegment = {
 	scope: string
 }
 
+/**
+ * Offset transformation for optimistic highlight updates.
+ * Applied lazily per-line instead of recreating all highlight objects.
+ */
+export type HighlightOffset = {
+	charDelta: number
+	lineDelta: number
+	fromCharIndex: number
+	fromLineRow: number
+}
+
 export type FoldRange = {
 	startLine: number
 	endLine: number
@@ -92,6 +103,8 @@ export type EditorProps = {
 	previewBytes?: Accessor<Uint8Array | undefined>
 	activeScopes?: Accessor<string[]>
 	highlights?: Accessor<EditorSyntaxHighlight[] | undefined>
+	/** Offset for optimistic highlight updates - applied lazily per-line */
+	highlightOffset?: Accessor<HighlightOffset | undefined>
 	folds?: Accessor<FoldRange[] | undefined>
 	brackets?: Accessor<BracketInfo[] | undefined>
 	errors?: Accessor<EditorError[] | undefined>

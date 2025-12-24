@@ -257,6 +257,7 @@ export const TextEditorView = (props: EditorProps) => {
 		highlights: () => props.highlights?.(),
 		errors: () => props.errors?.(),
 		lexerStates,
+		highlightOffset: () => props.highlightOffset?.(),
 	})
 
 	// Helper to get line entry for caching
@@ -281,7 +282,8 @@ export const TextEditorView = (props: EditorProps) => {
 		getLineBracketDepths,
 		getLineHighlights,
 		initialVisibleContent: props.initialVisibleContent,
-		onCaptureVisibleContent: props.onCaptureVisibleContent,
+		onCaptureVisibleContent: (snapshot) =>
+			props.onCaptureVisibleContent?.(snapshot),
 	})
 
 	// Mark live content as available when we have highlights (or when file is ready)

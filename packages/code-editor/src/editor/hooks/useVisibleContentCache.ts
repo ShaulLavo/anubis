@@ -1,4 +1,10 @@
-import { createEffect, on, onCleanup, type Accessor } from 'solid-js'
+import {
+	createEffect,
+	createSignal,
+	on,
+	onCleanup,
+	type Accessor,
+} from 'solid-js'
 import type {
 	VirtualItem2D,
 	LineEntry,
@@ -40,7 +46,8 @@ export type UseVisibleContentCacheOptions = {
 export const useVisibleContentCache = (
 	options: UseVisibleContentCacheOptions
 ) => {
-	let hasLiveContent = false
+	// Use a signal so that changes trigger reactive updates
+	const [hasLiveContent, setHasLiveContent] = createSignal(false)
 
 	/**
 	 * Capture the current visible content as a snapshot.
@@ -95,7 +102,7 @@ export const useVisibleContentCache = (
 	 * Called when we have live content and should mark the cache as stale.
 	 */
 	const markLiveContentAvailable = () => {
-		hasLiveContent = true
+		setHasLiveContent(true)
 	}
 
 	// Capture visible content when switching away from a file
@@ -104,7 +111,7 @@ export const useVisibleContentCache = (
 			() => options.filePath(),
 			(currentPath, previousPath) => {
 				// When path changes, capture the previous file's content
-				if (previousPath && previousPath !== currentPath && hasLiveContent) {
+				if (previousPath && previousPath !== currentPath && hasLiveContent()) {
 					const snapshot = captureVisibleContent()
 					if (snapshot && options.onCaptureVisibleContent) {
 						options.onCaptureVisibleContent(snapshot)
@@ -112,7 +119,7 @@ export const useVisibleContentCache = (
 				}
 
 				// Reset state for new file
-				hasLiveContent = false
+				setHasLiveContent(false)
 			}
 		)
 	)
@@ -120,7 +127,7 @@ export const useVisibleContentCache = (
 	// Capture on unmount
 	onCleanup(() => {
 		const path = options.filePath()
-		if (path && hasLiveContent && options.onCaptureVisibleContent) {
+		if (path && hasLiveContent() && options.onCaptureVisibleContent) {
 			const snapshot = captureVisibleContent()
 			if (snapshot) {
 				options.onCaptureVisibleContent(snapshot)
@@ -129,13 +136,20 @@ export const useVisibleContentCache = (
 	})
 	/**
 	 * Get cached TextRuns for a specific line if available.
-	 * Returns undefined if not in cache or cache doesn't match the column range.
+	 * Returns undefined if:
+	 * - Not in cache
+	 * - Cache doesn't match the column range
+	 * - Live content is available (highlights have loaded)
 	 */
 	const getCachedRuns = (
 		lineIndex: number,
 		columnStart: number,
 		columnEnd: number
 	) => {
+		// Once live content (highlights) is available, stop using cached runs
+		// This ensures freshly computed highlights are used instead of stale cache
+		if (hasLiveContent()) return undefined
+
 		const cache = options.initialVisibleContent?.()
 		if (!cache) return undefined
 

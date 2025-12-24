@@ -418,6 +418,7 @@ export function create2DVirtualizer(
 				const hStart = Math.max(0, colStartBase - horizontalOverscan)
 				// We don't clamp hEnd here because it depends on line length, done per item
 
+				const startV = performance.now()
 				for (let i = startIndex; i <= endIndex; i++) {
 					const rawLineLen = getLineLength(i)
 					let lineLen = 0
@@ -479,6 +480,13 @@ export function create2DVirtualizer(
 					}
 
 					items.push(item)
+				}
+
+				const durV = performance.now() - startV
+				if (durV > 1) {
+					console.log(
+						`📊 virtualItems calc: ${durV.toFixed(1)}ms (${items.length} items)`
+					)
 				}
 
 				return items

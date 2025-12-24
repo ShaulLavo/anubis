@@ -16,6 +16,7 @@ import {
 	type CommandDescriptor,
 	type KeybindingOptions,
 } from '@repo/keyboard'
+import { startGlobalTrace, markGlobalTrace } from '@repo/perf'
 import type { DocumentIncrementalEdit } from '../types'
 import { useCursor, getSelectionBounds, hasSelection } from '../cursor'
 import { useHistory, type HistoryMergeMode } from '../history'
@@ -128,6 +129,8 @@ export function createTextEditorInput(
 		const cursorBefore = snapshotCursorPosition()
 		const selectionBefore = snapshotSelection()
 
+		markGlobalTrace('keystroke', 'prep')
+
 		const incrementalEdit =
 			options.onIncrementalEdit &&
 			describeIncrementalEdit(
@@ -143,8 +146,11 @@ export function createTextEditorInput(
 				insertedText
 			)
 
+		markGlobalTrace('keystroke', 'describeEdit')
+
 		batch(() => {
 			cursor.lines.applyEdit(clampedStart, deletedText, insertedText)
+			markGlobalTrace('keystroke', 'batch:applyEdit')
 
 			let nextSnapshot: PieceTableSnapshot | undefined
 			options.updatePieceTable((current) => {
@@ -166,15 +172,20 @@ export function createTextEditorInput(
 				nextSnapshot = snapshot
 				return snapshot
 			})
+			markGlobalTrace('keystroke', 'batch:updatePieceTable')
 
 			if (nextSnapshot) {
 				cursor.lines.setPieceTableSnapshot(nextSnapshot)
 			}
+			markGlobalTrace('keystroke', 'batch:setPieceTable')
 
 			if (incrementalEdit) {
 				options.onIncrementalEdit?.(incrementalEdit)
 			}
+			markGlobalTrace('keystroke', 'batch:onIncrementalEdit')
 		})
+
+		markGlobalTrace('keystroke', 'batch')
 
 		const cursorOffsetAfter =
 			typeof changeOptions?.cursorOffsetAfter === 'number'
@@ -184,6 +195,8 @@ export function createTextEditorInput(
 					: clampedStart
 
 		cursor.actions.setCursorOffset(cursorOffsetAfter)
+
+		markGlobalTrace('keystroke', 'setCursor')
 
 		const cursorAfter = snapshotCursorPosition()
 		const selectionAfter = snapshotSelection()
@@ -203,7 +216,11 @@ export function createTextEditorInput(
 			}
 		)
 
+		markGlobalTrace('keystroke', 'history')
+
 		options.scrollCursorIntoView()
+
+		markGlobalTrace('keystroke', 'scroll')
 		return true
 	}
 
@@ -272,6 +289,9 @@ export function createTextEditorInput(
 		if (!value) {
 			return
 		}
+
+		// Start end-to-end trace from keystroke to render
+		startGlobalTrace('keystroke')
 
 		deleteSelection()
 

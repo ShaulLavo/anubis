@@ -40,6 +40,7 @@ export const Line = (props: LineProps) => {
 
 	const columnStart = props.virtualRow.columnStart
 	const columnEnd = props.virtualRow.columnEnd
+	if (Math.random() < 1) console.log('Line render', props.virtualRow.index)
 	const xOffset = columnStart * props.charWidth
 	if (columnEnd < columnStart) {
 		const message = 'Line virtual row column range is invalid'
