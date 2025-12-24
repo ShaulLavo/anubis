@@ -29,3 +29,11 @@ export {
 	logRecentOperations,
 	setLogLevel,
 } from './perfLogger'
+
+// Global cross-component tracing
+export {
+	startGlobalTrace,
+	markGlobalTrace,
+	endGlobalTrace,
+	hasGlobalTrace,
+} from './globalTrace'
