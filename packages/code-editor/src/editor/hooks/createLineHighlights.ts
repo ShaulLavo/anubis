@@ -16,12 +16,9 @@ import type {
 type ErrorHighlight = { startIndex: number; endIndex: number; scope: string }
 
 type CachedLineHighlights = {
-	start: number
 	length: number
 	text: string
 	segments: LineHighlightSegment[]
-	/** Offsets applied when this cache entry was created */
-	appliedOffsetsRef?: HighlightOffsets
 }
 
 export type CreateLineHighlightsOptions = {
@@ -63,6 +60,34 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 				scope: error.isMissing ? 'missing' : 'error',
 			}))
 			.sort((a, b) => a.startIndex - b.startIndex)
+	})
+
+	const validatedOffsets = createMemo(() => {
+		const offsets = options.highlightOffset?.() ?? EMPTY_OFFSETS
+		if (offsets.length === 0) return EMPTY_OFFSETS
+
+		for (const offset of offsets) {
+			assert(
+				Number.isFinite(offset.charDelta) &&
+					Number.isFinite(offset.fromCharIndex) &&
+					Number.isFinite(offset.oldEndIndex) &&
+					Number.isFinite(offset.newEndIndex) &&
+					offset.fromCharIndex >= 0 &&
+					offset.oldEndIndex >= offset.fromCharIndex &&
+					offset.newEndIndex >= offset.fromCharIndex,
+				'Invalid highlight offset',
+				{ offset }
+			)
+			const offsetCharDelta = offset.newEndIndex - offset.oldEndIndex
+			if (offset.charDelta !== offsetCharDelta) {
+				log.warn('Highlight offset delta mismatch', {
+					offset,
+					offsetCharDelta,
+				})
+			}
+		}
+
+		return offsets
 	})
 
 	let spatialIndex: Map<number, EditorSyntaxHighlight[]> = new Map()
@@ -117,6 +142,10 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 		const errors = sortedErrorHighlights()
 
 		if (highlights !== lastHighlightsRef || errors !== lastErrorsRef) {
+			log.debug('Highlight sources changed, clearing cache', {
+				highlightCount: highlights.length,
+				errorCount: errors.length,
+			})
 			highlightCache = new Map()
 			lastHighlightsRef = highlights
 			lastErrorsRef = errors
@@ -129,39 +158,23 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			lineTextLength,
 		})
 
-		const offsets = options.highlightOffset?.() ?? EMPTY_OFFSETS
+		const offsets = validatedOffsets()
 		const hasOffsets = offsets.length > 0
-		if (hasOffsets) {
-			for (const offset of offsets) {
-				assert(
-					Number.isFinite(offset.charDelta) &&
-						Number.isFinite(offset.fromCharIndex) &&
-						Number.isFinite(offset.oldEndIndex) &&
-						Number.isFinite(offset.newEndIndex) &&
-						offset.fromCharIndex >= 0 &&
-						offset.oldEndIndex >= offset.fromCharIndex &&
-						offset.newEndIndex >= offset.fromCharIndex,
-					'Invalid highlight offset',
-					{ offset, lineStart, lineLength }
-				)
-				const offsetCharDelta = offset.newEndIndex - offset.oldEndIndex
-				if (offset.charDelta !== offsetCharDelta) {
-					log.warn('Highlight offset delta mismatch', {
-						offset,
-						offsetCharDelta,
-					})
-				}
-			}
-		}
-		const appliedOffsetsRef = hasOffsets ? offsets : undefined
 		const cached = highlightCache.get(entry.index)
 		if (
 			cached !== undefined &&
-			cached.start === lineStart &&
 			cached.length === lineLength &&
-			cached.text === entry.text &&
-			cached.appliedOffsetsRef === appliedOffsetsRef
+			cached.text === entry.text
 		) {
+			assert(
+				cached.text.length <= lineLength,
+				'Cached line text exceeds length',
+				{
+					lineStart,
+					lineLength,
+					lineTextLength: cached.text.length,
+				}
+			)
 			return cached.segments
 		}
 
@@ -265,11 +278,9 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 		const result = mergeLineSegments(highlightSegments, errorSegments)
 
 		highlightCache.set(entry.index, {
-			start: lineStart,
 			length: lineLength,
 			text: entry.text,
 			segments: result,
-			appliedOffsetsRef,
 		})
 		if (highlightCache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
 			const firstKey = highlightCache.keys().next().value

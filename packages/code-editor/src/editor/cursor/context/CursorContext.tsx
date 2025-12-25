@@ -18,9 +18,11 @@ import {
 	getLineLength,
 	getLineStart,
 	getLineTextLength,
+	offsetToLineIndex,
 	offsetToPosition,
 	positionToOffset,
 } from '../utils/position'
+import { countLineBreaks, updateLineTextCache } from '../utils/lineTextCache'
 import type { CursorContextValue, CursorProviderProps } from './types'
 
 const CursorContext = createContext<CursorContextValue>()
@@ -141,6 +143,15 @@ const applyEditToLineStarts = (
 
 export function CursorProvider(props: CursorProviderProps) {
 	const log = loggers.codeEditor.withTag('cursor')
+	const assert = (
+		condition: boolean,
+		message: string,
+		details?: Record<string, unknown>
+	) => {
+		if (condition) return true
+		log.warn(message, details)
+		return false
+	}
 	const [documentLength, setDocumentLength] = createSignal(0)
 	const [lineStarts, setLineStarts] = createSignal<number[]>([])
 	const [activePieceTable, setActivePieceTable] = createSignal<
@@ -184,6 +195,28 @@ export function CursorProvider(props: CursorProviderProps) {
 		deletedText: string,
 		insertedText: string
 	) => {
+		const prevLineStarts = lineStarts()
+		const prevDocumentLength = documentLength()
+		const prevLineCount = prevLineStarts.length
+		const deletedLineBreaks = countLineBreaks(deletedText)
+		const insertedLineBreaks = countLineBreaks(insertedText)
+		const lineDelta = insertedLineBreaks - deletedLineBreaks
+		const hasLineBreaks = deletedLineBreaks > 0 || insertedLineBreaks > 0
+		const endOffset = Math.min(
+			prevDocumentLength,
+			startIndex + deletedText.length
+		)
+		const startLine = offsetToLineIndex(
+			startIndex,
+			prevLineStarts,
+			prevDocumentLength
+		)
+		const endLine = offsetToLineIndex(
+			endOffset,
+			prevLineStarts,
+			prevDocumentLength
+		)
+
 		batch(() => {
 			setDocumentLength((prev) =>
 				Math.max(0, prev + insertedText.length - deletedText.length)
@@ -193,7 +226,61 @@ export function CursorProvider(props: CursorProviderProps) {
 			)
 			syncCursorStateToDocument()
 		})
-		lineTextCache.clear()
+
+		const nextLineCount = lineStarts().length
+		if (
+			!assert(
+				nextLineCount === Math.max(0, prevLineCount + lineDelta),
+				'Line count delta mismatch after edit',
+				{
+					startIndex,
+					prevLineCount,
+					nextLineCount,
+					lineDelta,
+					deletedLineBreaks,
+					insertedLineBreaks,
+				}
+			)
+		) {
+			lineTextCache.clear()
+			log.debug('Cleared line text cache after line delta mismatch', {
+				startIndex,
+			})
+			return
+		}
+
+		if (
+			!assert(startLine <= endLine, 'Invalid line cache invalidation range', {
+				startLine,
+				endLine,
+			})
+		) {
+			lineTextCache.clear()
+			log.debug('Cleared line text cache after invalid range', {
+				startLine,
+				endLine,
+			})
+			return
+		}
+
+		if (lineTextCache.size === 0) return
+
+		if (!hasLineBreaks) {
+			lineTextCache.delete(startLine)
+			return
+		}
+
+		const retained = updateLineTextCache(lineTextCache, {
+			startLine,
+			endLine,
+			lineDelta,
+		})
+		log.debug('Shifted line text cache after edit', {
+			startLine,
+			endLine,
+			lineDelta,
+			retained,
+		})
 	}
 
 	const getLineText = (lineIndex: number): string => {
@@ -327,9 +414,13 @@ export function CursorProvider(props: CursorProviderProps) {
 			positionToOffset: (line, column) =>
 				positionToOffset(line, column, lineStarts(), documentLength()),
 			pieceTable: activePieceTable,
-			setPieceTableSnapshot: (snapshot) => {
+			setPieceTableSnapshot: (snapshot, options) => {
 				setActivePieceTable(snapshot)
+				if (options?.mode === 'incremental') return
 				lineTextCache.clear()
+				log.debug('Cleared line text cache after snapshot update', {
+					mode: options?.mode ?? 'reset',
+				})
 			},
 			applyEdit,
 		},

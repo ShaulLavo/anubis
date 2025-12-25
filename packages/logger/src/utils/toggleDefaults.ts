@@ -17,7 +17,7 @@ const LOGGER_TOGGLE_TREE = {
 		highlights: false,
 		history: false,
 		line: false,
-		'line-highlights': true,
+		'line-highlights': false,
 		minimap: false,
 		'minimap-render': false,
 		'minimap-selection': false,

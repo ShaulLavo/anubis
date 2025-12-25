@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRoot, createSignal } from 'solid-js'
+import type { HighlightOffsets } from '../types'
 import { createLineHighlights } from './createLineHighlights'
 
 describe('createLineHighlights', () => {
@@ -28,16 +29,16 @@ describe('createLineHighlights', () => {
 		})
 	})
 
-	it('recomputes highlights when highlight offset changes', () => {
+	it('recomputes highlights when highlight offset changes within a line', () => {
 		createRoot((dispose) => {
 			const [highlightOffset, setHighlightOffset] = createSignal([
 				{
-				charDelta: 0,
-				lineDelta: 0,
-				fromCharIndex: 0,
-				fromLineRow: 0,
-				oldEndIndex: 0,
-				newEndIndex: 0,
+					charDelta: 0,
+					lineDelta: 0,
+					fromCharIndex: 0,
+					fromLineRow: 0,
+					oldEndIndex: 0,
+					newEndIndex: 0,
 				},
 			])
 			const [highlights] = createSignal([
@@ -57,18 +58,60 @@ describe('createLineHighlights', () => {
 
 			setHighlightOffset([
 				{
-				charDelta: 2,
-				lineDelta: 0,
-				fromCharIndex: 0,
-				fromLineRow: 0,
-				oldEndIndex: 0,
-				newEndIndex: 2,
+					charDelta: 2,
+					lineDelta: 0,
+					fromCharIndex: 0,
+					fromLineRow: 0,
+					oldEndIndex: 0,
+					newEndIndex: 2,
 				},
 			])
 
-			const shifted = getLineHighlights(entry)
+			const shiftedEntry = {
+				index: 0,
+				start: 0,
+				length: 8,
+				text: 'xxabcdef',
+			}
+			const shifted = getLineHighlights(shiftedEntry)
 			expect(shifted).not.toBe(cached)
 			expect(shifted[0]?.start).toBe(2)
+
+			dispose()
+		})
+	})
+
+	it('reuses cached highlights when offsets shift a later line', () => {
+		createRoot((dispose) => {
+			const [highlightOffset, setHighlightOffset] =
+				createSignal<HighlightOffsets>([])
+			const [highlights] = createSignal([
+				{ startIndex: 10, endIndex: 12, scope: 'variable' },
+			])
+			const { getLineHighlights } = createLineHighlights({
+				highlights,
+				highlightOffset,
+			})
+
+			const entryBefore = { index: 0, start: 10, length: 4, text: 'abcd' }
+			const segments = getLineHighlights(entryBefore)
+			expect(segments[0]).toMatchObject({ start: 0, end: 2 })
+
+			setHighlightOffset([
+				{
+					charDelta: 2,
+					lineDelta: 0,
+					fromCharIndex: 0,
+					fromLineRow: 0,
+					oldEndIndex: 0,
+					newEndIndex: 2,
+				},
+			])
+
+			const entryAfter = { index: 0, start: 12, length: 4, text: 'abcd' }
+			const shifted = getLineHighlights(entryAfter)
+			expect(shifted).toBe(segments)
+			expect(shifted[0]).toMatchObject({ start: 0, end: 2 })
 
 			dispose()
 		})
@@ -78,12 +121,12 @@ describe('createLineHighlights', () => {
 		createRoot((dispose) => {
 			const [highlightOffset] = createSignal([
 				{
-				charDelta: 2,
-				lineDelta: 0,
-				fromCharIndex: 2,
-				fromLineRow: 0,
-				oldEndIndex: 2,
-				newEndIndex: 4,
+					charDelta: 2,
+					lineDelta: 0,
+					fromCharIndex: 2,
+					fromLineRow: 0,
+					oldEndIndex: 2,
+					newEndIndex: 4,
 				},
 			])
 			const [highlights] = createSignal([

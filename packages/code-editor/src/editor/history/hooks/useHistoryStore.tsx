@@ -148,7 +148,9 @@ export const useHistoryStore = (
 			})
 
 			if (nextSnapshot) {
-				cursor.lines.setPieceTableSnapshot(nextSnapshot)
+				cursor.lines.setPieceTableSnapshot(nextSnapshot, {
+					mode: 'incremental',
+				})
 			}
 		})
 

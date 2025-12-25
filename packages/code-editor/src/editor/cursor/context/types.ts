@@ -39,6 +39,10 @@ export type CursorActions = {
 	hasSelection: () => boolean
 }
 
+export type PieceTableSnapshotOptions = {
+	mode?: 'incremental' | 'reset'
+}
+
 export type CursorContextValue = {
 	state: CursorState
 	actions: CursorActions
@@ -52,7 +56,10 @@ export type CursorContextValue = {
 		offsetToPosition: (offset: number) => CursorPosition
 		positionToOffset: (line: number, column: number) => number
 		pieceTable: Accessor<PieceTableSnapshot | undefined>
-		setPieceTableSnapshot: (snapshot?: PieceTableSnapshot) => void
+		setPieceTableSnapshot: (
+			snapshot?: PieceTableSnapshot,
+			options?: PieceTableSnapshotOptions
+		) => void
 		applyEdit: (
 			startIndex: number,
 			deletedText: string,

@@ -1,4 +1,5 @@
 export * from './coordinates'
+export * from './lineTextCache'
 export * from './movement'
 export * from './position'
 export * from './selection'

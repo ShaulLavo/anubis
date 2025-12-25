@@ -169,7 +169,9 @@ export function createTextEditorInput(
 			})
 
 			if (nextSnapshot) {
-				cursor.lines.setPieceTableSnapshot(nextSnapshot)
+				cursor.lines.setPieceTableSnapshot(nextSnapshot, {
+					mode: 'incremental',
+				})
 			}
 
 			if (incrementalEdit) {
