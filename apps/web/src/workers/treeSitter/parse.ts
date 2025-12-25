@@ -157,6 +157,8 @@ export const reparseWithEdit = async (
 	path: string,
 	payload: TreeSitterEditPayload
 ): Promise<TreeSitterParseResult | undefined> => {
+	return undefined
+
 	const cached = astCache.get(path)
 	if (!cached) return undefined
 	const { languageId } = cached
@@ -205,6 +207,8 @@ export const reparseWithEditBatch = async (
 	path: string,
 	edits: Omit<TreeSitterEditPayload, 'path'>[]
 ): Promise<TreeSitterParseResult | undefined> => {
+	return undefined
+	/*
 	if (edits.length === 0) return undefined
 	const cached = astCache.get(path)
 	if (!cached) {
@@ -241,4 +245,5 @@ export const reparseWithEditBatch = async (
 		languageId,
 	})
 	return result
+	*/
 }

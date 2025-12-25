@@ -12,6 +12,8 @@ export type HighlightTransform = {
 	lineDelta: number
 	fromCharIndex: number
 	fromLineRow: number
+	oldEndRow: number
+	newEndRow: number
 	oldEndIndex: number
 	newEndIndex: number
 }
@@ -54,11 +56,18 @@ export const createHighlightState = () => {
 
 		assert(
 			Number.isFinite(transform.charDelta) &&
+				Number.isFinite(transform.lineDelta) &&
 				Number.isFinite(transform.fromCharIndex) &&
+				Number.isFinite(transform.fromLineRow) &&
 				Number.isFinite(transform.oldEndIndex) &&
 				Number.isFinite(transform.newEndIndex) &&
+				Number.isFinite(transform.oldEndRow) &&
+				Number.isFinite(transform.newEndRow) &&
 				transform.oldEndIndex >= transform.fromCharIndex &&
-				transform.newEndIndex >= transform.fromCharIndex,
+				transform.newEndIndex >= transform.fromCharIndex &&
+				transform.fromLineRow >= 0 &&
+				transform.oldEndRow >= transform.fromLineRow &&
+				transform.newEndRow >= transform.fromLineRow,
 			'Invalid highlight transform',
 			{ path, transform }
 		)
@@ -70,9 +79,30 @@ export const createHighlightState = () => {
 			})
 		}
 
+		const normalizedOldEndRow = Math.max(
+			transform.fromLineRow,
+			transform.oldEndRow
+		)
+		const normalizedNewEndRow = Math.max(
+			transform.fromLineRow,
+			transform.newEndRow
+		)
+		const normalizedLineDelta = normalizedNewEndRow - normalizedOldEndRow
+
+		if (transform.lineDelta !== normalizedLineDelta) {
+			log.warn('Highlight transform line delta mismatch', {
+				path,
+				transform,
+				normalizedLineDelta,
+			})
+		}
+
 		const incoming = {
 			...transform,
 			charDelta: normalizedCharDelta,
+			lineDelta: normalizedLineDelta,
+			oldEndRow: normalizedOldEndRow,
+			newEndRow: normalizedNewEndRow,
 			oldEndIndex: normalizedOldEnd,
 			newEndIndex: normalizedNewEnd,
 		}

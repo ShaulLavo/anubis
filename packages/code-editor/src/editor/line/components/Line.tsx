@@ -1,3 +1,4 @@
+import { Show, createMemo } from 'solid-js'
 import { loggers } from '@repo/logger'
 import type { LineProps } from '../../types'
 import { calculateColumnFromClick } from '../../utils'
@@ -7,19 +8,28 @@ const log = loggers.codeEditor.withTag('line')
 
 export const Line = (props: LineProps) => {
 	let lineElement: HTMLDivElement | null = null
+	const assert = (
+		condition: boolean,
+		message: string,
+		details?: Record<string, unknown>
+	) => {
+		if (condition) return true
+		log.warn(message, details)
+		return false
+	}
 
 	const handleMouseDown = (event: MouseEvent) => {
 		if (event.button !== 0) {
 			return
 		}
 
-		let column = props.entry.text.length
+		let column = props.lineText.length
 		if (lineElement) {
 			const rect = lineElement.getBoundingClientRect()
 			const clickX = event.clientX - rect.left
 
 			column = calculateColumnFromClick(
-				props.entry.text,
+				props.lineText,
 				clickX,
 				props.charWidth,
 				props.tabSize
@@ -27,7 +37,7 @@ export const Line = (props: LineProps) => {
 		}
 
 		if (props.onMouseDown) {
-			props.onMouseDown(event, props.entry.index, column, lineElement)
+			props.onMouseDown(event, props.lineIndex, column, lineElement)
 			return
 		}
 
@@ -35,39 +45,57 @@ export const Line = (props: LineProps) => {
 			return
 		}
 
-		props.onPreciseClick(props.entry.index, column, event.shiftKey)
+		props.onPreciseClick(props.lineIndex, column, event.shiftKey)
 	}
 
 	const columnStart = () => props.virtualRow.columnStart
 	const columnEnd = () => props.virtualRow.columnEnd
-	const xOffset = () => columnStart() * props.charWidth
+	const columnRange = createMemo(() => {
+		const start = columnStart()
+		const end = columnEnd()
+		if (
+			!assert(end >= start, 'Line virtual row column range is invalid', {
+				lineIndex: props.lineIndex,
+				columnStart: start,
+				columnEnd: end,
+			})
+		) {
+			return null
+		}
+		return { start, end }
+	})
+	const xOffset = () => (columnRange()?.start ?? 0) * props.charWidth
 
 	return (
-		<div
-			ref={(el) => {
-				lineElement = el
-			}}
-			data-index={props.virtualRow.index}
-			class="editor-line"
-			classList={{
-				'cursor-text': props.isEditable(),
-			}}
-			style={{
-				transform: `translate(${xOffset()}px, ${props.virtualRow.start}px)`,
-				'min-width': `${props.contentWidth}px`,
-				height: `${props.virtualRow.size || props.lineHeight}px`,
-				'tab-size': Math.max(1, props.tabSize),
-			}}
-			onMouseDown={handleMouseDown}
-		>
-			<Syntax
-				text={props.entry.text}
-				bracketDepths={props.lineBracketDepths}
-				highlightSegments={props.highlights}
-				columnStart={columnStart()}
-				columnEnd={columnEnd()}
-				cachedRuns={props.cachedRuns}
-			/>
-		</div>
+		<Show when={columnRange()}>
+			{(range) => (
+				<div
+					ref={(el) => {
+						lineElement = el
+					}}
+					data-index={props.lineIndex}
+					class="editor-line"
+					classList={{
+						'cursor-text': props.isEditable(),
+					}}
+					style={{
+						transform: `translate(${xOffset()}px, ${props.virtualRow.start}px)`,
+						'min-width': `${props.contentWidth}px`,
+						height: `${props.virtualRow.size || props.lineHeight}px`,
+						'tab-size': Math.max(1, props.tabSize),
+					}}
+					onMouseDown={handleMouseDown}
+				>
+					<Syntax
+						text={props.lineText}
+						bracketDepths={props.lineBracketDepths}
+						highlightSegments={props.highlights}
+						columnStart={range().start}
+						columnEnd={range().end}
+						cachedRuns={props.cachedRuns}
+					/>
+				</div>
+			)}
+		</Show>
 	)
 }

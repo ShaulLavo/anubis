@@ -103,6 +103,8 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 				lineDelta,
 				fromCharIndex: edit.startIndex,
 				fromLineRow: edit.startPosition.row,
+				oldEndRow: edit.oldEndPosition.row,
+				newEndRow: edit.newEndPosition.row,
 				oldEndIndex: edit.oldEndIndex,
 				newEndIndex: edit.newEndIndex,
 			})
@@ -145,6 +147,8 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			lineDelta: offset.lineDelta,
 			fromCharIndex: offset.fromCharIndex,
 			fromLineRow: offset.fromLineRow,
+			oldEndRow: offset.oldEndRow,
+			newEndRow: offset.newEndRow,
 			oldEndIndex: offset.oldEndIndex,
 			newEndIndex: offset.newEndIndex,
 		}))

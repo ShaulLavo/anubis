@@ -32,7 +32,8 @@ describe('Line', () => {
 					columnStart: 8,
 					columnEnd: 4,
 				}}
-				entry={{ index: 0, start: 0, length: 12, text: 'Hello, world' }}
+				lineIndex={0}
+				lineText="Hello, world"
 				lineHeight={20}
 				contentWidth={200}
 				charWidth={8}

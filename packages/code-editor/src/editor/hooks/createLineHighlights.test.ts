@@ -37,6 +37,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 0,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 0,
 					newEndIndex: 0,
 				},
@@ -62,6 +64,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 0,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 0,
 					newEndIndex: 2,
 				},
@@ -93,7 +97,7 @@ describe('createLineHighlights', () => {
 				highlightOffset,
 			})
 
-			const entryBefore = { index: 0, start: 10, length: 4, text: 'abcd' }
+			const entryBefore = { index: 1, start: 10, length: 4, text: 'abcd' }
 			const segments = getLineHighlights(entryBefore)
 			expect(segments[0]).toMatchObject({ start: 0, end: 2 })
 
@@ -103,12 +107,52 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 0,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 0,
 					newEndIndex: 2,
 				},
 			])
 
-			const entryAfter = { index: 0, start: 12, length: 4, text: 'abcd' }
+			const entryAfter = { index: 1, start: 12, length: 4, text: 'abcd' }
+			const shifted = getLineHighlights(entryAfter)
+			expect(shifted).toBe(segments)
+			expect(shifted[0]).toMatchObject({ start: 0, end: 2 })
+
+			dispose()
+		})
+	})
+
+	it('reuses cached highlights after line delta shifts', () => {
+		createRoot((dispose) => {
+			const [highlightOffset, setHighlightOffset] =
+				createSignal<HighlightOffsets>([])
+			const [highlights] = createSignal([
+				{ startIndex: 10, endIndex: 12, scope: 'variable' },
+			])
+			const { getLineHighlights } = createLineHighlights({
+				highlights,
+				highlightOffset,
+			})
+
+			const entryBefore = { index: 2, start: 10, length: 4, text: 'wxyz' }
+			const segments = getLineHighlights(entryBefore)
+			expect(segments[0]).toMatchObject({ start: 0, end: 2 })
+
+			setHighlightOffset([
+				{
+					charDelta: 1,
+					lineDelta: 1,
+					fromCharIndex: 0,
+					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 1,
+					oldEndIndex: 0,
+					newEndIndex: 1,
+				},
+			])
+
+			const entryAfter = { index: 3, start: 11, length: 4, text: 'wxyz' }
 			const shifted = getLineHighlights(entryAfter)
 			expect(shifted).toBe(segments)
 			expect(shifted[0]).toMatchObject({ start: 0, end: 2 })
@@ -125,6 +169,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 2,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 2,
 					newEndIndex: 4,
 				},
@@ -152,12 +198,14 @@ describe('createLineHighlights', () => {
 		createRoot((dispose) => {
 			const [highlightOffset] = createSignal([
 				{
-				charDelta: 3,
-				lineDelta: 0,
-				fromCharIndex: 2,
-				fromLineRow: 0,
-				oldEndIndex: 2,
-				newEndIndex: 5,
+					charDelta: 3,
+					lineDelta: 0,
+					fromCharIndex: 2,
+					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
+					oldEndIndex: 2,
+					newEndIndex: 5,
 				},
 			])
 			const [highlights] = createSignal([
@@ -183,11 +231,13 @@ describe('createLineHighlights', () => {
 			const [highlightOffset] = createSignal([
 				{
 					charDelta: -2,
-				lineDelta: 0,
-				fromCharIndex: 2,
-				fromLineRow: 0,
-				oldEndIndex: 4,
-				newEndIndex: 2,
+					lineDelta: 0,
+					fromCharIndex: 2,
+					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
+					oldEndIndex: 4,
+					newEndIndex: 2,
 				},
 			])
 			const [highlights] = createSignal([
@@ -216,6 +266,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 2,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 2,
 					newEndIndex: 4,
 				},
@@ -224,6 +276,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 5,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 6,
 					newEndIndex: 5,
 				},
@@ -255,6 +309,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 0,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 0,
 					newEndIndex: 5,
 				},
@@ -285,6 +341,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 0,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 5,
 					newEndIndex: 0,
 				},
@@ -315,6 +373,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 2,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 4,
 					newEndIndex: 2,
 				},
@@ -344,6 +404,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 2,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 4,
 					newEndIndex: 2,
 				},
@@ -374,6 +436,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 4,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 5,
 					newEndIndex: 4,
 				},
@@ -404,6 +468,8 @@ describe('createLineHighlights', () => {
 					lineDelta: 0,
 					fromCharIndex: 2,
 					fromLineRow: 0,
+					oldEndRow: 0,
+					newEndRow: 0,
 					oldEndIndex: 4,
 					newEndIndex: 4,
 				},

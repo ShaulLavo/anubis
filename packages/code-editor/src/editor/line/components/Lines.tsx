@@ -31,23 +31,33 @@ export const Lines = (props: LinesProps) => {
 							: virtualRow.index
 					)
 
-					const entry = createMemo<LineEntry | null>(() => {
+					const isLineValid = createMemo(() => {
 						const idx = lineIndex()
-						if (idx < 0 || idx >= cursor.lines.lineCount()) {
-							return null
-						}
+						return idx >= 0 && idx < cursor.lines.lineCount()
+					})
+
+					const lineText = createMemo(() => {
+						if (!isLineValid()) return ''
+						const idx = lineIndex()
+						return cursor.lines.getLineText(idx)
+					})
+
+					const entry = createMemo<LineEntry | null>(() => {
+						if (!isLineValid()) return null
+						const idx = lineIndex()
 						return {
 							index: idx,
 							start: cursor.lines.getLineStart(idx),
 							length: cursor.lines.getLineLength(idx),
-							text: cursor.lines.getLineText(idx),
+							text: lineText(),
 						}
 					})
 
 					const highlights = createMemo(
 						() => {
 							const e = entry()
-							return e ? props.getLineHighlights?.(e) : undefined
+							if (!e) return undefined
+							return props.getLineHighlights?.(e)
 						},
 						undefined,
 						{
@@ -109,24 +119,23 @@ export const Lines = (props: LinesProps) => {
 					})
 
 					return (
-						<Show when={entry()}>
-							{(validEntry) => (
-								<Line
-									virtualRow={virtualRow}
-									entry={validEntry()}
-									lineHeight={props.lineHeight()}
-									contentWidth={props.contentWidth()}
-									charWidth={props.charWidth()}
-									tabSize={props.tabSize()}
-									isEditable={props.isEditable}
-									onPreciseClick={props.onPreciseClick}
-									onMouseDown={props.onMouseDown}
-									isActive={props.activeLineIndex() === lineIndex()}
-									lineBracketDepths={lineBracketDepths()}
-									highlights={highlights()}
-									cachedRuns={cachedRuns()}
-								/>
-							)}
+						<Show when={isLineValid()}>
+							<Line
+								virtualRow={virtualRow}
+								lineIndex={lineIndex()}
+								lineText={lineText()}
+								lineHeight={props.lineHeight()}
+								contentWidth={props.contentWidth()}
+								charWidth={props.charWidth()}
+								tabSize={props.tabSize()}
+								isEditable={props.isEditable}
+								onPreciseClick={props.onPreciseClick}
+								onMouseDown={props.onMouseDown}
+								isActive={props.activeLineIndex() === lineIndex()}
+								lineBracketDepths={lineBracketDepths()}
+								highlights={highlights()}
+								cachedRuns={cachedRuns()}
+							/>
 						</Show>
 					)
 				}}

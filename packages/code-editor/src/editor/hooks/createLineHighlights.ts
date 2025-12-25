@@ -1,4 +1,4 @@
-import { createMemo, type Accessor } from 'solid-js'
+import { createMemo, untrack, type Accessor } from 'solid-js'
 import { loggers } from '@repo/logger'
 import {
 	mergeLineSegments,
@@ -62,17 +62,45 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			.sort((a, b) => a.startIndex - b.startIndex)
 	})
 
-	const validatedOffsets = createMemo(() => {
-		const offsets = options.highlightOffset?.() ?? EMPTY_OFFSETS
-		if (offsets.length === 0) return EMPTY_OFFSETS
+	let lastOffsetsRef: HighlightOffsets | undefined
+	let validatedOffsetsRef: HighlightOffsets = EMPTY_OFFSETS
+	let lineIndexCache: Map<number, number | null> | null = null
+	let dirtyHighlightCache = new Map<number, CachedLineHighlights>()
 
+	const getValidatedOffsets = (): HighlightOffsets => {
+		const offsets = options.highlightOffset
+			? untrack(options.highlightOffset) ?? EMPTY_OFFSETS
+			: EMPTY_OFFSETS
+
+		if (offsets === lastOffsetsRef) {
+			return validatedOffsetsRef
+		}
+
+		lastOffsetsRef = offsets
+		if (offsets.length === 0) {
+			validatedOffsetsRef = EMPTY_OFFSETS
+			lineIndexCache = null
+			dirtyHighlightCache.clear()
+			return validatedOffsetsRef
+		}
+
+		lineIndexCache = new Map()
+		dirtyHighlightCache.clear()
+
+		let lineDeltaCount = 0
 		for (const offset of offsets) {
 			assert(
 				Number.isFinite(offset.charDelta) &&
 					Number.isFinite(offset.fromCharIndex) &&
 					Number.isFinite(offset.oldEndIndex) &&
 					Number.isFinite(offset.newEndIndex) &&
+					Number.isFinite(offset.fromLineRow) &&
+					Number.isFinite(offset.oldEndRow) &&
+					Number.isFinite(offset.newEndRow) &&
 					offset.fromCharIndex >= 0 &&
+					offset.fromLineRow >= 0 &&
+					offset.oldEndRow >= offset.fromLineRow &&
+					offset.newEndRow >= offset.fromLineRow &&
 					offset.oldEndIndex >= offset.fromCharIndex &&
 					offset.newEndIndex >= offset.fromCharIndex,
 				'Invalid highlight offset',
@@ -85,10 +113,66 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 					offsetCharDelta,
 				})
 			}
+			const offsetLineDelta = offset.newEndRow - offset.oldEndRow
+			if (offset.lineDelta !== offsetLineDelta) {
+				log.warn('Highlight offset line delta mismatch', {
+					offset,
+					offsetLineDelta,
+				})
+			}
+			if (offset.lineDelta !== 0) {
+				lineDeltaCount += 1
+			}
 		}
 
-		return offsets
-	})
+		validatedOffsetsRef = offsets
+		log.debug('Highlight offsets updated', {
+			offsetCount: offsets.length,
+			lineDeltaCount,
+		})
+		return validatedOffsetsRef
+	}
+
+	const mapLineIndexToOldOffsets = (
+		lineIndex: number,
+		offsets: HighlightOffsets
+	): number | null => {
+		if (offsets.length === 0) return lineIndex
+
+		if (lineIndexCache && lineIndexCache.has(lineIndex)) {
+			return lineIndexCache.get(lineIndex) ?? null
+		}
+
+		let mappedIndex = lineIndex
+		for (let i = offsets.length - 1; i >= 0; i--) {
+			const offset = offsets[i]
+			if (!offset) continue
+
+			const startRow = offset.fromLineRow
+			const newEndRow = offset.newEndRow
+			if (mappedIndex < startRow) continue
+
+			if (mappedIndex <= newEndRow) {
+				if (lineIndexCache) lineIndexCache.set(lineIndex, null)
+				return null
+			}
+
+			mappedIndex -= offset.lineDelta
+		}
+
+		if (
+			!assert(Number.isFinite(mappedIndex), 'Mapped line index invalid', {
+				lineIndex,
+				mappedIndex,
+			})
+		) {
+			if (lineIndexCache) lineIndexCache.set(lineIndex, null)
+			return null
+		}
+
+		if (lineIndexCache) lineIndexCache.set(lineIndex, mappedIndex)
+		return mappedIndex
+	}
 
 	let spatialIndex: Map<number, EditorSyntaxHighlight[]> = new Map()
 	let largeHighlights: EditorSyntaxHighlight[] = []
@@ -147,6 +231,8 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 				errorCount: errors.length,
 			})
 			highlightCache = new Map()
+			dirtyHighlightCache.clear()
+			lineIndexCache = null
 			lastHighlightsRef = highlights
 			lastErrorsRef = errors
 			buildSpatialIndex(highlights)
@@ -158,9 +244,14 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			lineTextLength,
 		})
 
-		const offsets = validatedOffsets()
+		const offsets = getValidatedOffsets()
 		const hasOffsets = offsets.length > 0
-		const cached = highlightCache.get(entry.index)
+		const cacheKey = hasOffsets
+			? mapLineIndexToOldOffsets(entry.index, offsets)
+			: entry.index
+		const cacheMap = cacheKey === null ? dirtyHighlightCache : highlightCache
+		const cacheIndex = cacheKey === null ? entry.index : cacheKey
+		const cached = cacheMap.get(cacheIndex)
 		if (
 			cached !== undefined &&
 			cached.length === lineLength &&
@@ -277,15 +368,15 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 		const result = mergeLineSegments(highlightSegments, errorSegments)
 
-		highlightCache.set(entry.index, {
+		cacheMap.set(cacheIndex, {
 			length: lineLength,
 			text: entry.text,
 			segments: result,
 		})
-		if (highlightCache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
-			const firstKey = highlightCache.keys().next().value
+		if (cacheMap.size > MAX_HIGHLIGHT_CACHE_SIZE) {
+			const firstKey = cacheMap.keys().next().value
 			if (typeof firstKey === 'number') {
-				highlightCache.delete(firstKey)
+				cacheMap.delete(firstKey)
 			}
 		}
 

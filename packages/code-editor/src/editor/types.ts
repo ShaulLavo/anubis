@@ -41,6 +41,10 @@ export type HighlightOffset = {
 	lineDelta: number
 	fromCharIndex: number
 	fromLineRow: number
+	/** Old end row for the edit range (pre-edit coordinates). */
+	oldEndRow: number
+	/** New end row for the edit range (post-edit coordinates). */
+	newEndRow: number
 	/** Old end index for the edit range (pre-edit coordinates). */
 	oldEndIndex: number
 	/** New end index for the edit range (post-edit coordinates). */
@@ -150,7 +154,8 @@ export type LineEntry = {
 
 export type LineProps = {
 	virtualRow: VirtualItem2D
-	entry: LineEntry
+	lineIndex: number
+	lineText: string
 	lineHeight: number
 	contentWidth: number
 	charWidth: number
