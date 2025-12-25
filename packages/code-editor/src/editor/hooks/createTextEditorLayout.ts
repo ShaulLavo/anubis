@@ -475,7 +475,7 @@ export function createTextEditorLayout(
 		if (visualColumns === 0) {
 			return Math.max(options.fontSize(), 1)
 		}
-		return visualColumns * charWidth()
+		return Math.round(visualColumns * charWidth())
 	})
 
 	const columnOffset = (lineIndex: number, columnIndex: number): number => {

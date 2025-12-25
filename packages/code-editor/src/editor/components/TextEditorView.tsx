@@ -1,10 +1,4 @@
-import {
-	Show,
-	createEffect,
-	createSignal,
-	onCleanup,
-	untrack,
-} from 'solid-js'
+import { Show, createEffect, createSignal, onCleanup, untrack } from 'solid-js'
 import { loggers } from '@repo/logger'
 import { DEFAULT_TAB_SIZE } from '../consts'
 import { useCursor } from '../cursor'
