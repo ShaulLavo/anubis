@@ -1,5 +1,4 @@
-import { batch, For, Show } from 'solid-js'
-import { PRESETS } from '../utils/presets'
+import { For, Show } from 'solid-js'
 import { ResetDatabaseButton } from './ResetDatabaseButton'
 
 type SidebarProps = {
@@ -8,10 +7,10 @@ type SidebarProps = {
 	currentQuery: string
 	onLoadTable: (table: string) => void
 	onRefreshSchema: () => void
-	onRunPreset: (query: string) => void
 	setSqlQuery: (query: string) => void
 	setSelectedTable: (table: string | null) => void
 	onResetDatabase: () => void
+	onLoadExample: (example: string) => void
 }
 
 export const Sidebar = (props: SidebarProps) => {
@@ -52,39 +51,27 @@ export const Sidebar = (props: SidebarProps) => {
 						</div>
 					</Show>
 				</div>
-				<div class="py-1 px-1 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+				<div class="py-1 px-1 mt-4 text-xs font-medium text-zinc-500 uppercase tracking-wider">
 					Examples
 				</div>
 				<div>
-					<For each={Object.values(PRESETS)}>
-						{(preset) => (
-							<button
-								onClick={() => {
-									batch(() => {
-										props.setSqlQuery(preset.sql)
-										props.setSelectedTable(null)
-									})
-									props.onRunPreset(preset.sql)
-								}}
-								class="w-full text-left px-1 pb-1 rounded-sm text-xs transition-colors border"
-								classList={{
-									'bg-indigo-500/10 text-indigo-400 font-medium border-indigo-500/20':
-										!props.selectedTable &&
-										(props.currentQuery || '').trim() === preset.sql.trim(),
-									'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-transparent':
-										Boolean(props.selectedTable) ||
-										(props.currentQuery || '').trim() !== preset.sql.trim(),
-								}}
-							>
-								{preset.name}
-							</button>
-						)}
-					</For>
+					<button
+						onClick={() => props.onLoadExample('file-search')}
+						class="w-full text-left px-1 pb-1 rounded-sm text-xs transition-colors border"
+						classList={{
+							'bg-indigo-500/10 text-indigo-400 font-medium border-indigo-500/20':
+								props.selectedTable === 'example:file-search',
+							'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-transparent':
+								props.selectedTable !== 'example:file-search',
+						}}
+					>
+						File Search
+					</button>
 				</div>
 			</div>
 			<div class="p-4 border-t border-zinc-800 space-y-2">
 				<button
-					onClick={props.onRefreshSchema}
+					onClick={() => props.onRefreshSchema()}
 					class="w-full flex items-center justify-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-md text-xs font-medium transition-colors"
 				>
 					Refresh Schema

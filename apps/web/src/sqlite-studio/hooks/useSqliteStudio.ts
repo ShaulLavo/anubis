@@ -1,24 +1,39 @@
+/* eslint-disable solid/reactivity */
 import { batch, createSignal, onMount } from 'solid-js'
+import { makePersisted } from '@solid-primitives/storage'
 import {
 	initSqlite,
 	resetSqlite,
 	runSqliteQuery,
+	searchFiles,
 } from '../../workers/sqliteClient'
 import { splitStatements } from '../utils/sqlUtils'
+import type { SearchResult } from '../../workers/sqlite'
 
 type TableInfo = {
 	cid: number
 	name: string
 	type: string
 	notnull: number
-	dflt_value: any
+	dflt_value: unknown
 	pk: number
 }
 
+// Helper to safely extract error message
+const getErrorMessage = (e: unknown): string => {
+	if (e instanceof Error) return e.message
+	return String(e)
+}
+
 export const useSqliteStudio = () => {
-	const [tables, setTables] = createSignal<string[]>([])
-	const [selectedTable, setSelectedTable] = createSignal<string | null>(null)
-	const [tableData, setTableData] = createSignal<Record<string, any>[]>([])
+	const [tables, setTables] = makePersisted(createSignal<string[]>([]), {
+		name: 'sqlite_studio_tables',
+	})
+	const [selectedTable, setSelectedTable] = makePersisted(
+		createSignal<string | null>(null),
+		{ name: 'sqlite_studio_selected_table' }
+	)
+	const [tableData, setTableData] = createSignal<Record<string, unknown>[]>([])
 	const [columns, setColumns] = createSignal<string[]>([])
 	const [primaryKeys, setPrimaryKeys] = createSignal<string[]>([])
 	const [hasRowId, setHasRowId] = createSignal(false)
@@ -27,13 +42,19 @@ export const useSqliteStudio = () => {
 	const [error, setError] = createSignal<string | null>(null)
 	const [sqlQuery, setSqlQuery] = createSignal('')
 	const [queryResults, setQueryResults] = createSignal<
-		{ columns: string[]; rows: Record<string, any>[] }[] | null
+		{ columns: string[]; rows: Record<string, unknown>[] }[] | null
 	>(null)
 	const [editingCell, setEditingCell] = createSignal<{
-		row: Record<string, any>
+		row: Record<string, unknown>
 		col: string
-		value: any
+		value: unknown
 	} | null>(null)
+
+	// Search State
+	const [searchQuery, setSearchQuery] = createSignal('')
+	const [searchResults, setSearchResults] = createSignal<SearchResult[] | null>(
+		null
+	)
 
 	const fetchTables = async () => {
 		try {
@@ -41,9 +62,9 @@ export const useSqliteStudio = () => {
 				"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
 			)
 			setTables(res.rows.map((r) => r.name))
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error(e)
-			setError(e.message)
+			setError(getErrorMessage(e))
 		}
 	}
 
@@ -53,7 +74,7 @@ export const useSqliteStudio = () => {
 			selectCols = 'rowid, *'
 		}
 
-		const res = await runSqliteQuery<any>(
+		const res = await runSqliteQuery<Record<string, unknown>>(
 			`SELECT ${selectCols} FROM "${tableName}" LIMIT 100`
 		)
 		setTableData(res.rows)
@@ -86,14 +107,14 @@ export const useSqliteStudio = () => {
 			let rowIdAvailable = true
 			try {
 				await runSqliteQuery(`SELECT rowid FROM "${tableName}" LIMIT 1`)
-			} catch (e) {
+			} catch {
 				rowIdAvailable = false
 			}
 			setHasRowId(rowIdAvailable)
 
 			await refreshTableData(tableName)
-		} catch (e: any) {
-			setError(e.message)
+		} catch (e: unknown) {
+			setError(getErrorMessage(e))
 		} finally {
 			setIsLoading(false)
 		}
@@ -108,19 +129,23 @@ export const useSqliteStudio = () => {
 			setError(null)
 			setEditingCell(null)
 			setQueryResults(null)
+			setSearchResults(null)
 			setSelectedTable(null)
 		})
 		try {
 			const statements = splitStatements(sql)
-			const results: { columns: string[]; rows: any[] }[] = []
+			const results: { columns: string[]; rows: unknown[] }[] = []
 
 			for (const stmt of statements) {
-				const res = await runSqliteQuery<any>(stmt)
+				const res = await runSqliteQuery<unknown>(stmt)
 				results.push(res)
 			}
 			batch(() => {
 				setQueryResults(
-					results.filter((r) => r.rows.length > 0 || r.columns.length > 0)
+					results.filter((r) => r.rows.length > 0 || r.columns.length > 0) as {
+						columns: string[]
+						rows: Record<string, unknown>[]
+					}[]
 				)
 
 				setColumns([])
@@ -128,8 +153,26 @@ export const useSqliteStudio = () => {
 
 			// Refresh tables list in case of DDL
 			await fetchTables()
-		} catch (e: any) {
-			setError(e.message)
+		} catch (e: unknown) {
+			setError(getErrorMessage(e))
+		} finally {
+			setIsLoading(false)
+		}
+	}
+
+	const runSearch = async () => {
+		const q = searchQuery()
+
+		batch(() => {
+			setIsLoading(true)
+			setError(null)
+		})
+
+		try {
+			const results = await searchFiles(q)
+			setSearchResults(results)
+		} catch (e: unknown) {
+			setError(getErrorMessage(e))
 		} finally {
 			setIsLoading(false)
 		}
@@ -146,7 +189,8 @@ export const useSqliteStudio = () => {
 
 			if (hasRowId()) {
 				whereClause = 'rowid = ?'
-				params.push(cell.row.rowid)
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				params.push((cell.row as any).rowid)
 			} else if (primaryKeys().length > 0) {
 				whereClause = primaryKeys()
 					.map((pk) => `"${pk}" = ?`)
@@ -163,18 +207,28 @@ export const useSqliteStudio = () => {
 			setEditingCell(null)
 
 			await refreshTableData(tableName)
-		} catch (e: any) {
-			setError(e.message)
+		} catch (e: unknown) {
+			setError(getErrorMessage(e))
 		}
 	}
 
 	onMount(async () => {
+		setIsLoading(true)
 		try {
 			await initSqlite()
 			await fetchTables()
+			const currentTable = selectedTable()
+			if (currentTable && !currentTable.startsWith('example:')) {
+				await loadTable(currentTable)
+			} else if (currentTable === 'example:file-search') {
+				await runSearch()
+			} else {
+				setIsLoading(false)
+			}
 		} catch (e) {
 			console.error('[SqliteStudio] Failed to init:', e)
 			setError('Failed to initialize SQLite client')
+			setIsLoading(false)
 		}
 	})
 
@@ -186,6 +240,7 @@ export const useSqliteStudio = () => {
 				setTables([])
 				setSelectedTable(null)
 				setQueryResults(null)
+				setSearchResults(null)
 				setTableData([])
 				setColumns([])
 				setPrimaryKeys([])
@@ -193,9 +248,9 @@ export const useSqliteStudio = () => {
 				setEditingCell(null)
 			})
 			await fetchTables()
-		} catch (e: any) {
+		} catch (e: unknown) {
 			console.error(e)
-			setError(e.message)
+			setError(getErrorMessage(e))
 		} finally {
 			setIsLoading(false)
 		}
@@ -214,6 +269,8 @@ export const useSqliteStudio = () => {
 			sqlQuery,
 			queryResults,
 			editingCell,
+			searchQuery,
+			searchResults,
 		},
 		actions: {
 			setSqlQuery,
@@ -224,6 +281,9 @@ export const useSqliteStudio = () => {
 			commitEdit,
 			fetchTables,
 			resetDatabase,
+			setSearchQuery,
+			runSearch,
+			setSearchResults,
 		},
 	}
 }
