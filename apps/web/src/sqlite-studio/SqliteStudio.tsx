@@ -31,11 +31,13 @@ export const SqliteStudio: Component = () => {
 					primaryKeys={state.primaryKeys()}
 				/>
 
-				<QueryEditor
-					sqlQuery={state.sqlQuery}
-					setSqlQuery={actions.setSqlQuery}
-					onRunQuery={actions.runCustomQuery}
-				/>
+				<Show when={!state.selectedTable()}>
+					<QueryEditor
+						sqlQuery={state.sqlQuery}
+						setSqlQuery={actions.setSqlQuery}
+						onRunQuery={actions.runCustomQuery}
+					/>
+				</Show>
 
 				<div class="flex-1 overflow-auto p-2">
 					<Show when={state.error()}>

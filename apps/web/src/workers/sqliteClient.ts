@@ -9,14 +9,16 @@ export const sqliteApi: Remote<SqliteWorkerApi> = wrap<SqliteWorkerApi>(worker)
 
 export const initSqlite = () => sqliteApi.init()
 
-export const runSqliteDemo = () => sqliteApi.runDemo()
-
-export const runFtsDemo = (query?: string) => sqliteApi.runFtsDemo(query)
+import type { InArgs } from 'sqlite-wasm/client'
 
 export const runSqliteQuery = <T = Record<string, unknown>>(
 	sql: string,
 	params?: Record<string, unknown> | unknown[]
-) => sqliteApi.run(sql, params) as Promise<{ columns: string[]; rows: T[] }>
+) =>
+	sqliteApi.run(sql, params as InArgs) as Promise<{
+		columns: string[]
+		rows: T[]
+	}>
 
 export const execSqliteQuery = (sql: string) => sqliteApi.exec(sql)
 
