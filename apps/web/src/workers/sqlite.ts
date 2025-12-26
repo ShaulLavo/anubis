@@ -29,22 +29,47 @@ const getClient = (): Sqlite3Client => {
 
 const ensureSchema = async () => {
 	const c = getClient()
+
 	await c.execute(`
 		CREATE TABLE IF NOT EXISTS files (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			path TEXT UNIQUE NOT NULL,
 			path_lc TEXT NOT NULL,
 			basename_lc TEXT NOT NULL,
+			basename_initials TEXT NOT NULL, 
 			dir_lc TEXT NOT NULL,
 			kind TEXT NOT NULL,
 			recency INTEGER DEFAULT 0
 		)
 	`)
+
+	try {
+		const result = await c.execute('PRAGMA table_info(files)')
+		// result.rows is array of arrays, result.columns is array of column names
+		const nameIdx = result.columns.indexOf('name')
+		if (nameIdx !== -1) {
+			const hasInitials = result.rows.some(
+				(row) => row[nameIdx] === 'basename_initials'
+			)
+			if (!hasInitials) {
+				log('[SQLite] Migrating: Adding basename_initials column')
+				await c.execute(
+					"ALTER TABLE files ADD COLUMN basename_initials TEXT NOT NULL DEFAULT ''"
+				)
+			}
+		}
+	} catch (e) {
+		log('[SQLite] Migration check failed', e)
+	}
+
 	await c.execute(
 		'CREATE INDEX IF NOT EXISTS idx_files_path_lc ON files(path_lc)'
 	)
 	await c.execute(
 		'CREATE INDEX IF NOT EXISTS idx_files_basename_lc ON files(basename_lc)'
+	)
+	await c.execute(
+		'CREATE INDEX IF NOT EXISTS idx_files_basename_initials ON files(basename_initials)'
 	)
 }
 
@@ -125,26 +150,55 @@ export type FileMetadata = {
 	kind: string
 }
 
+// Helpers for initials extraction
+const getInitials = (basename: string): string => {
+	// 1. Remove extension
+	const name = basename.split('.').shift() ?? ''
+	if (!name) return ''
+
+	// 2. Split by non-alphanumeric chars (underscore, dash, dot, space etc)
+	//    AND split by camelCase boundaries
+	//    Regex logic:
+	//    - [^a-zA-Z0-9] matches separators
+	//    - (?=[A-Z]) matches position before a capital letter (camelCase)
+	const parts = name.split(/[^a-zA-Z0-9]|(?=[A-Z])/)
+
+	return parts
+		.filter((p) => p.length > 0)
+		.map((p) => p.charAt(0).toLowerCase())
+		.join('')
+}
+
 const batchInsertFiles = async (files: FileMetadata[]): Promise<void> => {
 	if (files.length === 0) return
 	const c = getClient()
 
-	const placeholders = files.map(() => '(?, ?, ?, ?, ?)').join(',')
+	const placeholders = files.map(() => '(?, ?, ?, ?, ?, ?)').join(',')
 	const args: (string | number)[] = []
 
 	for (const file of files) {
 		const path_lc = file.path.toLowerCase()
-		const basename_lc = file.path.split('/').pop()?.toLowerCase() ?? ''
+		const basename = file.path.split('/').pop() ?? ''
+		const basename_lc = basename.toLowerCase()
+		const basename_initials = getInitials(basename)
+
 		const dir_lc = file.path
 			.substring(0, file.path.lastIndexOf('/'))
 			.toLowerCase()
 
-		args.push(file.path, path_lc, basename_lc, dir_lc, file.kind)
+		args.push(
+			file.path,
+			path_lc,
+			basename_lc,
+			basename_initials,
+			dir_lc,
+			file.kind
+		)
 	}
 
 	try {
 		await c.execute({
-			sql: `INSERT OR IGNORE INTO files (path, path_lc, basename_lc, dir_lc, kind) VALUES ${placeholders}`,
+			sql: `INSERT OR IGNORE INTO files (path, path_lc, basename_lc, basename_initials, dir_lc, kind) VALUES ${placeholders}`,
 			args,
 		})
 	} catch (e) {
@@ -160,29 +214,46 @@ export type SearchResult = {
 	recency: number
 }
 
-const searchFiles = async (
-	query: string,
-	limit = 50
-): Promise<SearchResult[]> => {
+const SEARCH_PREFIX_SQL = `
+	SELECT id, path, kind, recency 
+	FROM files 
+	WHERE basename_lc LIKE ? OR basename_initials LIKE ?
+	ORDER BY recency DESC, path_lc ASC
+	LIMIT 1000
+`
+
+const SEARCH_FUZZY_SQL = `
+	SELECT id, path, kind, recency 
+	FROM files 
+	WHERE path_lc LIKE ? OR basename_initials LIKE ?
+	ORDER BY 
+		CASE 
+			WHEN basename_lc LIKE ? THEN 1
+			WHEN basename_initials LIKE ? THEN 2
+			ELSE 3
+		END,
+		recency DESC, 
+		length(path_lc) ASC
+	LIMIT 1000
+`
+
+const searchFiles = async (query: string): Promise<SearchResult[]> => {
 	const c = getClient()
-	const q = `%${query.toLowerCase()}%`
+	const qLower = query.toLowerCase()
+
+	// For empty or 1-char queries, use fast prefix matching (alphabetical sort)
+	// For 2+ chars, use fuzzy matching (shortest match sort)
+	const usePrefix = qLower.length <= 1
+	const pattern = usePrefix
+		? `${qLower}%`
+		: '%' + qLower.split('').join('%') + '%'
+	const prefixPattern = `${qLower}%`
 
 	const result = await c.execute({
-		sql: `
-			SELECT id, path, kind, recency 
-			FROM files 
-			WHERE path_lc LIKE ? 
-			ORDER BY 
-				CASE 
-					WHEN basename_lc LIKE ? THEN 1 
-					WHEN path_lc LIKE ? THEN 2 
-					ELSE 3 
-				END,
-				recency DESC,
-				path_lc ASC
-			LIMIT ?
-		`,
-		args: [q, q, `${q}%`, limit],
+		sql: usePrefix ? SEARCH_PREFIX_SQL : SEARCH_FUZZY_SQL,
+		args: usePrefix
+			? [prefixPattern, prefixPattern]
+			: [pattern, prefixPattern, prefixPattern, prefixPattern],
 	})
 
 	return result.rows.map(

@@ -75,7 +75,7 @@ export const useSqliteStudio = () => {
 		}
 
 		const res = await runSqliteQuery<Record<string, unknown>>(
-			`SELECT ${selectCols} FROM "${tableName}" LIMIT 100`
+			`SELECT ${selectCols} FROM "${tableName}" LIMIT 1000`
 		)
 		setTableData(res.rows)
 	}
@@ -95,14 +95,11 @@ export const useSqliteStudio = () => {
 			const info = await runSqliteQuery<TableInfo>(
 				`PRAGMA table_info("${tableName}")`
 			)
-			batch(() => {
-				const pks = info.rows
-					.filter((c) => c.pk > 0)
-					.sort((a, b) => a.pk - b.pk)
-					.map((c) => c.name)
-				setPrimaryKeys(pks)
-				setColumns(info.rows.map((c) => c.name))
-			})
+			const pks = info.rows
+				.filter((c) => c.pk > 0)
+				.sort((a, b) => a.pk - b.pk)
+				.map((c) => c.name)
+			setPrimaryKeys(pks)
 
 			let rowIdAvailable = true
 			try {
@@ -111,6 +108,9 @@ export const useSqliteStudio = () => {
 				rowIdAvailable = false
 			}
 			setHasRowId(rowIdAvailable)
+
+			// Set columns from table info (rowid is filtered out in display)
+			setColumns(info.rows.map((c) => c.name))
 
 			await refreshTableData(tableName)
 		} catch (e: unknown) {

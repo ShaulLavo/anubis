@@ -57,7 +57,7 @@ export const SqliteStudio: Component = () => {
 				</Show>
 
 				<Show when={!state.selectedTable()?.startsWith('example:')}>
-					<div class="flex-1 overflow-auto p-2">
+					<div class="flex-1 flex flex-col p-2 min-h-0">
 						<Show when={state.error()}>
 							<div class="mb-4 p-4 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-sm flex items-center justify-between">
 								<span>{state.error()}</span>

@@ -1,124 +1,184 @@
-import { For, Show, type Accessor } from 'solid-js'
+import { For, Show, createSignal, createMemo, type Accessor } from 'solid-js'
+import {
+	createFixedRowVirtualizer,
+	type FixedRowVirtualizer,
+} from '@repo/code-editor'
+
+const ROW_HEIGHT = 28
+const OVERSCAN = 5
 
 type ResultsTableProps = {
 	columns: Accessor<string[]>
-	rows: Accessor<Record<string, any>[]>
+	rows: Accessor<Record<string, unknown>[]>
 	selectedTable: Accessor<string | null>
-	queryResults: Accessor<Record<string, any>[] | null>
+	queryResults: Accessor<Record<string, unknown>[] | null>
 	hasRowId: Accessor<boolean>
 	primaryKeys: Accessor<string[]>
 	editingCell: Accessor<{
-		row: Record<string, any>
+		row: Record<string, unknown>
 		col: string
-		value: any
+		value: unknown
 	} | null>
 	setEditingCell: (
 		cell: {
-			row: Record<string, any>
+			row: Record<string, unknown>
 			col: string
-			value: any
+			value: unknown
 		} | null
 	) => void
 	onCommitEdit: () => void
 }
 
 export const ResultsTable = (props: ResultsTableProps) => {
+	const [scrollElement, setScrollElement] = createSignal<HTMLElement | null>(
+		null
+	)
+
+	const virtualizer: FixedRowVirtualizer = createFixedRowVirtualizer({
+		count: () => props.rows().length,
+		enabled: () => true,
+		scrollElement,
+		rowHeight: () => ROW_HEIGHT,
+		overscan: OVERSCAN,
+	})
+
+	// Use columns directly (rowid is not included in columns state)
+	const displayColumns = createMemo(() => props.columns())
+
+	// Smart column sizing: 3fr for paths, 2fr for names, 1fr for most, 0.5fr for tiny
+	const gridTemplate = createMemo(() =>
+		displayColumns()
+			.map((col) => {
+				const lc = col.toLowerCase()
+				// Full paths get most space
+				if (lc === 'path' || lc === 'path_lc') return '3fr'
+				// Names and directories get medium space
+				if (lc.includes('basename') && !lc.includes('initials')) return '2fr'
+				if (lc.includes('dir')) return '2fr'
+				// Tiny columns
+				if (lc === 'id' || lc === 'recency') return '0.5fr'
+				// Everything else (initials, kind) gets 1fr
+				return '1fr'
+			})
+			.join(' ')
+	)
+
 	return (
-		<div class="rounded-lg border border-zinc-800 overflow-hidden bg-[#0b0c0f] shadow-sm">
-			<div class="overflow-x-auto">
-				<table class="w-full text-left text-sm border-collapse">
-					<thead>
-						<tr class="bg-zinc-900/50 border-b border-zinc-800">
-							<For each={props.columns().filter((c) => c !== 'rowid')}>
-								{(col) => (
-									<th class="px-4 py-2 font-medium text-zinc-400 whitespace-nowrap">
-										{col}
-									</th>
-								)}
-							</For>
-						</tr>
-					</thead>
-					<tbody class="divide-y divide-zinc-800/50">
-						<For
-							each={props.rows()}
-							fallback={
-								<tr>
-									<td
-										colspan={props.columns().length}
-										class="px-4 py-8 text-center text-zinc-600 italic"
+		<div class="rounded-lg border border-zinc-800 overflow-hidden bg-[#0b0c0f] shadow-sm flex flex-col flex-1 min-h-0">
+			{/* Fixed Header */}
+			<div
+				class="shrink-0 bg-zinc-900/50 border-b border-zinc-800 grid text-sm font-medium text-zinc-400"
+				style={{ 'grid-template-columns': gridTemplate() }}
+			>
+				<For each={displayColumns()}>
+					{(col) => (
+						<div class="px-4 py-2 whitespace-nowrap overflow-hidden text-ellipsis">
+							{col}
+						</div>
+					)}
+				</For>
+			</div>
+
+			{/* Virtualized Body */}
+			<div ref={setScrollElement} class="overflow-auto flex-1 min-h-0">
+				<div
+					style={{
+						height: `${virtualizer.totalSize()}px`,
+						position: 'relative',
+					}}
+				>
+					<Show
+						when={props.rows().length > 0}
+						fallback={
+							<div class="px-4 py-8 text-center text-zinc-600 italic">
+								No results
+							</div>
+						}
+					>
+						<For each={virtualizer.virtualItems()}>
+							{(virtualItem) => {
+								const row = props.rows()[virtualItem.index]
+								if (!row) return null
+								return (
+									<div
+										class="grid text-sm hover:bg-zinc-800/30 transition-colors"
+										style={{
+											'grid-template-columns': gridTemplate(),
+											position: 'absolute',
+											top: `${virtualItem.start}px`,
+											left: 0,
+											right: 0,
+											height: `${ROW_HEIGHT}px`,
+										}}
 									>
-										No results
-									</td>
-								</tr>
-							}
-						>
-							{(row) => (
-								<tr class="hover:bg-zinc-800/30 transition-colors group">
-									<For each={props.columns().filter((c) => c !== 'rowid')}>
-										{(col) => (
-											<td
-												class={`pl-3 py-1 text-zinc-300 whitespace-nowrap max-w-xs overflow-hidden text-ellipsis font-mono text-xs border-r border-zinc-800/30 last:border-r-0 ${
-													props.hasRowId() || props.primaryKeys().length > 0
-														? 'cursor-text hover:bg-zinc-800'
-														: ''
-												}`}
-												onClick={() => {
-													if (
-														props.selectedTable() &&
-														(props.hasRowId() || props.primaryKeys().length > 0)
-													) {
-														props.setEditingCell({
-															row,
-															col,
-															value: row[col],
-														})
-													}
-												}}
-											>
-												<Show
-													when={
-														props.editingCell()?.row === row &&
-														props.editingCell()?.col === col
-													}
-													fallback={
-														row[col] === null ? (
-															<span class="text-zinc-600 italic">null</span>
-														) : (
-															String(row[col])
-														)
-													}
+										<For each={displayColumns()}>
+											{(col) => (
+												<div
+													class={`px-3 py-1 text-zinc-300 whitespace-nowrap overflow-x-auto font-mono text-xs flex items-center border-r border-zinc-800/30 last:border-r-0 scrollbar-none ${
+														props.hasRowId() || props.primaryKeys().length > 0
+															? 'cursor-text hover:bg-zinc-800'
+															: ''
+													}`}
+													style={{ 'scrollbar-width': 'none' }}
+													onClick={() => {
+														if (
+															props.selectedTable() &&
+															(props.hasRowId() ||
+																props.primaryKeys().length > 0)
+														) {
+															props.setEditingCell({
+																row,
+																col,
+																value: row[col],
+															})
+														}
+													}}
 												>
-													<input
-														ref={(el) => setTimeout(() => el.focus(), 0)}
-														value={String(props.editingCell()?.value ?? '')}
-														class="w-full bg-zinc-900 text-white px-1 py-0.5 rounded border border-indigo-500 outline-none"
-														onInput={(e) =>
-															props.setEditingCell((prev) =>
-																prev
-																	? {
-																			...prev,
-																			value: e.currentTarget.value,
-																		}
-																	: null
+													<Show
+														when={
+															props.editingCell()?.row === row &&
+															props.editingCell()?.col === col
+														}
+														fallback={
+															row[col] === null ? (
+																<span class="text-zinc-600 italic">null</span>
+															) : (
+																String(row[col])
 															)
 														}
-														onBlur={() => props.onCommitEdit()}
-														onKeyDown={(e) => {
-															if (e.key === 'Enter') props.onCommitEdit()
-															if (e.key === 'Escape') props.setEditingCell(null)
-														}}
-													/>
-												</Show>
-											</td>
-										)}
-									</For>
-								</tr>
-							)}
+													>
+														<input
+															ref={(el) => setTimeout(() => el.focus(), 0)}
+															value={String(props.editingCell()?.value ?? '')}
+															class="w-full bg-zinc-900 text-white px-1 py-0.5 rounded border border-indigo-500 outline-none"
+															onInput={(e) => {
+																const prev = props.editingCell()
+																if (prev) {
+																	props.setEditingCell({
+																		...prev,
+																		value: e.currentTarget.value,
+																	})
+																}
+															}}
+															onBlur={() => props.onCommitEdit()}
+															onKeyDown={(e) => {
+																if (e.key === 'Enter') props.onCommitEdit()
+																if (e.key === 'Escape')
+																	props.setEditingCell(null)
+															}}
+														/>
+													</Show>
+												</div>
+											)}
+										</For>
+									</div>
+								)
+							}}
 						</For>
-					</tbody>
-				</table>
+					</Show>
+				</div>
 			</div>
-			<div class="px-4 py-2 bg-zinc-900/30 border-t border-zinc-800 text-xs text-zinc-500 flex justify-between">
+			<div class="px-4 py-2 bg-zinc-900/30 border-t border-zinc-800 text-xs text-zinc-500 flex justify-between shrink-0">
 				<span>Showing {props.rows().length} rows</span>
 				<span class="font-mono opacity-50">
 					{props.selectedTable()
