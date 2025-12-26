@@ -13,6 +13,8 @@ import type {
 	LineHighlightSegment,
 } from '../types'
 
+const PERF_THRESHOLD_MS = 1
+
 type ErrorHighlight = { startIndex: number; endIndex: number; scope: string }
 
 type CachedLineHighlights = {
@@ -161,6 +163,16 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	const MAX_HIGHLIGHT_CACHE_SIZE = 500
 
 	const getLineHighlights = (entry: LineEntry): LineHighlightSegment[] => {
+		const perfThreshold = PERF_THRESHOLD_MS
+		const perfStart = performance.now()
+		let gatherMs = 0
+		let sortMs = 0
+		let dedupeMs = 0
+		let highlightMs = 0
+		let errorMs = 0
+		let mergeMs = 0
+		let candidateCount = 0
+
 		const lineStart = entry.start
 		const lineLength = entry.length
 		const lineTextLength = entry.text.length
@@ -195,6 +207,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 		let highlightSegments: LineHighlightSegment[]
 		if (highlights.length > 0) {
+			const gatherStart = performance.now()
 			// Get offset for optimistic updates
 			// Calculate the lookup position for the spatial index.
 			// If edits are pending, map the new line range back to old coordinates.
@@ -228,12 +241,15 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			}
 
 			// 3. Sort (mutates buffer)
+			const sortStart = performance.now()
 			candidatesBuffer.sort((a, b) => a.startIndex - b.startIndex)
+			sortMs = performance.now() - sortStart
 
 			// 4. Deduplicate in-place (if multiple chunks involved)
 			// Only needed if we pulled from >1 source that could overlap.
 			// Buckets overlap in content (same highlight in multiple buckets).
 			let uniqueCount = candidatesBuffer.length
+			const dedupeStart = performance.now()
 			if (startChunk !== endChunk && candidatesBuffer.length > 1) {
 				let writeIndex = 1
 				for (let i = 1; i < candidatesBuffer.length; i++) {
@@ -248,10 +264,14 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 				// We must truncate the buffer to correct length for the callee.
 				candidatesBuffer.length = uniqueCount
 			}
+			dedupeMs = performance.now() - dedupeStart
+			gatherMs = performance.now() - gatherStart
+			candidateCount = uniqueCount
 
 			// 5. Apply offset to candidates if needed (shift to new positions)
 			// We pass the offset info to toLineHighlightSegmentsForLine to adjust
 			// positions inline, avoiding object creation per-line.
+			const highlightStart = performance.now()
 			highlightSegments = toLineHighlightSegmentsForLine(
 				lineStart,
 				lineLength,
@@ -259,10 +279,12 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 				candidatesBuffer,
 				hasOffsets ? offsets : undefined
 			)
+			highlightMs = performance.now() - highlightStart
 		} else {
 			highlightSegments = []
 		}
 
+		const errorStart = performance.now()
 		const errorSegments = toLineHighlightSegmentsForLine(
 			lineStart,
 			lineLength,
@@ -270,8 +292,11 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			errors,
 			hasOffsets ? offsets : undefined
 		)
+		errorMs = performance.now() - errorStart
 
+		const mergeStart = performance.now()
 		const result = mergeLineSegments(highlightSegments, errorSegments)
+		mergeMs = performance.now() - mergeStart
 
 		cacheMap.set(cacheIndex, {
 			length: lineLength,
@@ -283,6 +308,28 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			if (typeof firstKey === 'number') {
 				cacheMap.delete(firstKey)
 			}
+		}
+
+		const totalMs = performance.now() - perfStart
+		if (totalMs >= perfThreshold) {
+			console.log('line highlights', {
+				line: entry.index,
+				length: lineLength,
+				textLength: lineTextLength,
+				highlightCount: highlights.length,
+				errorCount: errors.length,
+				candidates: candidateCount,
+				segments: highlightSegments.length,
+				errorSegments: errorSegments.length,
+				hasOffsets,
+				ms: totalMs,
+				gatherMs,
+				sortMs,
+				dedupeMs,
+				highlightMs,
+				errorMs,
+				mergeMs,
+			})
 		}
 
 		return result
