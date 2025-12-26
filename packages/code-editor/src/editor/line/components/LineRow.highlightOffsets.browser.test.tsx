@@ -2,16 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { batch, createSignal } from 'solid-js'
 import { render } from 'vitest-browser-solid'
 import { waitForFrames } from '../../benchmarks/utils/performanceMetrics'
-import {
-	createPieceTableSnapshot,
-	insertIntoPieceTable,
-	type PieceTableSnapshot,
-} from '@repo/utils'
+import { createPieceTableSnapshot, type PieceTableSnapshot } from '@repo/utils'
 import { getEditCharDelta, getEditLineDelta } from '@repo/utils/highlightShift'
-import { CursorProvider, useCursor } from '../../cursor'
-import { HistoryProvider } from '../../history'
-import { TextEditorView } from '../../components/TextEditorView'
-import { describeIncrementalEdit } from '../../utils'
+import { Editor } from '../../components/Editor'
 import type {
 	CursorMode,
 	EditorSyntaxHighlight,
@@ -60,7 +53,7 @@ type FileState = {
 
 type HarnessHandle = {
 	switchFile: (next: FileState) => void
-	applyEditAt: (lineIndex: number, column: number, insertedText: string) => void
+	typeAt: (lineIndex: number, column: number, text: string) => void
 	container: HTMLDivElement
 	getContent: () => string
 	unmount: () => void
@@ -172,14 +165,26 @@ const createHarness = (initialFile: FileState): HarnessHandle => {
 			setPieceTable(updater(pieceTable()))
 		},
 		isEditable: () => true,
-	}
+		applyIncrementalEdit: (edit) => {
+			setContent((prev) => {
+				const before = prev.slice(0, edit.startIndex)
+				const after = prev.slice(edit.oldEndIndex)
+				return before + edit.insertedText + after
+			})
 
-	let cursorRef: ReturnType<typeof useCursor> | null = null
+			const offset = {
+				charDelta: getEditCharDelta(edit),
+				lineDelta: getEditLineDelta(edit),
+				fromCharIndex: edit.startIndex,
+				fromLineRow: edit.startPosition.row,
+				oldEndRow: edit.oldEndPosition.row,
+				newEndRow: edit.newEndPosition.row,
+				oldEndIndex: edit.oldEndIndex,
+				newEndIndex: edit.newEndIndex,
+			}
 
-	const CursorCapture = () => {
-		const cursor = useCursor()
-		cursorRef = cursor
-		return null
+			setHighlightOffsets((prev) => (prev ? [...prev, offset] : [offset]))
+		},
 	}
 
 	const screen = render(() => (
@@ -192,26 +197,16 @@ const createHarness = (initialFile: FileState): HarnessHandle => {
 				'flex-direction': 'column',
 			}}
 		>
-			<CursorProvider
-				filePath={filePath}
+			<Editor
+				document={document}
 				isFileSelected={isFileSelected}
-				content={content}
-				pieceTable={pieceTable}
-			>
-				<HistoryProvider document={document}>
-					<TextEditorView
-						document={document}
-						isFileSelected={isFileSelected}
-						stats={stats}
-						fontSize={fontSize}
-						fontFamily={fontFamily}
-						cursorMode={cursorMode}
-						highlights={highlights}
-						highlightOffset={highlightOffsets}
-					/>
-					<CursorCapture />
-				</HistoryProvider>
-			</CursorProvider>
+				stats={stats}
+				fontSize={fontSize}
+				fontFamily={fontFamily}
+				cursorMode={cursorMode}
+				highlights={highlights}
+				highlightOffset={highlightOffsets}
+			/>
 		</div>
 	))
 
@@ -225,76 +220,44 @@ const createHarness = (initialFile: FileState): HarnessHandle => {
 		})
 	}
 
-	const applyEditAt = (
-		lineIndex: number,
-		column: number,
-		insertedText: string
-	) => {
-		if (!cursorRef) {
-			throw new Error('cursor not ready')
+	const typeAt = (lineIndex: number, column: number, text: string) => {
+		const line = screen.container.querySelector(
+			`.editor-line[data-index="${lineIndex}"]`
+		) as HTMLDivElement | null
+		if (!line) {
+			throw new Error(`line ${lineIndex} not found`)
 		}
 
-		const startIndex = cursorRef.lines.positionToOffset(lineIndex, column)
-		const deletedText = ''
-		const currentContent = content()
-		const nextContent =
-			currentContent.slice(0, startIndex) +
-			insertedText +
-			currentContent.slice(startIndex)
-
-		const incrementalEdit = describeIncrementalEdit(
-			(offset) => {
-				const pos = cursorRef!.lines.offsetToPosition(offset)
-				return { row: pos.line, column: pos.column }
-			},
-			startIndex,
-			deletedText,
-			insertedText
+		const rect = line.getBoundingClientRect()
+		line.dispatchEvent(
+			new MouseEvent('mousedown', {
+				button: 0,
+				clientX: rect.left + Math.max(1, column * 8),
+				clientY: rect.top + 2,
+				bubbles: true,
+			})
 		)
 
-		if (!incrementalEdit) return
+		const input = screen.container.querySelector(
+			'textarea'
+		) as HTMLTextAreaElement | null
+		if (!input) {
+			throw new Error('input not found')
+		}
 
-		batch(() => {
-			cursorRef!.lines.applyEdit(startIndex, deletedText, insertedText)
-			setContent(nextContent)
-
-			let nextSnapshot: PieceTableSnapshot | undefined
-			setPieceTable((current) => {
-				const baseSnapshot = current ?? createPieceTableSnapshot(currentContent)
-				let snapshot = baseSnapshot
-
-				if (insertedText.length > 0) {
-					snapshot = insertIntoPieceTable(snapshot, startIndex, insertedText)
-				}
-
-				nextSnapshot = snapshot
-				return snapshot
+		input.value = text
+		input.dispatchEvent(
+			new InputEvent('input', {
+				data: text,
+				inputType: 'insertText',
+				bubbles: true,
 			})
-
-			if (nextSnapshot) {
-				cursorRef!.lines.setPieceTableSnapshot(nextSnapshot, {
-					mode: 'incremental',
-				})
-			}
-
-			const offset = {
-				charDelta: getEditCharDelta(incrementalEdit),
-				lineDelta: getEditLineDelta(incrementalEdit),
-				fromCharIndex: incrementalEdit.startIndex,
-				fromLineRow: incrementalEdit.startPosition.row,
-				oldEndRow: incrementalEdit.oldEndPosition.row,
-				newEndRow: incrementalEdit.newEndPosition.row,
-				oldEndIndex: incrementalEdit.oldEndIndex,
-				newEndIndex: incrementalEdit.newEndIndex,
-			}
-
-			setHighlightOffsets((prev) => (prev ? [...prev, offset] : [offset]))
-		})
+		)
 	}
 
 	return {
 		switchFile,
-		applyEditAt,
+		typeAt,
 		container: screen.container as HTMLDivElement,
 		getContent: content,
 		unmount: () => screen.unmount(),
@@ -344,7 +307,7 @@ describe('LineRow highlight offsets', () => {
 		await waitForFrames(2)
 		buildTextRunsCalls.length = 0
 
-		activeHarness.applyEditAt(0, 0, 'x')
+		activeHarness.typeAt(0, 0, 'x')
 
 		await expect.poll(() => buildTextRunsCalls.length).toBeGreaterThan(0)
 
