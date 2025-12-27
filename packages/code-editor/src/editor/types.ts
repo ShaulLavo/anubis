@@ -202,6 +202,7 @@ export type LinesProps = {
 	activeLineIndex: Accessor<number | null>
 	getLineBracketDepths: (entry: LineEntry) => LineBracketDepthMap | undefined
 	getLineHighlights?: (entry: LineEntry) => LineHighlightSegment[] | undefined
+	highlightRevision?: Accessor<number>
 	/** Get cached TextRuns for a line (for instant rendering on tab switch) */
 	getCachedRuns?: (
 		lineIndex: number,

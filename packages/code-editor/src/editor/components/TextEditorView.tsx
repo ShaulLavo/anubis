@@ -20,7 +20,6 @@ import {
 	useVisibleContentCache,
 } from '../hooks'
 import { EditorViewport } from './EditorViewport'
-import { consumeLineRowCounters } from '../line/components/LineRow'
 import { Minimap, HorizontalScrollbar } from '../minimap'
 import type {
 	DocumentIncrementalEdit,
@@ -93,29 +92,7 @@ export const TextEditorView = (props: EditorProps) => {
 			return
 		}
 
-		console.log(
-			'[TextEditorView] incremental edit',
-			JSON.stringify(
-				{
-					edit,
-					highlightCount: props.highlights?.()?.length ?? 0,
-					offsetCount: props.highlightOffset?.()?.length ?? 0,
-					bracketCount: props.brackets?.()?.length ?? 0,
-				},
-				null,
-				2
-			)
-		)
 		props.document.applyIncrementalEdit?.(edit)
-		queueMicrotask(() => {
-			const { mounts, cleanups } = consumeLineRowCounters()
-			if (mounts > 0 || cleanups > 0) {
-				console.log('[TextEditorView] line-row mounts after edit', {
-					mounts,
-					cleanups,
-				})
-			}
-		})
 	}
 
 	const { foldedStarts, toggleFold } = useFoldedStarts({
@@ -311,7 +288,7 @@ export const TextEditorView = (props: EditorProps) => {
 		return entries
 	})
 
-	const { getLineHighlights } = createLineHighlights({
+	const { getLineHighlights, getHighlightsRevision } = createLineHighlights({
 		highlights: () => (showHighlights() ? props.highlights?.() : undefined),
 		errors: () => props.errors?.(),
 		highlightOffset: () =>
@@ -369,6 +346,7 @@ export const TextEditorView = (props: EditorProps) => {
 					tabSize={tabSize}
 					getLineBracketDepths={getLineBracketDepths}
 					getLineHighlights={getLineHighlights}
+					highlightRevision={getHighlightsRevision}
 					getCachedRuns={getCachedRuns}
 					folds={props.folds}
 					foldedStarts={foldedStarts}

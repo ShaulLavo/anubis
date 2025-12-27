@@ -1,4 +1,4 @@
-import { createMemo, untrack, type Accessor } from 'solid-js'
+import { createMemo, createSignal, untrack, type Accessor } from 'solid-js'
 
 import {
 	mergeLineSegments,
@@ -35,6 +35,8 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	const EMPTY_HIGHLIGHTS: EditorSyntaxHighlight[] = []
 	const EMPTY_ERRORS: ErrorHighlight[] = []
 	const EMPTY_OFFSETS: HighlightOffsets = []
+	const EMPTY_SEGMENTS: LineHighlightSegment[] = []
+	const [highlightsRevision, setHighlightsRevision] = createSignal(0)
 
 	const sortedHighlights = createMemo(() => {
 		const highlights = options.highlights?.()
@@ -92,6 +94,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	})
 
 	let precomputedCache = new Map<number, LineHighlightSegment[]>()
+	let lastPrecomputedSegments: LineHighlightSegment[][] | undefined
 	let lastOffsetsRef: HighlightOffsets | undefined
 	let validatedOffsetsRef: HighlightOffsets = EMPTY_OFFSETS
 	let lineIndexCache: Map<number, number | null> | null = null
@@ -248,6 +251,24 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	let lastHighlightsRef: EditorSyntaxHighlight[] | undefined
 	let lastErrorsRef: ErrorHighlight[] | undefined
 	const MAX_HIGHLIGHT_CACHE_SIZE = 500
+	const cacheLineHighlights = (
+		cache: Map<number, CachedLineHighlights>,
+		cacheIndex: number,
+		entry: LineEntry,
+		segments: LineHighlightSegment[]
+	) => {
+		cache.set(cacheIndex, {
+			length: entry.length,
+			text: entry.text,
+			segments,
+		})
+		if (cache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
+			const firstKey = cache.keys().next().value
+			if (typeof firstKey === 'number') {
+				cache.delete(firstKey)
+			}
+		}
+	}
 
 	const getLineHighlights = (entry: LineEntry): LineHighlightSegment[] => {
 		const offsets = getValidatedOffsets()
@@ -255,9 +276,11 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 		const precomputed = hasOffsets ? undefined : precomputedSegments()
 		if (precomputed && !hasOffsets) {
+			lastPrecomputedSegments = precomputed
 			const segments = precomputed[entry.index] ?? []
 			lastHighlightsRef = sortedHighlights()
 			lastErrorsRef = sortedErrorHighlights()
+			cacheLineHighlights(highlightCache, entry.index, entry, segments)
 			if (segments.length > 0) {
 				precomputedCache.set(entry.index, segments)
 				if (precomputedCache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
@@ -278,10 +301,12 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 		const errors = sortedErrorHighlights()
 
 		if (highlights !== lastHighlightsRef || errors !== lastErrorsRef) {
+			setHighlightsRevision((value) => value + 1)
 			highlightCache = new Map()
 			dirtyHighlightCache.clear()
 			lineIndexCache = null
 			precomputedCache.clear()
+			lastPrecomputedSegments = undefined
 			lastHighlightsRef = highlights
 			lastErrorsRef = errors
 			spatialIndexReady = false
@@ -307,6 +332,11 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			const cached = precomputedCache.get(mappedLineIndex)
 			if (cached) {
 				return cached
+			}
+			const precomputed = lastPrecomputedSegments
+			if (precomputed) {
+				const precomputedLine = precomputed[mappedLineIndex]
+				return precomputedLine ?? EMPTY_SEGMENTS
 			}
 		}
 		const cacheKey = hasOffsets ? mappedLineIndex : entry.index
@@ -423,20 +453,10 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			shiftedErrorSegments
 		)
 
-		cacheMap.set(cacheIndex, {
-			length: lineLength,
-			text: entry.text,
-			segments: result,
-		})
-		if (cacheMap.size > MAX_HIGHLIGHT_CACHE_SIZE) {
-			const firstKey = cacheMap.keys().next().value
-			if (typeof firstKey === 'number') {
-				cacheMap.delete(firstKey)
-			}
-		}
+		cacheLineHighlights(cacheMap, cacheIndex, entry, result)
 
 		return result
 	}
 
-	return { getLineHighlights }
+	return { getLineHighlights, getHighlightsRevision: highlightsRevision }
 }

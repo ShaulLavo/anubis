@@ -1,7 +1,7 @@
 import { For, createEffect } from 'solid-js'
 import { endGlobalTrace, hasGlobalTrace } from '@repo/perf'
 import { useCursor } from '../../cursor'
-import type { LinesProps, VirtualItem2D } from '../../types'
+import type { LinesProps } from '../../types'
 import { LineRow } from './LineRow'
 
 export const Lines = (props: LinesProps) => {
@@ -35,6 +35,7 @@ export const Lines = (props: LinesProps) => {
 						activeLineIndex={props.activeLineIndex}
 						getLineBracketDepths={props.getLineBracketDepths}
 						getLineHighlights={props.getLineHighlights}
+						highlightRevision={props.highlightRevision}
 						getCachedRuns={props.getCachedRuns}
 						displayToLine={props.displayToLine}
 					/>

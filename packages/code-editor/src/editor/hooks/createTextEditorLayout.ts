@@ -137,6 +137,13 @@ export const scanLineWidthSlice = (options: {
 	}
 }
 
+export const shouldResetWidthScan = (
+	nextTabSize: number,
+	nextLineCount: number,
+	prevTabSize: number,
+	prevLineCount: number
+) => nextTabSize !== prevTabSize || nextLineCount !== prevLineCount
+
 export function createTextEditorLayout(
 	options: TextEditorLayoutOptions
 ): TextEditorLayout {
@@ -373,10 +380,24 @@ export function createTextEditorLayout(
 		scheduleWidthScan()
 	}
 
+	let lastTabSize = options.tabSize()
+	let lastLineCount = cursor.lines.lineCount()
+
 	// *Approved*
 	createEffect(() => {
-		options.tabSize()
-		cursor.lines.lineStarts()
+		const tabSize = options.tabSize()
+		const lineCount = cursor.lines.lineCount()
+		const shouldReset = shouldResetWidthScan(
+			tabSize,
+			lineCount,
+			lastTabSize,
+			lastLineCount
+		)
+		lastTabSize = tabSize
+		lastLineCount = lineCount
+
+		if (!shouldReset) return
+
 		setMaxColumnsSeen(0)
 		lastWidthScanStart = 0
 		lastWidthScanEnd = -1

@@ -38,6 +38,7 @@ type LineRowProps = {
 	activeLineIndex: Accessor<number | null>
 	getLineBracketDepths: (entry: LineEntry) => LineBracketDepthMap | undefined
 	getLineHighlights?: (entry: LineEntry) => LineHighlightSegment[] | undefined
+	highlightRevision?: Accessor<number>
 	getCachedRuns?: (
 		lineIndex: number,
 		columnStart: number,
@@ -111,6 +112,7 @@ export const LineRow = (props: LineRowProps) => {
 		'activeLineIndex',
 		'getLineBracketDepths',
 		'getLineHighlights',
+		'highlightRevision',
 		'getCachedRuns',
 		'displayToLine',
 	])
@@ -164,10 +166,35 @@ export const LineRow = (props: LineRowProps) => {
 		}
 	})
 
+	let lastHighlightEntry: LineEntry | null = null
+	let lastHighlightRevision = -1
+
 	const highlights = createMemo(
-		() => {
+		(previous) => {
 			const e = entry()
-			return e ? local.getLineHighlights?.(e) : undefined
+			if (!e) {
+				lastHighlightEntry = null
+				return undefined
+			}
+
+			const revision = local.highlightRevision?.() ?? 0
+			if (
+				previous &&
+				lastHighlightEntry &&
+				lastHighlightRevision === revision &&
+				lastHighlightEntry.index === e.index &&
+				lastHighlightEntry.length === e.length &&
+				lastHighlightEntry.text === e.text &&
+				lastHighlightEntry.start !== e.start
+			) {
+				lastHighlightEntry = e
+				return previous
+			}
+
+			const next = local.getLineHighlights?.(e)
+			lastHighlightEntry = e
+			lastHighlightRevision = revision
+			return next
 		},
 		undefined,
 		{ equals: areHighlightSegmentsEqual }
