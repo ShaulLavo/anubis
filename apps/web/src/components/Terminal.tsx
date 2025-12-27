@@ -87,9 +87,7 @@ export const Terminal: Component = () => {
 				trackedTheme,
 				() => {
 					if (!controller) return
-					void setup(false).catch((error) => {
-						console.error('Failed to update terminal theme', error)
-					})
+					controller.setTheme(theme)
 				},
 				{ defer: true }
 			)
