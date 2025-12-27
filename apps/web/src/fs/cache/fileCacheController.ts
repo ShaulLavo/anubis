@@ -41,6 +41,7 @@ export type FileCacheController = {
 	getAsync: (path: string) => Promise<FileCacheEntry>
 	getScrollPosition: (path: string) => ScrollPosition | undefined
 	setActiveFile: (path: string | null) => void
+	setOpenTabs: (paths: string[]) => void
 	getStats: () => Promise<CacheStats>
 	flush: () => Promise<void>
 }
@@ -288,6 +289,10 @@ export const createFileCacheController = ({
 		tieredCache.setActiveFile(path)
 	}
 
+	const setOpenTabs = (paths: string[]): void => {
+		tieredCache.setOpenTabs(paths)
+	}
+
 	const getScrollPosition = (path: string): ScrollPosition | undefined => {
 		const memoryPos = state.scrollPositions[path]
 		if (memoryPos) return memoryPos
@@ -313,6 +318,7 @@ export const createFileCacheController = ({
 		getAsync,
 		getScrollPosition,
 		setActiveFile,
+		setOpenTabs,
 		getStats,
 		flush,
 	}

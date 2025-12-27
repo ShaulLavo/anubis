@@ -12,8 +12,14 @@ export interface ActiveFileState {
 	/** Current active file path, or null if none */
 	activePath: string | null
 	
+	/** Current open tab paths */
+	openTabs: string[]
+	
 	/** Set the active file path */
 	setActive(path: string | null): void
+	
+	/** Set open tabs */
+	setOpenTabs(paths: string[]): void
 	
 	/** Get active file's cache entry (always available) */
 	getActiveEntry(): FileCacheEntry | null
@@ -26,6 +32,9 @@ export interface ActiveFileState {
 	
 	/** Check if a path is the active file */
 	isActive(path: string): boolean
+	
+	/** Check if a path is in open tabs (protected from eviction) */
+	isOpenTab(path: string): boolean
 }
 
 /**
@@ -49,26 +58,28 @@ export interface ActiveFileStateOptions {
 export function createActiveFileState(options: ActiveFileStateOptions = {}): ActiveFileState {
 	let activePath: string | null = null
 	let activeEntry: FileCacheEntry = {}
+	let openTabs: string[] = []
 
 	const setActive = (path: string | null): void => {
 		const oldPath = activePath
 		
-		// If we're deactivating a file, trigger the callback for cache transition
 		if (oldPath && oldPath !== path && options.onDeactivate) {
 			options.onDeactivate(oldPath, { ...activeEntry })
 		}
 
-		// Clear active entry when changing files
 		if (oldPath !== path) {
 			activeEntry = {}
 		}
 
 		activePath = path
 		
-		// Notify about active file change
 		if (options.onActiveChange) {
 			options.onActiveChange(oldPath, path)
 		}
+	}
+
+	const setOpenTabs = (paths: string[]): void => {
+		openTabs = paths
 	}
 
 	const getActiveEntry = (): FileCacheEntry | null => {
@@ -80,10 +91,9 @@ export function createActiveFileState(options: ActiveFileStateOptions = {}): Act
 
 	const setActiveEntry = (entry: Partial<FileCacheEntry>): void => {
 		if (!activePath) {
-			return // No active file to update
+			return
 		}
 
-		// Merge the partial entry with existing active entry
 		activeEntry = {
 			...activeEntry,
 			...entry
@@ -92,10 +102,9 @@ export function createActiveFileState(options: ActiveFileStateOptions = {}): Act
 
 	const replaceActiveEntry = (entry: FileCacheEntry): void => {
 		if (!activePath) {
-			return // No active file to update
+			return
 		}
 
-		// Replace the entire entry
 		activeEntry = { ...entry }
 	}
 
@@ -103,15 +112,24 @@ export function createActiveFileState(options: ActiveFileStateOptions = {}): Act
 		return activePath === path
 	}
 
+	const isOpenTab = (path: string): boolean => {
+		return openTabs.includes(path)
+	}
+
 	return {
 		get activePath() {
 			return activePath
 		},
+		get openTabs() {
+			return openTabs
+		},
 		setActive,
+		setOpenTabs,
 		getActiveEntry,
 		setActiveEntry,
 		replaceActiveEntry,
-		isActive
+		isActive,
+		isOpenTab
 	}
 }
 

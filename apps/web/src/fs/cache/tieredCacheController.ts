@@ -139,6 +139,10 @@ export class TieredCacheController {
 		this.activeFileState.setActive(path)
 	}
 
+	setOpenTabs(paths: string[]): void {
+		this.activeFileState.setOpenTabs(paths)
+	}
+
 	getActiveFile(): string | null {
 		return this.activeFileState.activePath
 	}
@@ -242,7 +246,7 @@ export class TieredCacheController {
 		const path = match[1]
 		const dataType = match[2] as keyof FileCacheEntry
 		
-		if (path && this.activeFileState.isActive(path)) {
+		if (path && (this.activeFileState.isActive(path) || this.activeFileState.isOpenTab(path))) {
 			this.hotBackend.set(key, value)
 			return
 		}

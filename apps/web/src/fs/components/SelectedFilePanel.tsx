@@ -61,6 +61,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			updateSelectedFileScrollPosition,
 			updateSelectedFileVisibleContent,
 			saveFile,
+			fileCache,
 		},
 	] = useFs()
 	const focus = useFocusManager()
@@ -73,6 +74,10 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 
 	const tabs = useTabs(() => state.lastKnownFilePath, {
 		maxTabs: MAX_EDITOR_TABS,
+	})
+
+	createEffect(() => {
+		fileCache.setOpenTabs(tabs())
 	})
 
 	const handleTabSelect = (path: string) => {
