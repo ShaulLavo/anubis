@@ -12,7 +12,6 @@ export const Lines = (props: LinesProps) => {
 		void cursor.state.position.offset
 		void cursor.lines.lineCount()
 
-		// Use queueMicrotask to measure after Solid's render completes
 		queueMicrotask(() => {
 			if (hasGlobalTrace('keystroke')) {
 				endGlobalTrace('keystroke', 'render')
