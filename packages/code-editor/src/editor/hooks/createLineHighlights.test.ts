@@ -30,7 +30,7 @@ describe('createLineHighlights', () => {
 		})
 	})
 
-	it.fails(
+	it(
 		'keeps precomputed highlights for unaffected lines when offsets are applied',
 		() => {
 			createRoot((dispose) => {
@@ -350,9 +350,8 @@ describe('createLineHighlights', () => {
 	})
 
 	// This test checks edge case behavior where an edit occurred before
-	// the line but we still need to find highlights. Current behavior
-	// has this as an optimization tradeoff.
-	it.fails('keeps highlights on lines after insert offsets', () => {
+	// the line but we still need to find highlights.
+	it('keeps highlights on lines after insert offsets', () => {
 		createRoot((dispose) => {
 			const [highlightOffset] = createSignal([
 				{
@@ -385,9 +384,8 @@ describe('createLineHighlights', () => {
 	})
 
 	// This test checks edge case behavior where a deletion occurred before
-	// the line but we still need to find highlights. Current behavior
-	// has this as an optimization tradeoff.
-	it.fails('keeps highlights on lines after deletion offsets', () => {
+	// the line but we still need to find highlights.
+	it('keeps highlights on lines after deletion offsets', () => {
 		createRoot((dispose) => {
 			const [highlightOffset] = createSignal([
 				{

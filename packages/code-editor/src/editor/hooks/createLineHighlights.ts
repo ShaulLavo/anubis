@@ -91,6 +91,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 		return merged
 	})
 
+	let precomputedCache = new Map<number, LineHighlightSegment[]>()
 	let lastOffsetsRef: HighlightOffsets | undefined
 	let validatedOffsetsRef: HighlightOffsets = EMPTY_OFFSETS
 	let lineIndexCache: Map<number, number | null> | null = null
@@ -110,6 +111,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			validatedOffsetsRef = EMPTY_OFFSETS
 			lineIndexCache = null
 			dirtyHighlightCache.clear()
+			precomputedCache.clear()
 			return validatedOffsetsRef
 		}
 
@@ -205,6 +207,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	let largeHighlights: EditorSyntaxHighlight[] = []
 	const SPATIAL_CHUNK_SIZE = 512
 	const candidateScratch: EditorSyntaxHighlight[] = []
+	let spatialIndexReady = false
 
 	const buildSpatialIndex = (highlights: EditorSyntaxHighlight[]) => {
 		spatialIndex.clear()
@@ -246,10 +249,24 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 	const MAX_HIGHLIGHT_CACHE_SIZE = 500
 
 	const getLineHighlights = (entry: LineEntry): LineHighlightSegment[] => {
-		const precomputed = precomputedSegments()
-		if (precomputed) {
-			const segments = precomputed[entry.index]
-			return segments ?? []
+		const offsets = getValidatedOffsets()
+		const hasOffsets = offsets.length > 0
+
+		const precomputed = hasOffsets ? undefined : precomputedSegments()
+		if (precomputed && !hasOffsets) {
+			const segments = precomputed[entry.index] ?? []
+			lastHighlightsRef = sortedHighlights()
+			lastErrorsRef = sortedErrorHighlights()
+			if (segments.length > 0) {
+				precomputedCache.set(entry.index, segments)
+				if (precomputedCache.size > MAX_HIGHLIGHT_CACHE_SIZE) {
+					const firstKey = precomputedCache.keys().next().value
+					if (typeof firstKey === 'number') {
+						precomputedCache.delete(firstKey)
+					}
+				}
+			}
+			return segments
 		}
 
 		const lineStart = entry.start
@@ -263,21 +280,33 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			highlightCache = new Map()
 			dirtyHighlightCache.clear()
 			lineIndexCache = null
+			precomputedCache.clear()
 			lastHighlightsRef = highlights
 			lastErrorsRef = errors
-			buildSpatialIndex(highlights)
+			spatialIndexReady = false
 		}
 
-		const offsets = getValidatedOffsets()
-		const hasOffsets = offsets.length > 0
+		if (!spatialIndexReady) {
+			buildSpatialIndex(highlights)
+			spatialIndexReady = true
+		}
+
 		const offsetShift = hasOffsets
 			? toShiftOffsets(offsets, lineStart, lineEnd)
 			: { shift: 0, intersects: false }
 		const offsetShiftAmount = offsetShift.shift
 		const hasIntersectingOffsets = offsetShift.intersects
-		const cacheKey = hasOffsets
+		const shouldApplyOffsets =
+			hasOffsets && (hasIntersectingOffsets || offsetShiftAmount !== 0)
+		const offsetsForSegments = shouldApplyOffsets ? offsets : undefined
+		const mappedLineIndex = hasOffsets
 			? mapLineIndexToOldOffsets(entry.index, offsets)
 			: entry.index
+		if (hasOffsets && mappedLineIndex !== null) {
+			const cached = precomputedCache.get(mappedLineIndex)
+			if (cached) return cached
+		}
+		const cacheKey = hasOffsets ? mappedLineIndex : entry.index
 		const cacheMap = cacheKey === null ? dirtyHighlightCache : highlightCache
 		const cacheIndex = cacheKey === null ? entry.index : cacheKey
 		const cached = cacheMap.get(cacheIndex)
@@ -361,7 +390,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 				lineLength,
 				lineTextLength,
 				candidates,
-				hasIntersectingOffsets ? offsets : undefined
+				offsetsForSegments
 			)
 		} else {
 			highlightSegments = []
@@ -372,17 +401,17 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			lineLength,
 			lineTextLength,
 			errors,
-			hasIntersectingOffsets ? offsets : undefined
+			offsetsForSegments
 		)
 
-		const shiftedHighlightSegments = hasOffsets
+		const shiftedHighlightSegments = hasOffsets && !shouldApplyOffsets
 			? applyShiftToSegments(
 					highlightSegments,
 					offsetShiftAmount,
 					lineTextLength
 				)
 			: highlightSegments
-		const shiftedErrorSegments = hasOffsets
+		const shiftedErrorSegments = hasOffsets && !shouldApplyOffsets
 			? applyShiftToSegments(errorSegments, offsetShiftAmount, lineTextLength)
 			: errorSegments
 
