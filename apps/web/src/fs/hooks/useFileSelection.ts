@@ -20,10 +20,7 @@ import type { FsContextValue, SelectPathOptions } from '../context/FsContext'
 import { findNode } from '../runtime/tree'
 import type { FileCacheController } from '../cache/fileCacheController'
 import { parseBufferWithTreeSitter } from '../../treeSitter/workerClient'
-import {
-	viewTransition,
-	viewTransitionBatched,
-} from '@repo/utils/viewTransition'
+import { viewTransitionBatched } from '@repo/utils/viewTransition'
 import { toast } from '@repo/ui/toaster'
 
 const textDecoder = new TextDecoder()
@@ -42,6 +39,7 @@ type UseFileSelectionOptions = {
 	setSelectedFilePreviewBytes: (bytes: Uint8Array | undefined) => void
 	setSelectedFileContent: (content: string) => void
 	setSelectedFileLoading: (value: boolean) => void
+	setDirtyPath: (path: string, isDirty: boolean) => void
 	fileCache: FileCacheController
 }
 
@@ -54,6 +52,7 @@ export const useFileSelection = ({
 	setSelectedFilePreviewBytes,
 	setSelectedFileContent,
 	setSelectedFileLoading,
+	setDirtyPath,
 	fileCache,
 }: UseFileSelectionOptions) => {
 	let selectRequestId = 0
@@ -253,6 +252,8 @@ export const useFileSelection = ({
 			if (!next) return
 
 			fileCache.set(path, { pieceTable: next })
+			// Mark the file as dirty so its piece table won't be cleared when switching files
+			setDirtyPath(path, true)
 		}
 
 	const updateSelectedFileHighlights: FsContextValue[1]['updateSelectedFileHighlights'] =

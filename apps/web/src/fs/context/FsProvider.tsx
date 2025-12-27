@@ -122,6 +122,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setSelectedFilePreviewBytes,
 		setSelectedFileContent,
 		setSelectedFileLoading,
+		setDirtyPath,
 		fileCache,
 	})
 
