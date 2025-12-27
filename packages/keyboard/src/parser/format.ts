@@ -115,7 +115,7 @@ export function formatKeyLabel(
 	options: { platform?: Platform; useSymbols?: boolean } = {}
 ): string {
 	if (!key) return ''
-	const { useSymbols = false, platform = detectPlatform() } = options
+	const { useSymbols = true, platform = detectPlatform() } = options
 
 	if (useSymbols && platform === 'mac' && symbolOverrides[key]) {
 		return symbolOverrides[key] as string
