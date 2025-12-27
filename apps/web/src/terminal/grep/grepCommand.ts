@@ -134,6 +134,9 @@ export function parseGitignore(content: string): string[] {
 	for (const line of lines) {
 		const trimmed = line.trim()
 
+		if (!trimmed) continue
+		if (trimmed.startsWith('#')) continue
+
 		patterns.push(trimmed)
 	}
 

@@ -48,7 +48,7 @@ describe('formatKeyLabel friendly names', () => {
 
 	for (const [input, expected] of cases) {
 		it(`converts ${input} to ${expected}`, () => {
-			expect(formatKeyLabel(input)).toBe(expected)
+			expect(formatKeyLabel(input, { useSymbols: false })).toBe(expected)
 		})
 	}
 })

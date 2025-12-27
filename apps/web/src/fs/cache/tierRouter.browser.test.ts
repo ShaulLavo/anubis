@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import fc from 'fast-check'
 import { TierRouter } from './tierRouter'
-import type { StorageBackend } from './backends/types'
+import type {
+	AsyncStorageBackend,
+	SyncStorageBackend,
+} from './backends/types'
 import type { FileCacheEntry } from './fileCacheController'
 
 // Helper to generate safe serializable values for testing
@@ -18,7 +21,59 @@ const safeValueArb = fc.oneof(
 )
 
 // Mock backends for testing
-class MockStorageBackend implements StorageBackend<unknown> {
+class SyncMockStorageBackend implements SyncStorageBackend<unknown> {
+	private storage = new Map<string, unknown>()
+	public operations: Array<{ op: string; key: string; value?: unknown }> = []
+
+	get(key: string): unknown | null {
+		this.operations.push({ op: 'get', key })
+		return this.storage.has(key) ? this.storage.get(key) : null
+	}
+
+	set(key: string, value: unknown): unknown {
+		this.operations.push({ op: 'set', key, value })
+		// Don't store undefined values
+		if (value !== undefined) {
+			this.storage.set(key, value)
+		}
+		return value
+	}
+
+	remove(key: string): void {
+		this.operations.push({ op: 'remove', key })
+		this.storage.delete(key)
+	}
+
+	has(key: string): boolean {
+		this.operations.push({ op: 'has', key })
+		return this.storage.has(key)
+	}
+
+	keys(): string[] {
+		this.operations.push({ op: 'keys', key: '' })
+		return Array.from(this.storage.keys())
+	}
+
+	clear(): void {
+		this.operations.push({ op: 'clear', key: '' })
+		this.storage.clear()
+	}
+
+	estimateSize(): number {
+		return this.storage.size * 100 // Mock size estimation
+	}
+
+	// Test helpers
+	getStoredValue(key: string): unknown | undefined {
+		return this.storage.get(key)
+	}
+
+	clearOperations(): void {
+		this.operations = []
+	}
+}
+
+class AsyncMockStorageBackend implements AsyncStorageBackend<unknown> {
 	private storage = new Map<string, unknown>()
 	public operations: Array<{ op: string; key: string; value?: unknown }> = []
 
@@ -29,7 +84,6 @@ class MockStorageBackend implements StorageBackend<unknown> {
 
 	async set(key: string, value: unknown): Promise<unknown> {
 		this.operations.push({ op: 'set', key, value })
-		// Don't store undefined values
 		if (value !== undefined) {
 			this.storage.set(key, value)
 		}
@@ -57,10 +111,9 @@ class MockStorageBackend implements StorageBackend<unknown> {
 	}
 
 	async estimateSize(): Promise<number> {
-		return this.storage.size * 100 // Mock size estimation
+		return this.storage.size * 100
 	}
 
-	// Test helpers
 	getStoredValue(key: string): unknown | undefined {
 		return this.storage.get(key)
 	}
@@ -71,15 +124,15 @@ class MockStorageBackend implements StorageBackend<unknown> {
 }
 
 describe('TierRouter Browser Tests', () => {
-	let hotBackend: MockStorageBackend
-	let warmBackend: MockStorageBackend
-	let coldBackend: MockStorageBackend
+	let hotBackend: SyncMockStorageBackend
+	let warmBackend: SyncMockStorageBackend
+	let coldBackend: AsyncMockStorageBackend
 	let tierRouter: TierRouter
 
 	beforeEach(() => {
-		hotBackend = new MockStorageBackend()
-		warmBackend = new MockStorageBackend()
-		coldBackend = new MockStorageBackend()
+		hotBackend = new SyncMockStorageBackend()
+		warmBackend = new SyncMockStorageBackend()
+		coldBackend = new AsyncMockStorageBackend()
 		
 		tierRouter = new TierRouter({
 			hot: hotBackend,
@@ -109,9 +162,9 @@ describe('TierRouter Browser Tests', () => {
 					safeValueArb
 				, async (routing, path, dataType, value) => {
 					// Create fresh backends for each test to avoid state pollution
-					const testHotBackend = new MockStorageBackend()
-					const testWarmBackend = new MockStorageBackend()
-					const testColdBackend = new MockStorageBackend()
+					const testHotBackend = new SyncMockStorageBackend()
+					const testWarmBackend = new SyncMockStorageBackend()
+					const testColdBackend = new AsyncMockStorageBackend()
 
 					// Create router with custom routing
 					const customRouter = new TierRouter({

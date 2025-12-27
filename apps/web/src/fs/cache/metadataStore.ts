@@ -108,12 +108,12 @@ export function createCacheMetadataStore(
 	}
 
 	const isStale = (path: string, currentMtime?: number): boolean => {
-		if (currentMtime === undefined) {
-			return false
-		}
-
 		const metadata = getMetadata(path)
 		if (!metadata) {
+			return true
+		}
+
+		if (currentMtime === undefined) {
 			return false
 		}
 

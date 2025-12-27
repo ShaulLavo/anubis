@@ -102,6 +102,18 @@ export class WorkerTreeCache {
 		}
 	}
 
+	/**
+	 * Clear all cached entries
+	 */
+	async clear(): Promise<void> {
+		try {
+			await this.store.clear()
+		} catch (error) {
+			console.warn('WorkerTreeCache: Failed to clear cache:', error)
+			throw error
+		}
+	}
+
 }
 
 /**
