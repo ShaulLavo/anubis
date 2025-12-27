@@ -70,7 +70,7 @@ export const useFileSelection = ({
 		if (!tree) return
 
 		if (options?.forceReload) {
-			fileCache.clearPath(path)
+			fileCache.clearContent(path)
 		}
 
 		const node = findNode(tree, path)
@@ -124,8 +124,13 @@ export const useFileSelection = ({
 						)
 						if (requestId !== selectRequestId) return
 
+						const cachedEntry = await timeAsync('hydrate-cache', () =>
+							fileCache.getAsync(path)
+						)
+						if (requestId !== selectRequestId) return
+
 						const { pieceTable: existingSnapshot, stats: existingFileStats } =
-							fileCache.get(path)
+							cachedEntry
 						const detection = detectBinaryFromPreview(path, previewBytes)
 						const isBinary = !detection.isText
 

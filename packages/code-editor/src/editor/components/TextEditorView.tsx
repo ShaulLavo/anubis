@@ -166,20 +166,15 @@ export const TextEditorView = (props: EditorProps) => {
 	let saveTimeoutId: ReturnType<typeof setTimeout> | undefined
 
 	createEffect(() => {
-		const element = scrollElement()
 		const path = props.document.filePath()
 		const initialPos = props.initialScrollPosition?.()
+		const lineCount = cursor.lines.lineCount()
 
-		// Only restore once per file switch
-		if (!element || !path || restoreAttemptedForPath === path) return
-		restoreAttemptedForPath = path
-
-		if (initialPos) {
-			// Restore scroll position in next microtask to ensure DOM is ready
-			queueMicrotask(() => {
-				element.scrollTop = initialPos.scrollTop
-				element.scrollLeft = initialPos.scrollLeft
-			})
+		if (!path || lineCount === 0) return
+		
+		if (initialPos && restoreAttemptedForPath !== path) {
+			restoreAttemptedForPath = path
+			layout.scrollToLine(initialPos.lineIndex)
 		}
 	})
 
@@ -189,11 +184,11 @@ export const TextEditorView = (props: EditorProps) => {
 		if (!element || !onScroll) return
 
 		const handleScroll = () => {
-			// Debounce: save after scrolling settles
 			if (saveTimeoutId != null) clearTimeout(saveTimeoutId)
 			saveTimeoutId = setTimeout(() => {
+				const range = layout.visibleLineRange()
 				onScroll({
-					scrollTop: element.scrollTop,
+					lineIndex: range.start,
 					scrollLeft: element.scrollLeft,
 				})
 			}, 150)
