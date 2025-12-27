@@ -142,6 +142,20 @@ body {
 		@apply pointer-events-none absolute left-1.5 top-0 bottom-0 z-10 border-l transition-opacity duration-200 ease-linear;
 	}
 
+	/* Fs Toolbar */
+	.fs-toolbar {
+		@apply flex items-center gap-0.5 px-1 py-1;
+	}
+	.fs-toolbar-btn {
+		@apply flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-foreground/10 hover:text-foreground;
+	}
+	.fs-toolbar-input-container {
+		@apply ml-2 flex-1;
+	}
+	.fs-toolbar-input {
+		@apply w-full rounded border border-border/50 bg-background/50 px-2 py-0.5 text-xs text-foreground outline-none focus:border-accent;
+	}
+
 	/* Line */
 	.editor-line {
 		@apply absolute left-0 top-0 w-full whitespace-pre;

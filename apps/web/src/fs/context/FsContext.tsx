@@ -55,6 +55,10 @@ export type FsActions = {
 	saveFile: (path?: string) => Promise<void>
 	setDirtyPath: (path: string, isDirty: boolean) => void
 	pickNewRoot: () => Promise<void>
+	collapseAll: () => void
+	setCreationState: (
+		state: { type: 'file' | 'folder'; parentPath: string } | null
+	) => void
 }
 
 export type FsContextValue = [FsState, FsActions]

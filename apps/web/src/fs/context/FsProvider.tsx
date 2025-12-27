@@ -57,6 +57,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 		clearDeferredMetadata,
 		setScrollPosition,
 		setVisibleContent,
+		collapseAll,
+		setCreationState,
 	} = createFsState()
 
 	const fileCache = createFileCacheController({
@@ -309,6 +311,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 			saveFile,
 			setDirtyPath,
 			pickNewRoot,
+			collapseAll,
+			setCreationState,
 		},
 	]
 
