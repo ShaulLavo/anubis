@@ -117,7 +117,8 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 		lineIndexCache = new Map()
 		dirtyHighlightCache.clear()
-
+		// Keep precomputed segments around so first edit can reuse them.
+		// They remain valid for non-intersecting lines mapped via offsets.
 		validatedOffsetsRef = offsets
 		return validatedOffsetsRef
 	}

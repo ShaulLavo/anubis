@@ -12,6 +12,7 @@ import {
 	disposeTreeSitterWorker,
 	parseBufferWithTreeSitter,
 } from '../../../../../../apps/web/src/treeSitter/workerClient'
+import { consumeLineRowCounters } from './LineRow'
 import type {
 	CursorMode,
 	EditorSyntaxHighlight,
@@ -118,6 +119,11 @@ const getTreeSitterHighlights = async (
 
 	highlightCache.set(path, result.captures)
 	return result.captures
+}
+
+const resetLineRowCounters = () => {
+	consumeLineRowCounters()
+	lineRowCounterSnapshots.length = 0
 }
 
 const collectBuildTextRunsLines = (calls: string[], content: string) => {
@@ -363,6 +369,7 @@ describe('LineRow highlight offsets', () => {
 		const sqliteHighlights = await sqliteHighlightsPromise
 		activeHarness.setHighlights(sqliteHighlights)
 		await waitForFrames(2)
+		resetLineRowCounters()
 
 		activeHarness.typeAt(0, 0, 'x')
 		await expect
