@@ -21,7 +21,7 @@ import {
 } from '../hooks'
 import { EditorViewport } from './EditorViewport'
 import { consumeLineRowCounters } from '../line/components/LineRow'
-import { Minimap } from '../minimap'
+import { Minimap, HorizontalScrollbar } from '../minimap'
 import type {
 	DocumentIncrementalEdit,
 	EditorProps,
@@ -240,9 +240,13 @@ export const TextEditorView = (props: EditorProps) => {
 			offsets && offsets.length > 0
 				? getLineOffsetShift(lineStart, lineEnd, offsets)
 				: null
-		const bracketStart = offsetInfo?.intersects ? lineStart : offsetInfo?.oldStart ?? lineStart
-		const bracketEnd = offsetInfo?.intersects ? lineEnd : offsetInfo?.oldEnd ?? lineEnd
-		const shift = offsetInfo?.intersects ? 0 : offsetInfo?.shift ?? 0
+		const bracketStart = offsetInfo?.intersects
+			? lineStart
+			: (offsetInfo?.oldStart ?? lineStart)
+		const bracketEnd = offsetInfo?.intersects
+			? lineEnd
+			: (offsetInfo?.oldEnd ?? lineEnd)
+		const shift = offsetInfo?.intersects ? 0 : (offsetInfo?.shift ?? 0)
 
 		const map: Record<number, number> = {}
 		let found = false
@@ -381,6 +385,10 @@ export const TextEditorView = (props: EditorProps) => {
 						content={props.document.content}
 					/>
 				</Show>
+				<HorizontalScrollbar
+					scrollElement={scrollElement}
+					class="absolute bottom-0 left-0 right-[14px] z-50"
+				/>
 			</div>
 		</Show>
 	)
