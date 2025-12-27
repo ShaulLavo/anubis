@@ -109,10 +109,10 @@ export class TreeCacheController {
 		}
 	}
 
-	async setCachedTree(rootPath: string, tree: FsDirTreeNode): Promise<void> {
+	async setCachedTree(rootPath: string, tree: FsDirTreeNode, directoryMtime?: number): Promise<void> {
 		try {
 			const key = CACHE_KEY_SCHEMA.root(rootPath)
-			const cached = this.convertTreeNodeToCached(tree)
+			const cached = this.convertTreeNodeToCached(tree, directoryMtime)
 			
 			await this.store.setItem(key, cached)
 			cacheLogger.debug('Cached root tree', { rootPath, childrenCount: cached.children.length })
@@ -147,10 +147,10 @@ export class TreeCacheController {
 		}
 	}
 
-	async setCachedDirectory(path: string, node: FsDirTreeNode): Promise<void> {
+	async setCachedDirectory(path: string, node: FsDirTreeNode, directoryMtime?: number): Promise<void> {
 		try {
 			const key = CACHE_KEY_SCHEMA.dir(path)
-			const cached = this.convertTreeNodeToCached(node)
+			const cached = this.convertTreeNodeToCached(node, directoryMtime)
 			
 			await this.store.setItem(key, cached)
 			cacheLogger.debug('Cached directory', { path, childrenCount: cached.children.length })
@@ -222,10 +222,14 @@ export class TreeCacheController {
 				return false
 			}
 			
+			// If no current modification time provided, consider it fresh
+			// This allows for cache-first loading scenarios
 			if (currentMtime === undefined) {
 				return true
 			}
 			
+			// Compare cached modification time with current modification time
+			// Directory is fresh if cached time is greater than or equal to current time
 			const isFresh = cached.lastModified !== undefined && cached.lastModified >= currentMtime
 			
 			const validationTime = performance.now() - startTime
@@ -239,6 +243,15 @@ export class TreeCacheController {
 				validationTime 
 			})
 			
+			// If directory is stale, mark it for cleanup
+			if (!isFresh) {
+				cacheLogger.debug('Directory is stale, marking for cleanup', { 
+					path, 
+					cachedMtime: cached.lastModified, 
+					currentMtime 
+				})
+			}
+			
 			return isFresh
 		} catch (error) {
 			cacheLogger.warn('Failed to check directory freshness', { path, error })
@@ -247,10 +260,176 @@ export class TreeCacheController {
 	}
 
 	async markDirectoryStale(path: string): Promise<void> {
-		await this.invalidateDirectory(path)
+		try {
+			// Remove the stale directory from cache
+			await this.invalidateDirectory(path)
+			
+			// Also invalidate ancestors to maintain hierarchy consistency
+			await this.invalidateAncestors(path)
+			
+			cacheLogger.debug('Marked directory and ancestors as stale', { path })
+		} catch (error) {
+			cacheLogger.warn('Failed to mark directory stale', { path, error })
+		}
 	}
 
-	async batchSetDirectories(entries: Map<string, FsDirTreeNode>): Promise<void> {
+	/**
+	 * Invalidate all ancestor directories of the given path
+	 * This ensures hierarchical cache consistency when a directory changes
+	 */
+	async invalidateAncestors(path: string): Promise<void> {
+		try {
+			const ancestors = this.getAncestorPaths(path)
+			const invalidationPromises = ancestors.map(ancestorPath => 
+				this.invalidateDirectory(ancestorPath)
+			)
+			
+			await Promise.all(invalidationPromises)
+			
+			cacheLogger.debug('Invalidated ancestor directories', { 
+				path, 
+				ancestors, 
+				count: ancestors.length 
+			})
+		} catch (error) {
+			cacheLogger.warn('Failed to invalidate ancestors', { path, error })
+		}
+	}
+
+	/**
+	 * Get all ancestor paths for a given directory path
+	 * For example: "/src/components/Button" -> ["/src/components", "/src", "/"]
+	 */
+	private getAncestorPaths(path: string): string[] {
+		const ancestors: string[] = []
+		let currentPath = path
+		
+		while (currentPath !== '/' && currentPath !== '') {
+			const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'))
+			const normalizedParent = parentPath === '' ? '/' : parentPath
+			
+			if (normalizedParent !== currentPath) {
+				ancestors.push(normalizedParent)
+				currentPath = normalizedParent
+			} else {
+				break
+			}
+		}
+		
+		return ancestors
+	}
+
+	/**
+	 * Enhanced freshness validation that compares modification times
+	 * and automatically cleans up stale entries
+	 */
+	async validateAndCleanupStaleEntries(directoryMtimes: Map<string, number>): Promise<void> {
+		const startTime = performance.now()
+		
+		try {
+			const keys = await this.store.keys()
+			const directoryKeys = keys.filter(key => 
+				typeof key === 'string' && key.startsWith('v1:tree:dir:')
+			)
+			
+			const staleEntries: string[] = []
+			
+			// Check each cached directory against current modification times
+			for (const key of directoryKeys) {
+				if (typeof key !== 'string') continue
+				
+				const path = key.substring('v1:tree:dir:'.length)
+				const currentMtime = directoryMtimes.get(path)
+				
+				if (currentMtime !== undefined) {
+					const isFresh = await this.isDirectoryFresh(path, currentMtime)
+					if (!isFresh) {
+						staleEntries.push(path)
+					}
+				}
+			}
+			
+			// Remove all stale entries
+			if (staleEntries.length > 0) {
+				const cleanupPromises = staleEntries.map(path => this.invalidateDirectory(path))
+				await Promise.all(cleanupPromises)
+				
+				cacheLogger.info('Cleaned up stale cache entries', { 
+					count: staleEntries.length,
+					paths: staleEntries 
+				})
+			}
+			
+			const validationTime = performance.now() - startTime
+			this.stats.validationTime += validationTime
+			
+			cacheLogger.debug('Completed stale entry validation and cleanup', {
+				totalChecked: directoryKeys.length,
+				staleFound: staleEntries.length,
+				validationTime
+			})
+		} catch (error) {
+			cacheLogger.warn('Failed to validate and cleanup stale entries', { error })
+		}
+	}
+
+	/**
+	 * Automatic cleanup of cache entries older than the specified threshold
+	 */
+	async cleanupOldEntries(maxAgeMs: number = 7 * 24 * 60 * 60 * 1000): Promise<void> {
+		const startTime = performance.now()
+		const cutoffTime = Date.now() - maxAgeMs
+		
+		try {
+			const keys = await this.store.keys()
+			const directoryKeys = keys.filter(key => 
+				typeof key === 'string' && key.startsWith('v1:tree:dir:')
+			)
+			
+			const oldEntries: string[] = []
+			
+			// Check each cached directory's age
+			for (const key of directoryKeys) {
+				if (typeof key !== 'string') continue
+				
+				try {
+					const cached = await this.store.getItem<CachedDirectoryEntry>(key)
+					if (cached && cached.cachedAt < cutoffTime) {
+						const path = key.substring('v1:tree:dir:'.length)
+						oldEntries.push(path)
+					}
+				} catch (error) {
+					// If we can't read the entry, consider it for cleanup
+					const path = key.substring('v1:tree:dir:'.length)
+					oldEntries.push(path)
+				}
+			}
+			
+			// Remove all old entries
+			if (oldEntries.length > 0) {
+				const cleanupPromises = oldEntries.map(path => this.invalidateDirectory(path))
+				await Promise.all(cleanupPromises)
+				
+				cacheLogger.info('Cleaned up old cache entries', { 
+					count: oldEntries.length,
+					maxAgeMs,
+					cutoffTime: new Date(cutoffTime).toISOString()
+				})
+			}
+			
+			const cleanupTime = performance.now() - startTime
+			
+			cacheLogger.debug('Completed old entry cleanup', {
+				totalChecked: directoryKeys.length,
+				oldFound: oldEntries.length,
+				cleanupTime
+			})
+		} catch (error) {
+			cacheLogger.warn('Failed to cleanup old entries', { error })
+		}
+	}
+
+	async batchSetDirectories(entries: Map<string, FsDirTreeNode>, directoryMtimes?: Map<string, number>): Promise<void> {
 		const startTime = performance.now()
 		
 		try {
@@ -258,7 +437,8 @@ export class TreeCacheController {
 			
 			for (const [path, node] of entries) {
 				const key = CACHE_KEY_SCHEMA.dir(path)
-				const cached = this.convertTreeNodeToCached(node)
+				const directoryMtime = directoryMtimes?.get(path)
+				const cached = this.convertTreeNodeToCached(node, directoryMtime)
 				promises.push(this.store.setItem(key, cached).then(() => {}))
 			}
 			
@@ -340,7 +520,7 @@ export class TreeCacheController {
 		}
 	}
 
-	private convertTreeNodeToCached(node: FsDirTreeNode): CachedDirectoryEntry {
+	private convertTreeNodeToCached(node: FsDirTreeNode, directoryMtime?: number): CachedDirectoryEntry {
 		const children: CachedChildEntry[] = node.children.map(child => ({
 			kind: child.kind,
 			name: child.name,
@@ -358,7 +538,7 @@ export class TreeCacheController {
 			depth: node.depth,
 			parentPath: node.parentPath,
 			cachedAt: Date.now(),
-			lastModified: undefined,
+			lastModified: directoryMtime, // Use provided directory modification time
 			version: this.version,
 			children,
 			isLoaded: node.isLoaded ?? false,
