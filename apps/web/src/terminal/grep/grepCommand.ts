@@ -93,10 +93,24 @@ export function parseGrepArgs(args: string[]): GrepCommandArgs {
 
 	// First positional is pattern, second is path
 	if (positional.length > 0) {
-		result.pattern = positional[0] ?? null
+		// Strip surrounding quotes from pattern if present
+		let pattern = positional[0] ?? null
+		if (pattern && pattern.length >= 2 && 
+		    ((pattern.startsWith('"') && pattern.endsWith('"')) || 
+		     (pattern.startsWith("'") && pattern.endsWith("'")))) {
+			pattern = pattern.slice(1, -1)
+		}
+		result.pattern = pattern
 	}
 	if (positional.length > 1) {
-		result.path = positional[1] ?? null
+		// Strip surrounding quotes from path if present
+		let path = positional[1] ?? null
+		if (path && path.length >= 2 && 
+		    ((path.startsWith('"') && path.endsWith('"')) || 
+		     (path.startsWith("'") && path.endsWith("'")))) {
+			path = path.slice(1, -1)
+		}
+		result.path = path
 	}
 
 	return result
