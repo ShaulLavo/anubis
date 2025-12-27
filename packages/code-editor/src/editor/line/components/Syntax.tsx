@@ -35,5 +35,8 @@ export const Syntax = (props: SyntaxProps) => {
 		return buildTextRunsHtml(runs, getBracketDepthTextClass)
 	})
 
+	// innerHtml allows for massive pref gain
+	// buildTextRunsHtml escapes all text + attributes.
+	// eslint-disable-next-line solid/no-innerhtml
 	return <span innerHTML={cachedHtml() ?? computedHtml()} />
 }
