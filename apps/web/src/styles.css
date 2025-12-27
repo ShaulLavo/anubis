@@ -122,14 +122,6 @@ body {
 	.editor-gutter-container {
 		@apply shrink-0 select-none text-[11px] font-semibold tracking-[0.08em] tabular-nums flex items-center justify-between gap-1;
 	}
-	.editor-fold-button {
-		@apply flex h-4 w-4 shrink-0 items-center justify-center rounded text-[10px];
-		color: var(--editor-line-number);
-	}
-	.editor-fold-button:hover {
-		color: var(--editor-line-number-active);
-		background-color: var(--editor-cursor-line);
-	}
 
 	/* Line Gutters */
 	.editor-gutter-wrapper {
@@ -193,4 +185,21 @@ body {
 		filter: blur(8px);
 		/* transform: scale(1.02); */
 	}
+}
+
+/* Theme toggle: disable default view transition so JS can animate the circle */
+/* Only applies when .theme-transitioning class is on html element */
+html.theme-transitioning::view-transition-old(*) {
+	animation: none;
+	display: none;
+}
+
+html.theme-transitioning::view-transition-new(*) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+/* During theme toggle, disable all named view transitions so everything is part of root */
+html.theme-transitioning * {
+	view-transition-name: none !important;
 }

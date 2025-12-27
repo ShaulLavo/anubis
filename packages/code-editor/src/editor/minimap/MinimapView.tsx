@@ -81,7 +81,6 @@ export const MinimapView = (props: MinimapProps) => {
 						: 'opacity-0 hover:opacity-100'
 				)}
 				style={{
-					'view-transition-name': 'minimap',
 					width: `${core.minimapWidthCss()}px`,
 					'background-color': core.backgroundColor(),
 				}}
