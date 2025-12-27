@@ -1,4 +1,4 @@
-import { useColorMode } from '@kobalte/core'
+import { ThemeMode, useTheme } from '@repo/theme'
 import { ModeToggle, type ModeToggleProps } from './ModeToggle'
 
 const ANIMATION_DURATION = 400
@@ -6,7 +6,7 @@ const ANIMATION_DURATION = 400
 export type AnimatedModeToggleProps = Omit<ModeToggleProps, 'onClick' | 'ref'>
 
 export const AnimatedModeToggle = (props: AnimatedModeToggleProps) => {
-	const { toggleColorMode } = useColorMode()
+	const { mode, setMode } = useTheme()
 	let buttonRef: HTMLButtonElement | undefined
 
 	const handleClick = async () => {
@@ -14,7 +14,9 @@ export const AnimatedModeToggle = (props: AnimatedModeToggleProps) => {
 
 		// Check for View Transitions API support
 		if (!document.startViewTransition) {
-			toggleColorMode()
+			const modes: ThemeMode[] = ['light', 'dark', 'system']
+			const nextMode = modes[(modes.indexOf(mode()) + 1) % modes.length]
+			setMode(nextMode!)
 			return
 		}
 
@@ -25,7 +27,9 @@ export const AnimatedModeToggle = (props: AnimatedModeToggleProps) => {
 		document.head.appendChild(style)
 
 		const transition = document.startViewTransition(() => {
-			toggleColorMode()
+			const modes: ThemeMode[] = ['light', 'dark', 'system']
+			const nextMode = modes[(modes.indexOf(mode()) + 1) % modes.length]
+			setMode(nextMode!)
 		})
 
 		try {
