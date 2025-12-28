@@ -1,6 +1,5 @@
-import { Show, createMemo, splitProps, type Accessor } from 'solid-js'
+import { Show, createMemo, type Accessor } from 'solid-js'
 
-import { useCursor } from '../../cursor'
 import type {
 	LineBracketDepthMap,
 	LineEntry,
@@ -8,10 +7,15 @@ import type {
 	VirtualItem2D,
 } from '../../types'
 import type { TextRun } from '../utils/textRuns'
-import { VIRTUALIZATION_THRESHOLD } from '../../hooks/create2DVirtualizer'
+import { useLineResolution } from '../hooks/useLineResolution'
+import { useLineEntry } from '../hooks/useLineEntry'
+import { useLineHighlights } from '../hooks/useLineHighlights'
+import { useLineBracketDepths } from '../hooks/useLineBracketDepths'
+import { useCachedRuns } from '../hooks/useCachedRuns'
+import { useRenderColumnEnd } from '../hooks/useRenderColumnEnd'
 import { Line } from './Line'
 
-type LineRowProps = {
+export type LineRowProps = {
 	virtualRow: VirtualItem2D
 	lineHeight: Accessor<number>
 	contentWidth: Accessor<number>
@@ -42,220 +46,61 @@ type LineRowProps = {
 	displayToLine?: (displayIndex: number) => number
 }
 
-const areHighlightSegmentsEqual = (
-	a: LineHighlightSegment[] | undefined,
-	b: LineHighlightSegment[] | undefined
-) => {
-	if (a === b) return true
-	if (!a || !b) return false
-	if (a.length !== b.length) return false
-
-	for (let i = 0; i < a.length; i++) {
-		const sA = a[i]
-		const sB = b[i]
-		if (
-			!sA ||
-			!sB ||
-			sA.start !== sB.start ||
-			sA.end !== sB.end ||
-			sA.className !== sB.className
-		) {
-			return false
-		}
-	}
-	return true
-}
-
-const areBracketDepthsEqual = (
-	a: LineBracketDepthMap | undefined,
-	b: LineBracketDepthMap | undefined
-) => {
-	if (a === b) return true
-	if (!a || !b) return false
-	const keysA = Object.keys(a)
-	const keysB = Object.keys(b)
-	if (keysA.length !== keysB.length) return false
-
-	for (let i = 0; i < keysA.length; i++) {
-		const key = keysA[i]!
-		// @ts-expect-error - keys are numbers in type but strings in Object.keys
-		if (a[key] !== b[key]) return false
-	}
-	return true
-}
-
 export const LineRow = (props: LineRowProps) => {
-	const [local] = splitProps(props, [
-		'virtualRow',
-		'lineHeight',
-		'contentWidth',
-		'charWidth',
-		'tabSize',
-		'isEditable',
-		'onPreciseClick',
-		'onMouseDown',
-		'activeLineIndex',
-		'getLineBracketDepths',
-		'getLineHighlights',
-		'highlightRevision',
-		'getCachedRuns',
-		'displayToLine',
-	])
-	const cursor = useCursor()
+	const virtualRow = () => props.virtualRow
 
-	const resolvedLineId = createMemo(() => {
-		const lineId = local.virtualRow.lineId
-		if (lineId > 0) return lineId
+	const { resolvedLineId, lineIndex, isLineValid, lineText } =
+		useLineResolution({
+			virtualRow,
+			displayToLine: () => props.displayToLine,
+		})
 
-		const idx = local.virtualRow.index
-		if (idx >= 0) {
-			const resolved = cursor.lines.getLineId(idx)
-			if (resolved > 0) return resolved
-		}
-
-		return lineId
+	const entry = useLineEntry({
+		resolvedLineId,
+		lineIndex,
+		isLineValid,
+		lineText,
 	})
 
-	const lineIndex = createMemo(() => {
-		const lineId = resolvedLineId()
-		if (lineId > 0) {
-			const resolved = cursor.lines.getLineIndex(lineId)
-			if (resolved >= 0) return resolved
-		}
-
-		const rawIndex = local.virtualRow.index
-		if (rawIndex < 0) return -1
-		return local.displayToLine ? local.displayToLine(rawIndex) : rawIndex
+	const highlights = useLineHighlights({
+		entry,
+		getLineHighlights: () => props.getLineHighlights,
+		highlightRevision: () => props.highlightRevision?.(),
 	})
 
-	const isLineValid = createMemo(() => {
-		const idx = lineIndex()
-		const count = cursor.lines.lineCount()
-		return idx >= 0 && idx < count
+	const lineBracketDepths = useLineBracketDepths({
+		entry,
+		getLineBracketDepths: () => props.getLineBracketDepths,
 	})
 
-	const lineText = createMemo(() => {
-		const lineId = resolvedLineId()
-		if (lineId > 0) {
-			return cursor.lines.getLineTextById(lineId)
-		}
-		if (!isLineValid()) return ''
-		return cursor.lines.getLineText(lineIndex())
+	const cachedRuns = useCachedRuns({
+		virtualRow,
+		resolvedLineId,
+		lineIndex,
+		isLineValid,
+		getCachedRuns: () => props.getCachedRuns,
 	})
 
-	const entry = createMemo<LineEntry | null>((prev) => {
-		if (!isLineValid()) return null
-		const idx = lineIndex()
-		const lineId = resolvedLineId()
-		const start =
-			lineId > 0 ? cursor.lines.getLineStartById(lineId) : cursor.lines.getLineStart(idx)
-		const length =
-			lineId > 0
-				? cursor.lines.getLineLengthById(lineId)
-				: cursor.lines.getLineLength(idx)
-		const text = lineText()
-		if (
-			prev &&
-			prev.lineId === lineId &&
-			prev.length === length &&
-			prev.text === text
-		) {
-			if (prev.index !== idx) prev.index = idx
-			if (prev.start !== start) prev.start = start
-			return prev
-		}
-		return {
-			lineId,
-			index: idx,
-			start,
-			length,
-			text,
-		}
+	const renderColumnEnd = useRenderColumnEnd({
+		virtualRow,
+		lineText,
 	})
 
-	let lastHighlightEntry: LineEntry | null = null
-	let lastHighlightRevision = -1
-
-	const highlights = createMemo(
-		(previous) => {
-			const e = entry()
-			if (!e) {
-				lastHighlightEntry = null
-				return undefined
-			}
-
-			const revision = local.highlightRevision?.() ?? 0
-			if (
-				previous &&
-				lastHighlightEntry &&
-				lastHighlightRevision === revision &&
-				lastHighlightEntry.lineId === e.lineId &&
-				lastHighlightEntry.length === e.length &&
-				lastHighlightEntry.text === e.text &&
-				lastHighlightEntry.start !== e.start
-			) {
-				lastHighlightEntry = e
-				return previous
-			}
-
-			const next = local.getLineHighlights?.(e)
-			lastHighlightEntry = e
-			lastHighlightRevision = revision
-			return next
-		},
-		undefined,
-		{ equals: areHighlightSegmentsEqual }
-	)
-
-	const lineBracketDepths = createMemo(
-		() => {
-			const e = entry()
-			return e ? local.getLineBracketDepths(e) : undefined
-		},
-		undefined,
-		{ equals: areBracketDepthsEqual }
-	)
-
-	const cachedRuns = createMemo(() => {
-		if (!local.getCachedRuns) return undefined
-		if (!isLineValid()) return undefined
-		const idx = lineIndex()
-		const lineId = resolvedLineId()
-		return local.getCachedRuns(
-			idx,
-			local.virtualRow.columnStart,
-			local.virtualRow.columnEnd,
-			lineId
-		)
-	})
-
-	const renderColumnEnd = createMemo(() => {
-		const textLength = lineText().length
-		const columnEnd = local.virtualRow.columnEnd
-		if (
-			textLength <= VIRTUALIZATION_THRESHOLD &&
-			textLength > columnEnd
-		) {
-			return textLength
-		}
-		return columnEnd
-	})
-
-	const isActive = createMemo(() => local.activeLineIndex() === lineIndex())
+	const isActive = createMemo(() => props.activeLineIndex() === lineIndex())
 
 	return (
 		<Show when={isLineValid()}>
 			<Line
-				virtualRow={local.virtualRow}
+				virtualRow={props.virtualRow}
 				lineIndex={lineIndex()}
 				lineText={lineText()}
-				lineHeight={local.lineHeight()}
-				contentWidth={local.contentWidth()}
-				charWidth={local.charWidth()}
-				tabSize={local.tabSize()}
-				isEditable={local.isEditable}
-				onPreciseClick={local.onPreciseClick}
-				onMouseDown={local.onMouseDown}
+				lineHeight={props.lineHeight()}
+				contentWidth={props.contentWidth()}
+				charWidth={props.charWidth()}
+				tabSize={props.tabSize()}
+				isEditable={props.isEditable}
+				onPreciseClick={props.onPreciseClick}
+				onMouseDown={props.onMouseDown}
 				isActive={isActive()}
 				lineBracketDepths={lineBracketDepths()}
 				highlights={highlights()}
