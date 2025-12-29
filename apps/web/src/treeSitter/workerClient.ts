@@ -8,9 +8,12 @@ const supportsWorkers =
 	typeof window !== 'undefined' && typeof Worker !== 'undefined'
 
 const createTreeSitterWorker = () =>
-	new Worker(new URL('../workers/treeSitter/worker.ts', import.meta.url), {
-		type: 'module',
-	})
+	new Worker(
+		new URL('../workers/treeSitter/treeSitter.worker.ts', import.meta.url),
+		{
+			type: 'module',
+		}
+	)
 
 type TreeSitterWorkerHandle = {
 	worker: Worker
