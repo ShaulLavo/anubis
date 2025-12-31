@@ -10,7 +10,7 @@ import { useMinimapCore } from './useMinimapCore'
 import { useMinimapInteraction } from './useMinimapInteraction'
 import { useMinimapOverlay } from './useMinimapOverlay'
 
-const MINIMAP_VISIBILITY = AutoHideVisibility.SHOW
+const MINIMAP_VISIBILITY = AutoHideVisibility.HIDE
 
 export const MinimapView = (props: MinimapProps) => {
 	const cursor = useCursor()
