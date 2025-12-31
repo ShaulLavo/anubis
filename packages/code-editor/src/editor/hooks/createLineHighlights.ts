@@ -199,7 +199,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			// precomputedSegments returned indexByLineId to help mapping?
 			// The usage in getLineHighlights used indexByLineId to map cache key (lineId) to index.
 			// But getLineHighlights receives `entry`. `entry` knows its index!
-			// So indexByLineId might not be needed?
+			// Sof indexByLineId might not be needed?
 			// Let's check getLineHighlights usage.
 
 			let result: PrecomputedLineHighlights
@@ -230,31 +230,35 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 
 	let precomputedCache = new Map<number, LineHighlightSegment[]>()
 	let lastPrecomputed: PrecomputedLineHighlights | undefined
-	let lastOffsetsRef: HighlightOffsets | undefined
 	let validatedOffsetsRef: HighlightOffsets = EMPTY_OFFSETS
 	let dirtyHighlightCache = new Map<number, CachedLineHighlights>()
 
+	let lastRawOffsetsRef: HighlightOffsets | undefined = undefined
+	let lastUnwrappedOffsets: HighlightOffsets = EMPTY_OFFSETS
+
 	const getValidatedOffsets = (): HighlightOffsets => {
-		const offsets = options.highlightOffset
-			? (unwrap(untrack(options.highlightOffset)) ?? EMPTY_OFFSETS)
-			: EMPTY_OFFSETS
+		const rawOffsets = options.highlightOffset
+			? untrack(options.highlightOffset)
+			: undefined
 
-		if (offsets === lastOffsetsRef) {
-			return validatedOffsetsRef
-		}
-
-		lastOffsetsRef = offsets
-		if (offsets.length === 0) {
+		// Fast path: no offsets
+		if (!rawOffsets || rawOffsets.length === 0) {
+			lastRawOffsetsRef = undefined
+			lastUnwrappedOffsets = EMPTY_OFFSETS
 			validatedOffsetsRef = EMPTY_OFFSETS
-			// Don't clear cache aggressively. Let per-line logic validate.
-			// dirtyHighlightCache.clear()
-			// precomputedCache.clear()
 			return validatedOffsetsRef
 		}
 
-		// Don't clear cache aggressively.
-		// dirtyHighlightCache.clear()
-		validatedOffsetsRef = offsets
+		// If the raw proxy reference is the same, return cached unwrapped array
+		// This works because SolidJS store returns same proxy for unchanged data
+		if (rawOffsets === lastRawOffsetsRef) {
+			return validatedOffsetsRef
+		}
+
+		// Proxy changed - unwrap once and cache
+		lastRawOffsetsRef = rawOffsets
+		lastUnwrappedOffsets = unwrap(rawOffsets)
+		validatedOffsetsRef = lastUnwrappedOffsets
 		return validatedOffsetsRef
 	}
 
@@ -329,6 +333,10 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 		}
 	}
 
+	let calcCount = 0
+	let shiftCount = 0
+	let cacheHitCount = 0
+
 	const getLineHighlights = (entry: LineEntry): LineHighlightSegment[] => {
 		const offsets = getValidatedOffsets()
 		const hasOffsets = offsets.length > 0
@@ -352,6 +360,10 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 					}
 				}
 			}
+			// Debug log for precomputed hit
+			// log.debug(
+			// 	`getLineHighlights (precomputed): line ${entry.index} in ${(performance.now() - start).toFixed(2)}ms`
+			// )
 			return segments
 		}
 
@@ -388,6 +400,7 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 			: { shift: 0, intersects: false }
 		const offsetShiftAmount = offsetShift.shift
 		const hasIntersectingOffsets = offsetShift.intersects
+
 		const shouldApplyOffsets =
 			hasOffsets && (hasIntersectingOffsets || offsetShiftAmount !== 0)
 		const offsetsForSegments = shouldApplyOffsets ? offsets : undefined
@@ -424,12 +437,43 @@ export const createLineHighlights = (options: CreateLineHighlightsOptions) => {
 		if (
 			cached !== undefined &&
 			cached.length === lineLength &&
-			cached.text === entry.text &&
-			cached.appliedShift === offsetShiftAmount
+			cached.text === entry.text
 		) {
-			return cached.segments
+			if (cached.appliedShift === offsetShiftAmount) {
+				cacheHitCount++
+				return cached.segments
+			}
+
+			// Optimization: If only shift changed (no intersection), simply shift cached segments
+			// This avoids re-querying the spatial index for every line shift
+			if (!hasIntersectingOffsets) {
+				const shiftDelta = offsetShiftAmount - cached.appliedShift
+				const shiftedSegments = applyShiftToSegments(
+					cached.segments,
+					shiftDelta,
+					entry.text.length
+				)
+				cacheLineHighlights(
+					cacheMap,
+					lineKey,
+					entry,
+					shiftedSegments,
+					offsetShiftAmount
+				)
+				shiftCount++
+				return shiftedSegments
+			}
 		}
 
+		calcCount++
+		if (entry.index === 19) {
+			log.debug(
+				`stats: calc=${calcCount} shift=${shiftCount} cacheHit=${cacheHitCount}`
+			)
+			calcCount = 0
+			shiftCount = 0
+			cacheHitCount = 0
+		}
 		let highlightSegments: LineHighlightSegment[]
 		if (highlights.length > 0) {
 			const lookupRange = hasOffsets

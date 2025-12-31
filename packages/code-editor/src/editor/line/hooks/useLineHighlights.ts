@@ -32,8 +32,8 @@ export const useLineHighlights = (
 				lastHighlightRevision === revision &&
 				lastHighlightEntry.lineId === e.lineId &&
 				lastHighlightEntry.length === e.length &&
-				lastHighlightEntry.text === e.text &&
-				lastHighlightEntry.start !== e.start
+				lastHighlightEntry.text === e.text
+
 			) {
 				lastHighlightEntry = e
 				return previous
