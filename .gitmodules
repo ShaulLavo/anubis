@@ -7,3 +7,6 @@
 [submodule "packages/ghostty-web"]
 	path = packages/ghostty-web
 	url = https://github.com/ShaulLavo/ghostty-web.git
+[submodule "packages/just-bash"]
+	path = packages/just-bash
+	url = https://github.com/ShaulLavo/just-bash.git
