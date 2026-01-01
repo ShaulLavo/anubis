@@ -38,6 +38,7 @@ export const createTerminalController = async (
 		throw new Error('terminal initialization failed', { cause: error })
 	}
 	const term = new Ghostty({
+		scrollback: 0,
 		convertEol: true,
 		cursorBlink: true,
 		fontSize: 14,
@@ -63,16 +64,16 @@ export const createTerminalController = async (
 		if (options.shellContext) {
 			const fsContext = await options.shellContext.getVfsContext()
 			const tree = options.shellContext.state.tree ?? undefined
-			return createJustBashAdapter(fsContext, tree)
+			return createJustBashAdapter(fsContext, tree, options.shellContext)
 		}
 		return createJustBashAdapter()
 	})()
 
 	const startPromptLoop = async () => {
 		while (!disposed) {
-			const { label, continuation } = options.getPrompt()
+			const prompt = bashAdapter.getPrompt()
 			try {
-				const input = await echoAddon.read(label, continuation)
+				const input = await echoAddon.read(prompt)
 				const result = await bashAdapter.exec(input)
 				if (result.stdout) echoAddon.print(result.stdout)
 				if (result.stderr) echoAddon.print(result.stderr)

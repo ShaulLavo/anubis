@@ -549,13 +549,6 @@ export const TextEditorView = (props: EditorProps) => {
 					scrollElement={scrollElement}
 					class="absolute bottom-0 left-0 right-[14px] z-50"
 				/>
-				<Show when={shouldBlockEditingForPrecompute()}>
-					<div class="absolute inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
-						<div class="rounded-md bg-zinc-950/80 px-3 py-2 text-sm text-zinc-200 shadow">
-							Warming up highlights…
-						</div>
-					</div>
-				</Show>
 			</div>
 		</Show>
 	)

@@ -39,12 +39,9 @@ const api: TreeSitterWorkerApi = {
 		return parseBufferAndCache(payload.path, payload.buffer)
 	},
 	async applyEdit(payload) {
-		return undefined
 		return reparseWithEdit(payload.path, payload)
 	},
 	async applyEditBatch(payload) {
-		return undefined
-
 		return reparseWithEditBatch(payload.path, payload.edits)
 	},
 	subscribeMinimapReady(callback) {
