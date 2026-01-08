@@ -30,10 +30,6 @@ type MissListener = (payload: {
 	scopesTried: string[]
 }) => void
 
-// Keys that should never trigger repeat (modifiers only)
-const MODIFIER_KEYS =
-	/^(?:Meta|Control|Alt|Shift|CapsLock|NumLock|ScrollLock|ContextMenu|OS|Dead|Unidentified)$/
-
 // Default key repeat timing
 const DEFAULT_REPEAT_INITIAL_DELAY = 300
 const DEFAULT_REPEAT_INITIAL_INTERVAL = 80
@@ -134,30 +130,29 @@ export function createKeymapController<TContext = unknown>(
 		repeatLastEvent = null
 	}
 
-	function startRepeat(event: KeyboardEvent, executeNow: () => boolean) {
+	function startRepeat(
+		event: KeyboardEvent,
+		executeNow: () => { handled: boolean; allowsRepeat: boolean }
+	) {
 		if (!keyRepeatConfig?.enabled) return false
 
 		const key = event.key
 
-		// Never repeat modifier-only keys
-		if (MODIFIER_KEYS.test(key)) {
-			return false
-		}
-
-		// If a different key is pressed, stop previous repeat
 		if (repeatActiveKey !== null && repeatActiveKey !== key) {
 			stopRepeat()
 		}
 
-		// If this key is already active, ignore (we handle our own repeat)
 		if (repeatActiveKey === key) {
-			return true // We handled it
+			return true
 		}
 
-		// Execute immediately
-		const handled = executeNow()
-		if (!handled) {
+		const result = executeNow()
+		if (!result.handled) {
 			return false
+		}
+
+		if (!result.allowsRepeat) {
+			return true
 		}
 
 		repeatActiveKey = key
@@ -174,18 +169,15 @@ export function createKeymapController<TContext = unknown>(
 		const accelerationSteps =
 			keyRepeatConfig.accelerationSteps ?? DEFAULT_REPEAT_ACCELERATION_STEPS
 
-		// Start repeat after initial delay
 		repeatTimeout = setTimeout(() => {
 			let currentInterval = initialInterval
 
 			const doRepeat = () => {
 				if (repeatActiveKey !== key || !repeatLastEvent) return
 
-				// Re-execute with stored event
 				executeNow()
 				repeatCount++
 
-				// Accelerate if not at max speed
 				if (repeatCount < accelerationSteps) {
 					currentInterval = Math.max(
 						minInterval,
@@ -193,7 +185,6 @@ export function createKeymapController<TContext = unknown>(
 					)
 				}
 
-				// Schedule next repeat
 				repeatTimeout = setTimeout(doRepeat, currentInterval)
 			}
 
@@ -204,16 +195,15 @@ export function createKeymapController<TContext = unknown>(
 	}
 
 	function handleKeydown(event: KeyboardEvent): boolean {
-		// If key repeat is enabled and this is a native repeat, ignore it
 		if (keyRepeatConfig?.enabled && event.repeat) {
 			event.preventDefault()
 			return true
 		}
 
-		const executeCommand = (): boolean => {
+		const executeCommand = (): { handled: boolean; allowsRepeat: boolean } => {
 			const matches = keybindings.match(event)
 			if (matches.length === 0) {
-				return false
+				return { handled: false, allowsRepeat: false }
 			}
 
 			for (const match of matches) {
@@ -263,26 +253,22 @@ export function createKeymapController<TContext = unknown>(
 						scope: candidate.scope,
 						context,
 					})
-					return true
+					return { handled: true, allowsRepeat: match.binding.repeat }
 				}
 
 				notifyMiss(match.id)
 			}
 
-			return false
+			return { handled: false, allowsRepeat: false }
 		}
 
-		// If key repeat is enabled, use the repeat system
 		if (keyRepeatConfig?.enabled) {
 			return startRepeat(event, executeCommand)
 		}
-
-		// Otherwise just execute normally
-		return executeCommand()
+		return executeCommand().handled
 	}
 
 	function handleKeyup(event: KeyboardEvent): void {
-		// Stop repeat when the active key is released
 		if (event.key === repeatActiveKey) {
 			stopRepeat()
 		}

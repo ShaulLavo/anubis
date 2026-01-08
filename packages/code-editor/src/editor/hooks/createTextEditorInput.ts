@@ -458,7 +458,7 @@ export function createTextEditorInput(
 				performDelete(key, ctrlOrMeta)
 			},
 		},
-		[{ shortcut: 'delete' }]
+		[{ shortcut: 'delete', options: { repeat: true } }]
 	)
 
 	registerCommandWithShortcuts(
@@ -526,10 +526,10 @@ export function createTextEditorInput(
 			},
 		},
 		[
-			{ shortcut: 'left' },
-			{ shortcut: 'shift+left' },
-			{ shortcut: 'primary+left' },
-			{ shortcut: 'primary+shift+left' },
+			{ shortcut: 'left', options: { repeat: true } },
+			{ shortcut: 'shift+left', options: { repeat: true } },
+			{ shortcut: 'primary+left', options: { repeat: true } },
+			{ shortcut: 'primary+shift+left', options: { repeat: true } },
 		],
 		KEYMAP_SCOPE_NAVIGATION
 	)
@@ -544,10 +544,10 @@ export function createTextEditorInput(
 			},
 		},
 		[
-			{ shortcut: 'right' },
-			{ shortcut: 'shift+right' },
-			{ shortcut: 'primary+right' },
-			{ shortcut: 'primary+shift+right' },
+			{ shortcut: 'right', options: { repeat: true } },
+			{ shortcut: 'shift+right', options: { repeat: true } },
+			{ shortcut: 'primary+right', options: { repeat: true } },
+			{ shortcut: 'primary+shift+right', options: { repeat: true } },
 		],
 		KEYMAP_SCOPE_NAVIGATION
 	)
@@ -560,7 +560,10 @@ export function createTextEditorInput(
 				options.scrollCursorIntoView()
 			},
 		},
-		[{ shortcut: 'up' }, { shortcut: 'shift+up' }],
+		[
+			{ shortcut: 'up', options: { repeat: true } },
+			{ shortcut: 'shift+up', options: { repeat: true } },
+		],
 		KEYMAP_SCOPE_NAVIGATION
 	)
 
@@ -572,7 +575,10 @@ export function createTextEditorInput(
 				options.scrollCursorIntoView()
 			},
 		},
-		[{ shortcut: 'down' }, { shortcut: 'shift+down' }],
+		[
+			{ shortcut: 'down', options: { repeat: true } },
+			{ shortcut: 'shift+down', options: { repeat: true } },
+		],
 		KEYMAP_SCOPE_NAVIGATION
 	)
 
@@ -586,7 +592,10 @@ export function createTextEditorInput(
 				performDelete('Backspace', ctrlOrMeta)
 			},
 		},
-		[{ shortcut: 'backspace' }, { shortcut: 'primary+backspace' }]
+		[
+			{ shortcut: 'backspace', options: { repeat: true } },
+			{ shortcut: 'primary+backspace', options: { repeat: true } },
+		]
 	)
 
 	const PRINTABLE_CHARS: string[] = [
@@ -619,7 +628,7 @@ export function createTextEditorInput(
 	for (const char of PRINTABLE_CHARS) {
 		const binding = keymap.registerKeybinding({
 			shortcut: char,
-			options: { preventDefault: true },
+			options: { preventDefault: true, repeat: true },
 		})
 		keymapDisposers.push(binding.dispose)
 
@@ -633,7 +642,7 @@ export function createTextEditorInput(
 		// Also register with shift for uppercase/symbols
 		const shiftBinding = keymap.registerKeybinding({
 			shortcut: `shift+${char}`,
-			options: { preventDefault: true },
+			options: { preventDefault: true, repeat: true },
 		})
 		keymapDisposers.push(shiftBinding.dispose)
 

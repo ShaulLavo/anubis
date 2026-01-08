@@ -8,6 +8,8 @@ export type KeybindingOptions = ShortcutSequenceMatcherOptions & {
 	priority?: number
 	preventDefault?: boolean
 	stopPropagation?: boolean
+	/** Whether this keybinding should repeat when held. Default: false */
+	repeat?: boolean
 	meta?: Record<string, unknown>
 }
 
@@ -24,6 +26,8 @@ export type KeybindingSnapshot = {
 	priority: number
 	preventDefault: boolean
 	stopPropagation: boolean
+	/** Whether this keybinding repeats when held. Default: false */
+	repeat: boolean
 	meta?: Record<string, unknown>
 }
 

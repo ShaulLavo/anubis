@@ -26,6 +26,7 @@ function splitOptions(options: KeybindingOptions = {}) {
 		priority = 0,
 		preventDefault = false,
 		stopPropagation = false,
+		repeat = false,
 		meta,
 		...matcherOptions
 	} = options
@@ -35,6 +36,7 @@ function splitOptions(options: KeybindingOptions = {}) {
 		priority,
 		preventDefault,
 		stopPropagation,
+		repeat,
 		meta,
 		matcherOptions,
 	}
@@ -129,6 +131,7 @@ export function createKeybindingRegistry() {
 				priority: parts.priority,
 				preventDefault: parts.preventDefault,
 				stopPropagation: parts.stopPropagation,
+				repeat: parts.repeat,
 				meta: parts.meta,
 			},
 			matcher,
