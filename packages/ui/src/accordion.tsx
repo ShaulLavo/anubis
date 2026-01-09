@@ -4,7 +4,7 @@ import { splitProps } from 'solid-js'
 import * as AccordionPrimitive from '@kobalte/core/accordion'
 import type { PolymorphicProps } from '@kobalte/core/polymorphic'
 
-import { cn } from '~/lib/utils'
+import { cn } from './lib/utils'
 
 const Accordion = AccordionPrimitive.Root
 
@@ -18,7 +18,7 @@ const AccordionItem = <T extends ValidComponent = 'div'>(
 ) => {
 	const [local, others] = splitProps(props as AccordionItemProps, ['class'])
 	return (
-		<AccordionPrimitive.Item class={cn('border-b', local.class)} {...others} />
+		<AccordionPrimitive.Item class={cn(local.class)} {...others} />
 	)
 }
 
@@ -39,7 +39,7 @@ const AccordionTrigger = <T extends ValidComponent = 'button'>(
 		<AccordionPrimitive.Header class="flex">
 			<AccordionPrimitive.Trigger
 				class={cn(
-					'flex flex-1 items-center justify-between py-4 font-medium transition-all hover:underline [&[data-expanded]>svg]:rotate-180',
+					'flex flex-1 items-center justify-between py-1 font-medium transition-all [&[data-expanded]>svg]:rotate-180',
 					local.class
 				)}
 				{...others}
@@ -79,12 +79,12 @@ const AccordionContent = <T extends ValidComponent = 'div'>(
 	return (
 		<AccordionPrimitive.Content
 			class={cn(
-				'animate-accordion-up overflow-hidden text-sm transition-all data-[expanded]:animate-accordion-down',
+				'overflow-hidden text-sm',
 				local.class
 			)}
 			{...others}
 		>
-			<div class="pb-4 pt-0">{local.children}</div>
+			{local.children}
 		</AccordionPrimitive.Content>
 	)
 }
