@@ -148,7 +148,6 @@ export const createFileCacheController = ({
 
 	const clearContent = (path: string) => {
 		if (!path) return
-		console.debug(`[FileCacheController] clearContent called for ${path}`)
 		batch(() => {
 			setPieceTable(path, undefined)
 			setFileStats(path, undefined)
@@ -162,7 +161,6 @@ export const createFileCacheController = ({
 
 	const clearPath = (path: string) => {
 		if (!path) return
-		console.debug(`[FileCacheController] clearPath called for ${path}`)
 		batch(() => {
 			setPieceTable(path, undefined)
 			setFileStats(path, undefined)
@@ -180,8 +178,6 @@ export const createFileCacheController = ({
 	}
 
 	const clearAll = () => {
-		console.debug('[FileCacheController] clearAll called')
-		console.trace()
 		batch(() => {
 			for (const path of Object.keys(state.pieceTables)) {
 				setPieceTable(path, undefined)
@@ -217,7 +213,6 @@ export const createFileCacheController = ({
 	}
 
 	const clearMemory = () => {
-		console.debug('[FileCacheController] clearMemory called')
 		batch(() => {
 			for (const path of Object.keys(state.pieceTables)) {
 				setPieceTable(path, undefined)

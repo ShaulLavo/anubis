@@ -23,12 +23,14 @@ export const Providers: ParentComponent = (props) => {
 				<ThemeProvider>
 					<KeymapProvider>
 						<FocusProvider>
-							<CommandPaletteProvider>
-								<ThemedToaster />
-								<Modal />
-								<CommandPalette />
-								<FsProvider>{props.children}</FsProvider>
-							</CommandPaletteProvider>
+							<FsProvider>
+								<CommandPaletteProvider>
+									<ThemedToaster />
+									<Modal />
+									<CommandPalette />
+									{props.children}
+								</CommandPaletteProvider>
+							</FsProvider>
 						</FocusProvider>
 					</KeymapProvider>
 				</ThemeProvider>

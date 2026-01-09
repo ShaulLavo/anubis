@@ -145,8 +145,6 @@ export class TieredCacheController {
 
 	async clearPath(path: string): Promise<void> {
 		if (!path) return
-		console.debug(`[TieredCacheController] clearPath called for ${path}`)
-		console.trace()
 		
 		if (this.activeFileState.isActive(path)) {
 			this.activeFileState.setActive(null)
@@ -157,8 +155,6 @@ export class TieredCacheController {
 	}
 
 	async clearAll(): Promise<void> {
-		console.debug('[TieredCacheController] clearAll called')
-		console.trace()
 		this.activeFileState.setActive(null)
 		await this.tierRouter.clearAll()
 		this.metadataStore.clear()

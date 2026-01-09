@@ -48,6 +48,9 @@ export const useScrollbar = (options: UseScrollbarOptions) => {
 				setScrollOffset: (offset: number) => {
 					element.scrollLeft = offset
 				},
+				scrollBy: (delta: number) => {
+					element.scrollLeft += delta
+				},
 			}
 		}
 
@@ -57,6 +60,9 @@ export const useScrollbar = (options: UseScrollbarOptions) => {
 			scrollOffset: element.scrollTop,
 			setScrollOffset: (offset: number) => {
 				element.scrollTop = offset
+			},
+			scrollBy: (delta: number) => {
+				element.scrollTop += delta
 			},
 		}
 	}
