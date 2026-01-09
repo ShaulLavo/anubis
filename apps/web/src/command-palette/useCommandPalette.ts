@@ -47,7 +47,7 @@ function fileToResult(file: SearchResult): PaletteResult {
 		id: `file:${file.path}`,
 		label: fileName,
 		description: file.path,
-		kind: 'file'
+		kind: 'file',
 	}
 }
 
@@ -58,21 +58,21 @@ function commandToResult(cmd: CommandDescriptor): PaletteResult {
 		label: cmd.label,
 		description: cmd.category,
 		shortcut: cmd.shortcut,
-		kind: 'command'
+		kind: 'command',
 	}
 }
 
 export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 	// Get FS actions for file opening
 	const [, fsActions] = useFs()
-	
+
 	// State signals
 	const [isOpen, setIsOpen] = createSignal(false)
 	const [query, setQuery] = createSignal('')
 	const [selectedIndex, setSelectedIndex] = createSignal(0)
 	const [results, setResults] = createSignal<PaletteResult[]>([])
 	const [loading, setLoading] = createSignal(false)
-	
+
 	// Focus manager for focus restoration
 	// const focusManager = useFocusManager() // TODO: Will be used in later tasks
 	let previousActiveElement: HTMLElement | null = null
@@ -81,14 +81,16 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 	const mode = createMemo(() => detectModeFromQuery(query()))
 
 	// Computed state object
-	const state = createMemo((): PaletteState => ({
-		isOpen: isOpen(),
-		mode: mode(),
-		query: query(),
-		selectedIndex: selectedIndex(),
-		results: results(),
-		loading: loading()
-	}))
+	const state = createMemo(
+		(): PaletteState => ({
+			isOpen: isOpen(),
+			mode: mode(),
+			query: query(),
+			selectedIndex: selectedIndex(),
+			results: results(),
+			loading: loading(),
+		})
+	)
 
 	// Search function that handles both file and command modes
 	const performSearch = async (searchQuery: string) => {
@@ -98,10 +100,10 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 		}
 
 		setLoading(true)
-		
+
 		try {
 			const currentMode = detectModeFromQuery(searchQuery)
-			
+
 			if (currentMode === 'command') {
 				// Remove the '>' prefix for command search
 				const commandQuery = searchQuery.slice(1).trim()
@@ -130,17 +132,17 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 			if (document.activeElement instanceof HTMLElement) {
 				previousActiveElement = document.activeElement
 			}
-			
+
 			batch(() => {
 				setIsOpen(true)
 				setSelectedIndex(0)
-				
+
 				if (openMode === 'command') {
 					setQuery('>')
 				} else {
 					setQuery('')
 				}
-				
+
 				// Clear results when opening
 				setResults([])
 			})
@@ -154,7 +156,7 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 				setSelectedIndex(0)
 				setLoading(false)
 			})
-			
+
 			// Restore focus to previous element
 			if (previousActiveElement) {
 				previousActiveElement.focus()
@@ -167,7 +169,7 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 				setQuery(newQuery)
 				setSelectedIndex(0) // Reset selection when query changes
 			})
-			
+
 			// Perform search with debouncing would be ideal, but for now search immediately
 			void performSearch(newQuery)
 		},
@@ -175,14 +177,14 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 		selectNext() {
 			const currentResults = results()
 			if (currentResults.length === 0) return
-			
-			setSelectedIndex(prev => 
+
+			setSelectedIndex((prev) =>
 				prev < currentResults.length - 1 ? prev + 1 : prev
 			)
 		},
 
 		selectPrevious() {
-			setSelectedIndex(prev => prev > 0 ? prev - 1 : prev)
+			setSelectedIndex((prev) => (prev > 0 ? prev - 1 : prev))
 		},
 
 		setSelectedIndex(index: number) {
@@ -195,41 +197,71 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 		activateSelected() {
 			const currentResults = results()
 			const currentIndex = selectedIndex()
-			
-			console.log(`[useCommandPalette] activateSelected called`, { 
-				resultsCount: currentResults.length, 
-				currentIndex 
+
+			console.log(`[useCommandPalette] activateSelected called`, {
+				resultsCount: currentResults.length,
+				currentIndex,
 			})
-			
-			if (currentResults.length === 0 || currentIndex >= currentResults.length) {
-				console.log(`[useCommandPalette] activateSelected: no results or invalid index`)
+
+			if (
+				currentResults.length === 0 ||
+				currentIndex >= currentResults.length
+			) {
+				console.log(
+					`[useCommandPalette] activateSelected: no results or invalid index`
+				)
 				return
 			}
-			
+
 			const selectedResult = currentResults[currentIndex]
 			if (!selectedResult) {
-				console.log(`[useCommandPalette] activateSelected: selectedResult is undefined`)
+				console.log(
+					`[useCommandPalette] activateSelected: selectedResult is undefined`
+				)
 				return
 			}
-			
-			console.log(`[useCommandPalette] activateSelected: selected result`, { 
-				kind: selectedResult.kind, 
+
+			console.log(`[useCommandPalette] activateSelected: selected result`, {
+				kind: selectedResult.kind,
 				id: selectedResult.id,
 				label: selectedResult.label,
-				description: selectedResult.description 
+				description: selectedResult.description,
 			})
-			
+
 			if (selectedResult.kind === 'file') {
 				// Handle file activation by opening it in the tab system
 				const filePath = selectedResult.description // The full file path is stored in description
-				console.log(`[useCommandPalette] activateSelected: opening file`, { filePath })
+				console.log(`[useCommandPalette] activateSelected: opening file`, {
+					filePath,
+				})
 				if (filePath) {
-					void fsActions.selectPath(filePath).then(() => {
-						console.log(`[useCommandPalette] activateSelected: selectPath completed successfully`, { filePath })
-						actions.close()
-					}).catch((error) => {
-						console.error('[useCommandPalette] Failed to open file:', error)
-					})
+					void fsActions
+						.selectPath(filePath)
+						.then(() => {
+							console.log(
+								`[useCommandPalette] activateSelected: selectPath completed successfully`,
+								{ filePath }
+							)
+							actions.close()
+						})
+						.catch((error) => {
+							console.error('[useCommandPalette] Failed to open file:', error)
+							// If file not found, remove stale entry from search index
+							const errorMsg =
+								error instanceof Error ? error.message : String(error)
+							if (
+								errorMsg.includes('not found') ||
+								errorMsg.includes('ENOENT') ||
+								errorMsg.includes('NotFoundError')
+							) {
+								console.log(
+									'[useCommandPalette] Removing stale search entry:',
+									filePath
+								)
+								void searchService.removeFile(filePath)
+							}
+							actions.close()
+						})
 				} else {
 					console.error('[useCommandPalette] File path not found in result')
 					actions.close()
@@ -238,14 +270,17 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 				// Execute command
 				const commandId = selectedResult.id.replace('cmd:', '')
 				const registry = getCommandPaletteRegistry()
-				
-				void registry.execute(commandId).then(() => {
-					actions.close()
-				}).catch((error) => {
-					console.error('Command execution failed:', error)
-				})
+
+				void registry
+					.execute(commandId)
+					.then(() => {
+						actions.close()
+					})
+					.catch((error) => {
+						console.error('Command execution failed:', error)
+					})
 			}
-		}
+		},
 	}
 
 	return [state, actions]
