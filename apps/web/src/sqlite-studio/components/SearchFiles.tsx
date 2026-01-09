@@ -1,5 +1,5 @@
 import { For, Show, onMount } from 'solid-js'
-import type { SearchResult } from '../../workers/sqlite'
+import type { SearchResult } from '../../search/types'
 
 type Props = {
 	searchQuery: () => string

@@ -5,10 +5,10 @@ import {
 	initSqlite,
 	resetSqlite,
 	runSqliteQuery,
-	searchFiles,
 } from '../../workers/sqliteClient'
+import { searchService } from '../../search/SearchService'
 import { splitStatements } from '../utils/sqlUtils'
-import type { SearchResult } from '../../workers/sqlite'
+import type { SearchResult } from '../../search/types'
 
 type TableInfo = {
 	cid: number
@@ -169,7 +169,7 @@ export const useSqliteStudio = () => {
 		})
 
 		try {
-			const results = await searchFiles(q)
+			const results = await searchService.search(q)
 			setSearchResults(results)
 		} catch (e: unknown) {
 			setError(getErrorMessage(e))
