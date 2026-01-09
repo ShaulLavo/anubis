@@ -59,7 +59,7 @@ export const createTerminalController = async (
 
 	const { term, fitAddon, remeasureRendererFont, setTheme } = runtime
 	const echoAddon = new LocalEchoController({
-		outputMode: backend === 'ghostty' ? 'strict' : 'none',
+		outputMode: backend === 'ghostty' ? 'ansi' : 'none',
 	})
 
 	term.loadAddon(fitAddon)

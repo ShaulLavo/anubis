@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
 				'web-tree-sitter',
 				'js-base64',
 				'@tree-sitter-grammars/tree-sitter-markdown',
+				'minimatch',
 			],
 			exclude: [],
 		},

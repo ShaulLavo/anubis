@@ -63,6 +63,69 @@ const stripAnsi = (value: string): string => value.replace(ANSI_COLOR_REGEX, '')
 
 // Drop control bytes that crash Ghostty; ANSI mode allows CSI sequences.
 const ALLOWED_CONTROL_CODES_STRICT = new Set([0x09, 0x0a, 0x0d])
+const CSI_FINAL_MIN = 0x40
+const CSI_FINAL_MAX = 0x7e
+const CSI_START = 0x5b
+const CSI_MAX_LENGTH = 64
+
+const isCsiContinuation = (code: number): boolean =>
+	(code >= 0x30 && code <= 0x3f) || (code >= 0x20 && code <= 0x2f)
+
+const readCsiSequenceEnd = (value: string, start: number): number => {
+	if (value.charCodeAt(start + 1) !== CSI_START) return 0
+
+	let index = start + 2
+	let length = 0
+
+	while (index < value.length && length < CSI_MAX_LENGTH) {
+		const code = value.charCodeAt(index)
+		length += 1
+
+		if (code >= CSI_FINAL_MIN && code <= CSI_FINAL_MAX) return index + 1
+		if (isCsiContinuation(code)) {
+			index += 1
+			continue
+		}
+
+		return 0
+	}
+
+	return 0
+}
+
+const sanitizeAnsiOutput = (value: string): string => {
+	let sanitized = ''
+	let changed = false
+
+	for (let i = 0; i < value.length; i++) {
+		const code = value.charCodeAt(i)
+
+		if (code === KEY.ESCAPE) {
+			const end = readCsiSequenceEnd(value, i)
+			if (end > 0) {
+				sanitized += value.slice(i, end)
+				i = end - 1
+				continue
+			}
+			changed = true
+			continue
+		}
+
+		const isAsciiControl = code < 0x20 || code === 0x7f
+		const isC1Control = code >= 0x80 && code <= 0x9f
+		const isBlocked =
+			(isAsciiControl && !ALLOWED_CONTROL_CODES_STRICT.has(code)) || isC1Control
+
+		if (isBlocked) {
+			changed = true
+			continue
+		}
+
+		sanitized += value[i]
+	}
+
+	return changed ? sanitized : value
+}
 
 /**
  * Local terminal controller for displaying messages and handling local echo.
@@ -204,10 +267,9 @@ export class LocalEchoController implements ILocalEchoController {
 	private sanitizeOutput(value: string): string {
 		if (this.outputMode === 'none') return value
 
-		const allowedControls =
-			this.outputMode === 'ansi'
-				? ALLOWED_CONTROL_CODES_ANSI
-				: ALLOWED_CONTROL_CODES_STRICT
+		if (this.outputMode === 'ansi') {
+			return sanitizeAnsiOutput(value)
+		}
 
 		let sanitized = ''
 		let changed = false
@@ -217,7 +279,8 @@ export class LocalEchoController implements ILocalEchoController {
 			const isAsciiControl = code < 0x20 || code === 0x7f
 			const isC1Control = code >= 0x80 && code <= 0x9f
 			const isBlocked =
-				(isAsciiControl && !allowedControls.has(code)) || isC1Control
+				(isAsciiControl && !ALLOWED_CONTROL_CODES_STRICT.has(code)) ||
+				isC1Control
 
 			if (isBlocked) {
 				changed = true
