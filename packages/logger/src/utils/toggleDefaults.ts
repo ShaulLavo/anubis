@@ -18,7 +18,7 @@ const LOGGER_TOGGLE_TREE = {
 		minimap: false,
 		'minimap-render': false,
 		scrollbar: false,
-		trace: true,
+		trace: false,
 		virtualizer: false
 	},
 	desktop: false,

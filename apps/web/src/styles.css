@@ -31,6 +31,14 @@ body {
 	display: block;
 }
 
+/* Ensure terminal backends fill the available space */
+.terminal-container .xterm,
+.terminal-container .xterm-viewport,
+.terminal-container .xterm-screen {
+	width: 100%;
+	height: 100%;
+}
+
 /* ghostty-web: hide the helper textarea caret (keep input working) */
 .terminal-container textarea {
 	caret-color: transparent;
@@ -108,8 +116,10 @@ body {
 
 	/* Editor Viewport */
 	.editor-viewport-scroll {
-		@apply relative flex-1 overflow-auto;
+		@apply relative flex-1 min-h-0 min-w-0 overflow-auto;
 		background-color: var(--editor-background);
+		width: 100%;
+		height: 100%;
 	}
 
 	/* Line Gutter */

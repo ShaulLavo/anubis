@@ -10,6 +10,8 @@ import { FsProvider } from './fs/context/FsProvider'
 import { KeymapProvider } from './keymap/KeymapContext'
 import { Modal } from '@repo/ui/modal'
 import { ThemeProvider } from '@repo/theme'
+import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider'
+import { CommandPalette } from './command-palette/CommandPalette'
 
 export const storageManager = createLocalStorageManager('ui-theme')
 
@@ -21,9 +23,12 @@ export const Providers: ParentComponent = (props) => {
 				<ThemeProvider>
 					<KeymapProvider>
 						<FocusProvider>
-							<ThemedToaster />
-							<Modal />
-							<FsProvider>{props.children}</FsProvider>
+							<CommandPaletteProvider>
+								<ThemedToaster />
+								<Modal />
+								<CommandPalette />
+								<FsProvider>{props.children}</FsProvider>
+							</CommandPaletteProvider>
 						</FocusProvider>
 					</KeymapProvider>
 				</ThemeProvider>
