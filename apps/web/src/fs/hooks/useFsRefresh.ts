@@ -9,7 +9,7 @@ import {
 import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsState, FsSource } from '../types'
 import type { TreePrefetchClient } from '../prefetch/treePrefetchClient'
-import { findNode } from '../runtime/tree'
+
 import { modal } from '@repo/ui/modal'
 import { loggers } from '@repo/logger'
 
@@ -93,22 +93,15 @@ export const useFsRefresh = ({
 	const getRestorableFilePath = () => {
 		// lastKnownFilePath is only set when a file is selected (see FsProvider createEffect)
 		// so we can trust it's a file path even if it's not in the tree yet
-		const lastFilePath = localStorage.getItem('fs-last-known-file-path') ?? undefined
-		
-		console.log(`[useFsRefresh] getRestorableFilePath called`, { 
-			selectedPath: state.selectedPath, 
-			lastKnownFilePath: state.lastKnownFilePath,
-			lastFilePath,
-		})
+		const lastFilePath =
+			localStorage.getItem('fs-last-known-file-path') ?? undefined
 
 		// If we have a stored file path from localStorage, use it directly
 		// The file might not be in the tree yet (parent dir not loaded), but selectPath can handle that
 		if (lastFilePath) {
-			console.log(`[useFsRefresh] getRestorableFilePath: using lastFilePath from localStorage`, { lastFilePath })
 			return lastFilePath
 		}
 
-		console.log(`[useFsRefresh] getRestorableFilePath: no restorable path found`)
 		return undefined
 	}
 
@@ -161,13 +154,12 @@ export const useFsRefresh = ({
 					}
 				}
 
-				console.log(`[useFsRefresh] refresh: about to restore file`, { restorablePath })
 				if (restorablePath) {
-					console.log(`[useFsRefresh] refresh: calling selectPath with forceReload`, { restorablePath })
+					// console.log(`[useFsRefresh] refresh: calling selectPath with forceReload`, { restorablePath })
 					await selectPath(restorablePath, { forceReload: true })
-					console.log(`[useFsRefresh] refresh: selectPath complete`, { restorablePath })
+					// console.log(`[useFsRefresh] refresh: selectPath complete`, { restorablePath })
 				} else {
-					console.log(`[useFsRefresh] refresh: no restorablePath, skipping selectPath`)
+					// console.log(`[useFsRefresh] refresh: no restorablePath, skipping selectPath`)
 				}
 				return
 			} catch (error) {

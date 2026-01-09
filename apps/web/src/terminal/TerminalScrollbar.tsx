@@ -19,10 +19,12 @@ export const TerminalScrollbar = (props: TerminalScrollbarProps) => {
 	const { theme } = useTheme()
 	let warnedMissingSource = false
 	let warnedHiddenScrollbar = false
-	const [scrollSource, setScrollSource] =
-		createSignal<ScrollbarSource | null>(null)
-	const [scrollElement, setScrollElement] =
-		createSignal<HTMLElement | null>(null)
+	const [scrollSource, setScrollSource] = createSignal<ScrollbarSource | null>(
+		null
+	)
+	const [scrollElement, setScrollElement] = createSignal<HTMLElement | null>(
+		null
+	)
 
 	createEffect(() => {
 		const controller = props.controller()
@@ -53,8 +55,8 @@ export const TerminalScrollbar = (props: TerminalScrollbarProps) => {
 		const element = scrollElement()
 		if (!source && !element) {
 			if (!warnedMissingSource) {
-				warnedMissingSource = true
-				console.log('terminal-scrollbar: missing scroll source and element')
+				// warnedMissingSource = true
+				// console.log('terminal-scrollbar: missing scroll source and element')
 			}
 			return
 		}
@@ -65,11 +67,11 @@ export const TerminalScrollbar = (props: TerminalScrollbarProps) => {
 		const hasOverflow = scrollSize > clientSize
 		if (hasOverflow && !scrollbar.isVisible()) {
 			warnedHiddenScrollbar = true
-			console.log('terminal-scrollbar: hidden despite overflow', {
-				scrollSize,
-				clientSize,
-				scrollOffset: source.getScrollOffset(),
-			})
+			// console.log('terminal-scrollbar: hidden despite overflow', {
+			// 	scrollSize,
+			// 	clientSize,
+			// 	scrollOffset: source.getScrollOffset(),
+			// })
 		}
 	})
 

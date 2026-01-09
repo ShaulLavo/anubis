@@ -89,7 +89,6 @@ export class PrefetchQueue {
 	}
 
 	async resetForSource(source: FsSource) {
-		console.log(`[PrefetchQueue] resetForSource called`, { source })
 		this.source = source
 		this.stopRequested = true
 		this.sessionToken += 1
@@ -103,17 +102,15 @@ export class PrefetchQueue {
 		}
 		this.stopRequested = false
 		this.clearState()
-		console.log(`[PrefetchQueue] resetForSource complete`, { source })
 	}
 
 	async seedTree(tree?: FsDirTreeNode) {
 		if (!tree) {
-			console.log(`[PrefetchQueue] seedTree: no tree provided`)
 			return
 		}
-		console.log(`[PrefetchQueue] seedTree called`, { treePath: tree.path, treeName: tree.name })
+
 		const pending = this.ingestLoadedSubtree(tree)
-		console.log(`[PrefetchQueue] seedTree: ingested subtree`, { pendingCount: pending.length })
+
 		this.emitStatus(this.running)
 		this.enqueueTargets(pending)
 	}
