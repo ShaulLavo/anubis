@@ -111,6 +111,21 @@ const searchFiles = async (query: string): Promise<SearchResult[]> => {
 	return searchImpl.searchFiles(getClient(), query)
 }
 
+const removeFromIndex = async (
+	path: string,
+	options?: { recursive?: boolean }
+): Promise<number> => {
+	return searchImpl.removeFromIndex(getClient(), path, options)
+}
+
+const renameInIndex = async (
+	oldPath: string,
+	newPath: string,
+	options?: { recursive?: boolean }
+): Promise<number> => {
+	return searchImpl.renameInIndex(getClient(), oldPath, newPath, options)
+}
+
 const reset = async (): Promise<void> => {
 	if (db) {
 		try {
@@ -144,6 +159,8 @@ const workerApi = {
 	reset,
 	batchInsertFiles,
 	searchFiles,
+	removeFromIndex,
+	renameInIndex,
 }
 
 export type SqliteWorkerApi = typeof workerApi

@@ -27,5 +27,15 @@ export const resetSqlite = () => sqliteApi.reset()
 export const batchInsertFiles = (files: FileMetadata[]) =>
 	sqliteApi.batchInsertFiles(files)
 
-export const searchFiles = (query: string) =>
-	sqliteApi.searchFiles(query)
+export const searchFiles = (query: string) => sqliteApi.searchFiles(query)
+
+export const removeFromIndex = (
+	path: string,
+	options?: { recursive?: boolean }
+) => sqliteApi.removeFromIndex(path, options)
+
+export const renameInIndex = (
+	oldPath: string,
+	newPath: string,
+	options?: { recursive?: boolean }
+) => sqliteApi.renameInIndex(oldPath, newPath, options)

@@ -160,3 +160,110 @@ export const searchFiles = async (
 			}) as SearchResult
 	)
 }
+
+/**
+ * Remove a file or directory from the search index.
+ * If recursive is true, also removes all children under that path.
+ */
+export const removeFromIndex = async (
+	client: Sqlite3Client,
+	path: string,
+	options: { recursive?: boolean } = {}
+): Promise<number> => {
+	const { recursive = false } = options
+
+	if (recursive) {
+		// Remove the path itself and all children
+		const result = await client.execute({
+			sql: 'DELETE FROM files WHERE path = ? OR path LIKE ?',
+			args: [path, `${path}/%`],
+		})
+		log(
+			`[SQLite] Removed ${result.rowsAffected} entries for path: ${path} (recursive)`
+		)
+		return result.rowsAffected
+	}
+
+	const result = await client.execute({
+		sql: 'DELETE FROM files WHERE path = ?',
+		args: [path],
+	})
+	log(`[SQLite] Removed ${result.rowsAffected} entries for path: ${path}`)
+	return result.rowsAffected
+}
+
+/**
+ * Rename/move a file or directory in the search index.
+ * If recursive is true, also updates all children under that path.
+ */
+export const renameInIndex = async (
+	client: Sqlite3Client,
+	oldPath: string,
+	newPath: string,
+	options: { recursive?: boolean } = {}
+): Promise<number> => {
+	const { recursive = false } = options
+
+	let totalChanges = 0
+
+	// Update the exact path
+	const newBasename = newPath.split('/').pop() ?? ''
+	const newPathLc = newPath.toLowerCase()
+	const newBasenameLc = newBasename.toLowerCase()
+	const newBasenameInitials = getInitials(newBasename)
+	const newDirLc = newPath.substring(0, newPath.lastIndexOf('/')).toLowerCase()
+
+	const result = await client.execute({
+		sql: `UPDATE files 
+			SET path = ?, path_lc = ?, basename_lc = ?, basename_initials = ?, dir_lc = ?
+			WHERE path = ?`,
+		args: [
+			newPath,
+			newPathLc,
+			newBasenameLc,
+			newBasenameInitials,
+			newDirLc,
+			oldPath,
+		],
+	})
+	totalChanges += result.rowsAffected
+
+	if (recursive) {
+		// Update all children - replace the prefix
+		const childrenResult = await client.execute({
+			sql: 'SELECT id, path FROM files WHERE path LIKE ?',
+			args: [`${oldPath}/%`],
+		})
+
+		for (const row of childrenResult.rows) {
+			const childId = row[0] as number
+			const childOldPath = row[1] as string
+			const childNewPath = newPath + childOldPath.substring(oldPath.length)
+			const childBasename = childNewPath.split('/').pop() ?? ''
+			const childPathLc = childNewPath.toLowerCase()
+			const childBasenameLc = childBasename.toLowerCase()
+			const childBasenameInitials = getInitials(childBasename)
+			const childDirLc = childNewPath
+				.substring(0, childNewPath.lastIndexOf('/'))
+				.toLowerCase()
+
+			await client.execute({
+				sql: `UPDATE files 
+					SET path = ?, path_lc = ?, basename_lc = ?, basename_initials = ?, dir_lc = ?
+					WHERE id = ?`,
+				args: [
+					childNewPath,
+					childPathLc,
+					childBasenameLc,
+					childBasenameInitials,
+					childDirLc,
+					childId,
+				],
+			})
+			totalChanges += 1
+		}
+	}
+
+	log(`[SQLite] Renamed ${totalChanges} entries from ${oldPath} to ${newPath}`)
+	return totalChanges
+}

@@ -8,6 +8,7 @@ import type {
 	BufferEncoding,
 } from 'just-bash'
 import type { FsContext, FsTreeNode, FsDirTreeNode } from '@repo/fs'
+import { searchService } from '../search/SearchService'
 
 /**
  * Adapter implementing just-bash's IFileSystem interface
@@ -140,6 +141,10 @@ export class VfsBashAdapter implements IFileSystem {
 				recursive: options?.recursive,
 				force: options?.force,
 			})
+			// Sync with SQLite search index
+			void searchService.removeFile(normalizedPath, {
+				recursive: options?.recursive,
+			})
 		} catch (error) {
 			if (!options?.force) {
 				throw error
@@ -173,8 +178,9 @@ export class VfsBashAdapter implements IFileSystem {
 		const destPath = this.#normalizePath(dest)
 
 		const srcStat = await this.stat(srcPath)
+		const isDirectory = srcStat.isDirectory
 
-		if (srcStat.isDirectory) {
+		if (isDirectory) {
 			const srcDir = this.#ctx.dir(srcPath)
 			const destDir = this.#ctx.dir(destPath)
 			await srcDir.moveTo(destDir)
@@ -183,6 +189,11 @@ export class VfsBashAdapter implements IFileSystem {
 			const destFile = this.#ctx.file(destPath, 'rw')
 			await srcFile.moveTo(destFile)
 		}
+
+		// Sync with SQLite search index
+		void searchService.renameFile(srcPath, destPath, {
+			recursive: isDirectory,
+		})
 	}
 
 	resolvePath(base: string, path: string): string {
