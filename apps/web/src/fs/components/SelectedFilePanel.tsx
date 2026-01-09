@@ -1,38 +1,17 @@
-import type {
-	EditorSyntaxHighlight,
-	HighlightOffsets,
-	TextEditorDocument,
-} from '@repo/code-editor'
-import {
-	CursorMode,
-	Editor,
-	getHighlightClassForScope,
-} from '@repo/code-editor'
-import { getEditCharDelta, getEditLineDelta } from '@repo/utils/highlightShift'
-
-import {
-	Accessor,
-	Match,
-	Switch,
-	batch,
-	createEffect,
-	createMemo,
-	createResource,
-	createSignal,
-} from 'solid-js'
+import { CursorMode, Editor } from '@repo/code-editor'
+import { Accessor, Match, Switch, createResource } from 'solid-js'
 import { useFocusManager } from '~/focus/focusManager'
 import { useFs } from '../../fs/context/FsContext'
 
-import { sendIncrementalTreeEdit } from '../../treeSitter/incrementalEdits'
 import { getTreeSitterWorker } from '../../treeSitter/workerClient'
-import { useTabs } from '../hooks/useTabs'
 
 import { Tabs } from './Tabs'
-import { unwrap } from 'solid-js/store'
-import { logger } from '../../logger'
 import { SettingsTab } from '../../settings/components/SettingsTab'
 import { SettingsJSONTab } from '../../settings/components/SettingsJSONTab'
-import { useSettingsRoute } from '../../settings/hooks/useSettingsRoute'
+import { useEditorDecorations } from '../hooks/useEditorDecorations'
+import { useEditorDocument } from '../hooks/useEditorDocument'
+import { useSelectedFileTabs } from '../hooks/useSelectedFileTabs'
+import { useSettingsViewState } from '../hooks/useSettingsViewState'
 
 const FONT_OPTIONS = [
 	{
@@ -71,186 +50,50 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		},
 	] = useFs()
 	const focus = useFocusManager()
-	const highlightLog = logger.withTag('highlights')
-	
-	// Initialize settings route
-	const settingsRoute = useSettingsRoute()
 
-	const isBinary = () => state.selectedFileStats?.contentKind === 'binary'
-	const isSettingsFile = () => state.selectedPath === '/.system/settings.json'
-	
-	// Check if we should show settings based on URL routing or if settings file is selected
-	const shouldShowSettings = () => {
-		return settingsRoute.isSettingsOpen() || isSettingsFile()
-	}
-	
-	// Check if we should show JSON view
-	const shouldShowJSONView = () => {
-		return settingsRoute.isJSONView() || (isSettingsFile() && settingsRoute.isJSONView())
-	}
+	const settingsView = useSettingsViewState({
+		selectedPath: () => state.selectedPath,
+		isLoading: () => state.loading,
+		isSelectedFileLoading: () => state.selectedFileLoading,
+		selectPath,
+	})
 
-	const [documentVersion, setDocumentVersion] = createSignal(0)
 	const [treeSitterWorker] = createResource(async () => getTreeSitterWorker())
 
-	const [tabsState, tabsActions] = useTabs(() => state.lastKnownFilePath, {
-		maxTabs: MAX_EDITOR_TABS,
-	})
-
-	createEffect(() => {
-		fileCache.setOpenTabs(tabsState())
-	})
-
-	const handleTabSelect = (path: string) => {
-		if (!path || path === state.selectedPath) return
-		void selectPath(path)
-	}
-
-	const handleTabClose = (path: string) => {
-		const isClosingActiveTab = path === state.selectedPath
-
-		// Get the previous tab from history before closing
-		const previousTab = isClosingActiveTab
-			? tabsActions.getPreviousTab(path)
-			: undefined
-
-		console.log('[handleTabClose]', {
-			path,
-			isClosingActiveTab,
-			previousTab,
-			currentSelectedPath: state.selectedPath,
-			tabsCount: tabsState().length,
+	const { tabsState, handleTabSelect, handleTabClose, tabLabel } =
+		useSelectedFileTabs({
+			currentPath: () => state.lastKnownFilePath,
+			selectedPath: () => state.selectedPath,
+			selectPath,
+			setOpenTabs: fileCache.setOpenTabs,
+			shouldShowJSONView: settingsView.shouldShowJSONView,
+			maxTabs: MAX_EDITOR_TABS,
 		})
 
-		// Close the tab
-		tabsActions.closeTab(path)
-
-		// Switch to the previous tab or clear selection
-		if (isClosingActiveTab) {
-			if (previousTab) {
-				console.log('[handleTabClose] switching to previous tab:', previousTab)
-				void selectPath(previousTab)
-			} else {
-				// No previous tab available, clear selection
-				console.log('[handleTabClose] no previous tab, clearing selection')
-				void selectPath('')
-			}
-		}
-	}
-
-	const tabLabel = (path: string) => {
-		if (path === '/.system/settings.json') {
-			return shouldShowJSONView() ? 'Settings (JSON)' : 'Settings'
-		}
-		return path.split('/').pop() || path
-	}
-
-	const isEditable = () =>
-		props.isFileSelected() && !state.selectedFileLoading && !state.loading
-
-	const editorDocument: TextEditorDocument = {
+	const { editorDocument, documentVersion } = useEditorDocument({
 		filePath: () => state.lastKnownFilePath,
 		content: () => state.selectedFileContent,
 		pieceTable: () => state.selectedFilePieceTable,
 		updatePieceTable: updateSelectedFilePieceTable,
-		isEditable,
-		applyIncrementalEdit: (edit) => {
-			if (isBinary()) return
-			const path = state.lastKnownFilePath
-			const parsePromise = sendIncrementalTreeEdit(path, edit)
-			if (!parsePromise) return
-
-			const charDelta = getEditCharDelta(edit)
-			const lineDelta = getEditLineDelta(edit)
-
-			applySelectedFileHighlightOffset({
-				charDelta,
-				lineDelta,
-				fromCharIndex: edit.startIndex,
-				fromLineRow: edit.startPosition.row,
-				oldEndRow: edit.oldEndPosition.row,
-				newEndRow: edit.newEndPosition.row,
-				oldEndIndex: edit.oldEndIndex,
-				newEndIndex: edit.newEndIndex,
-			})
-
-			void parsePromise.then((result) => {
-				if (result && path === state.lastKnownFilePath) {
-					batch(() => {
-						updateSelectedFileHighlights(result.captures)
-						updateSelectedFileFolds(result.folds)
-						updateSelectedFileBrackets(result.brackets)
-						updateSelectedFileErrors(result.errors)
-						setDocumentVersion((v) => v + 1)
-					})
-				}
-			})
-		},
-	}
-
-	const editorHighlights = createMemo<EditorSyntaxHighlight[] | undefined>(
-		() => {
-			const captures = state.selectedFileHighlights
-			if (!captures || captures.length === 0) {
-				return undefined
-			}
-			const unwrapped = unwrap(captures)
-			const next: EditorSyntaxHighlight[] = []
-			for (let i = 0; i < unwrapped.length; i += 1) {
-				const capture = unwrapped[i]
-				if (!capture) continue
-				const className =
-					capture.className ?? getHighlightClassForScope(capture.scope)
-				next.push({
-					startIndex: capture.startIndex,
-					endIndex: capture.endIndex,
-					scope: capture.scope,
-					className,
-				})
-			}
-			return next
-		}
-	)
-
-	const editorHighlightOffset = createMemo<HighlightOffsets | undefined>(() => {
-		const offsets = state.selectedFileHighlightOffset
-		if (!offsets?.length) return undefined
-		const unwrapped = unwrap(offsets)
-		return unwrapped.map((offset) => ({
-			charDelta: offset.charDelta,
-			lineDelta: offset.lineDelta,
-			fromCharIndex: offset.fromCharIndex,
-			fromLineRow: offset.fromLineRow,
-			oldEndRow: offset.oldEndRow,
-			newEndRow: offset.newEndRow,
-			oldEndIndex: offset.oldEndIndex,
-			newEndIndex: offset.newEndIndex,
-		}))
+		isFileSelected: () => props.isFileSelected(),
+		isSelectedFileLoading: () => state.selectedFileLoading,
+		isLoading: () => state.loading,
+		stats: () => state.selectedFileStats,
+		applyHighlightOffset: applySelectedFileHighlightOffset,
+		updateHighlights: updateSelectedFileHighlights,
+		updateFolds: updateSelectedFileFolds,
+		updateBrackets: updateSelectedFileBrackets,
+		updateErrors: updateSelectedFileErrors,
 	})
 
-	const editorErrors = createMemo(() => state.selectedFileErrors)
-
-	createEffect(() => {
-		highlightLog.debug('[SelectedFilePanel] highlight update', {
-			path: state.lastKnownFilePath,
-			highlightCount: editorHighlights()?.length ?? 0,
-			offsetCount: editorHighlightOffset()?.length ?? 0,
-			isSelected: props.isFileSelected(),
+	const { editorHighlights, editorHighlightOffset, editorErrors } =
+		useEditorDecorations({
+			highlights: () => state.selectedFileHighlights,
+			highlightOffsets: () => state.selectedFileHighlightOffset,
+			errors: () => state.selectedFileErrors,
+			isFileSelected: () => props.isFileSelected(),
+			filePath: () => state.lastKnownFilePath,
 		})
-	})
-
-	// Handle settings routing - only sync when settings route is explicitly activated
-	createEffect(() => {
-		const isSettingsRouteOpen = settingsRoute.isSettingsOpen()
-		const isSettingsSelected = isSettingsFile()
-		
-		// Only open settings file if:
-		// 1. Settings route is active
-		// 2. Settings file is not already selected
-		// 3. We're not currently loading (to avoid conflicts during page restoration)
-		if (isSettingsRouteOpen && !isSettingsSelected && !state.loading && !state.selectedFileLoading) {
-			void selectPath('/.system/settings.json')
-		}
-	})
 
 	return (
 		<div class="flex h-full flex-col font-mono overflow-hidden">
@@ -296,17 +139,26 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 						/>
 					}
 				>
-					<Match when={shouldShowSettings() && shouldShowJSONView()}>
+					<Match
+						when={
+							settingsView.shouldShowSettings() &&
+							settingsView.shouldShowJSONView()
+						}
+					>
 						<SettingsJSONTab />
 					</Match>
 
-					<Match when={shouldShowSettings() && !shouldShowJSONView()}>
-						<SettingsTab 
-							initialCategory={settingsRoute.currentCategory()}
-							currentCategory={settingsRoute.currentCategory()}
-							onCategoryChange={(categoryId) => {
-								settingsRoute.navigateToCategory(categoryId)
-							}}
+					<Match
+						when={
+							settingsView.shouldShowSettings() &&
+							!settingsView.shouldShowJSONView()
+						}
+					>
+						<SettingsTab
+							initialCategory={settingsView.settingsRoute.currentCategory()}
+							currentCategory={settingsView.settingsRoute.currentCategory()}
+							parentCategory={settingsView.settingsRoute.currentParentCategory()}
+							onCategoryChange={settingsView.handleCategoryChange}
 						/>
 					</Match>
 
