@@ -41,10 +41,8 @@ export const useSettingsRoute = () => {
 	}
 
 	const navigateToCategory = (categoryId: string) => {
-		console.log('[useSettingsRoute] navigateToCategory called with:', categoryId)
 		// Clear view mode when navigating to a category
 		setSearchParams({ settings: categoryId, view: undefined })
-		console.log('[useSettingsRoute] Set settings category to:', categoryId)
 	}
 
 	return {
