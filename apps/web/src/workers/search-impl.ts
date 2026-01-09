@@ -103,7 +103,8 @@ export const batchInsertFiles = async (
 const SEARCH_PREFIX_SQL = `
 	SELECT id, path, kind, recency 
 	FROM files 
-	WHERE basename_lc LIKE ? OR basename_initials LIKE ?
+	WHERE (basename_lc LIKE ? OR basename_initials LIKE ?)
+	AND kind = ?
 	ORDER BY recency DESC, path_lc ASC
 	LIMIT 1000
 `
@@ -111,7 +112,8 @@ const SEARCH_PREFIX_SQL = `
 const SEARCH_FUZZY_SQL = `
 	SELECT id, path, kind, recency 
 	FROM files 
-	WHERE path_lc LIKE ? OR basename_initials LIKE ?
+	WHERE (path_lc LIKE ? OR basename_initials LIKE ?)
+	AND kind = ?
 	ORDER BY 
 		CASE 
 			WHEN basename_lc LIKE ? THEN 1
@@ -123,11 +125,17 @@ const SEARCH_FUZZY_SQL = `
 	LIMIT 1000
 `
 
+export type SearchOptions = {
+	kind?: 'file' | 'dir'
+}
+
 export const searchFiles = async (
 	client: Sqlite3Client,
-	query: string
+	query: string,
+	options: SearchOptions = {}
 ): Promise<SearchResult[]> => {
 	const qLower = query.toLowerCase()
+	const kind = options.kind ?? 'file' // Default to files only
 
 	const usePrefix = qLower.length <= 1
 	const pattern = usePrefix
@@ -138,8 +146,8 @@ export const searchFiles = async (
 	const result = await client.execute({
 		sql: usePrefix ? SEARCH_PREFIX_SQL : SEARCH_FUZZY_SQL,
 		args: usePrefix
-			? [prefixPattern, prefixPattern]
-			: [pattern, prefixPattern, prefixPattern, prefixPattern],
+			? [prefixPattern, prefixPattern, kind]
+			: [pattern, prefixPattern, kind, prefixPattern, prefixPattern],
 	})
 
 	return result.rows.map(

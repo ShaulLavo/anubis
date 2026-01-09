@@ -12,8 +12,8 @@ export class SearchService implements SearchBackend {
 		await initSqlite()
 	}
 
-	async search(query: string, limit?: number): Promise<SearchResult[]> {
-		return searchFiles(query, limit)
+	async search(query: string): Promise<SearchResult[]> {
+		return searchFiles(query)
 	}
 
 	async indexFiles(files: FileMetadata[]): Promise<void> {

@@ -27,5 +27,5 @@ export const resetSqlite = () => sqliteApi.reset()
 export const batchInsertFiles = (files: FileMetadata[]) =>
 	sqliteApi.batchInsertFiles(files)
 
-export const searchFiles = (query: string, limit?: number) =>
-	sqliteApi.searchFiles(query, limit)
+export const searchFiles = (query: string) =>
+	sqliteApi.searchFiles(query)
