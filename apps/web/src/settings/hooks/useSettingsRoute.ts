@@ -1,32 +1,58 @@
-import { useQueryState, parseAsString } from 'nuqs-solid'
+import { useSearchParams } from '@solidjs/router'
 
 export const useSettingsRoute = () => {
-	// Type-safe query state for settings category
-	const [settingsCategory, setSettingsCategory] = useQueryState(
-		'settings',
-		parseAsString
-	)
+	const [searchParams, setSearchParams] = useSearchParams()
+
+	// Type-safe query state for settings category or view mode
+	const settingsCategory = () => {
+		const value = searchParams.settings
+		return Array.isArray(value) ? value[0] || null : value || null
+	}
+	const viewMode = () => {
+		const value = searchParams.view
+		return Array.isArray(value) ? value[0] || null : value || null
+	}
 
 	const isSettingsOpen = () => settingsCategory() !== null
 
-	const currentCategory = () => settingsCategory() || 'editor'
+	const isJSONView = () => {
+		// Check both ?settings=json and ?view=json patterns
+		return settingsCategory() === 'json' || viewMode() === 'json'
+	}
+
+	const currentCategory = () => {
+		const category = settingsCategory()
+		// If in JSON view or no category specified, default to 'editor'
+		return category === 'json' || !category ? 'editor' : category
+	}
 
 	const openSettings = (category?: string) => {
-		void setSettingsCategory(category || '')
+		// Clear view mode when opening regular settings
+		setSearchParams({ settings: category || '', view: undefined })
+	}
+
+	const openJSONView = () => {
+		// Use view=json parameter for JSON view
+		setSearchParams({ settings: '', view: 'json' })
 	}
 
 	const closeSettings = () => {
-		void setSettingsCategory(null)
+		setSearchParams({ settings: undefined, view: undefined })
 	}
 
 	const navigateToCategory = (categoryId: string) => {
-		void setSettingsCategory(categoryId)
+		console.log('[useSettingsRoute] navigateToCategory called with:', categoryId)
+		// Clear view mode when navigating to a category
+		setSearchParams({ settings: categoryId, view: undefined })
+		console.log('[useSettingsRoute] Set settings category to:', categoryId)
 	}
 
 	return {
 		isSettingsOpen,
+		isJSONView,
 		currentCategory,
 		openSettings,
+		openJSONView,
 		closeSettings,
 		navigateToCategory,
 	}

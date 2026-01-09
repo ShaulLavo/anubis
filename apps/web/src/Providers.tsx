@@ -7,6 +7,7 @@ import { type ParentComponent } from 'solid-js'
 import { ThemedToaster } from './ThemedToaster'
 import { FocusProvider } from './focus/focusManager'
 import { FsProvider } from './fs/context/FsProvider'
+import { SettingsProvider } from './settings/SettingsProvider'
 import { KeymapProvider } from './keymap/KeymapContext'
 import { Modal } from '@repo/ui/modal'
 import { ThemeProvider } from '@repo/theme'
@@ -24,12 +25,14 @@ export const Providers: ParentComponent = (props) => {
 					<KeymapProvider>
 						<FocusProvider>
 							<FsProvider>
-								<CommandPaletteProvider>
-									<ThemedToaster />
-									<Modal />
-									<CommandPalette />
-									{props.children}
-								</CommandPaletteProvider>
+								<SettingsProvider>
+									<CommandPaletteProvider>
+										<ThemedToaster />
+										<Modal />
+										<CommandPalette />
+										{props.children}
+									</CommandPaletteProvider>
+								</SettingsProvider>
 							</FsProvider>
 						</FocusProvider>
 					</KeymapProvider>
