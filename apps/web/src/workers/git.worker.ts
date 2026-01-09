@@ -1,0 +1,393 @@
+import * as Comlink from 'comlink'
+import git from 'isomorphic-git'
+import http from 'isomorphic-git/http/web'
+import type {
+	GitCloneRequest,
+	GitCloneResult,
+	GitFile,
+	GitProgressCallback,
+	GitProgressMessage,
+	GitWorkerApi,
+	GitWorkerConfig,
+} from '../git/types'
+
+type FsEntry =
+	| {
+			type: 'file'
+			content: Uint8Array
+			mtimeMs: number
+			ctimeMs: number
+	  }
+	| {
+			type: 'dir'
+			mtimeMs: number
+			ctimeMs: number
+	  }
+	| {
+			type: 'symlink'
+			target: string
+			mtimeMs: number
+			ctimeMs: number
+	  }
+
+type FsStats = {
+	size: number
+	mtimeMs: number
+	ctimeMs: number
+	isFile: () => boolean
+	isDirectory: () => boolean
+	isSymbolicLink: () => boolean
+}
+
+type GitCloneRuntimeConfig = {
+	corsProxy?: string
+	authToken?: string
+	userAgent: string
+}
+
+const DEFAULT_USER_AGENT = 'git/2.37.3'
+
+let baseConfig: GitWorkerConfig = {}
+
+const logDebug = (message: GitProgressMessage) => {
+	console.log('[git-worker]', JSON.stringify(message, null, 2))
+}
+
+const emitProgress = async (
+	callback: GitProgressCallback | undefined,
+	message: GitProgressMessage
+) => {
+	logDebug(message)
+	if (callback) {
+		await callback(message)
+	}
+}
+
+const normalizePath = (rawPath: string) => {
+	let path = rawPath.replace(/\\/g, '/').replace(/\/+/g, '/')
+	if (!path.startsWith('/')) {
+		path = `/${path}`
+	}
+	if (path.length > 1 && path.endsWith('/')) {
+		path = path.slice(0, -1)
+	}
+	return path
+}
+
+const getDirName = (path: string) => {
+	if (path === '/') return null
+	const idx = path.lastIndexOf('/')
+	return idx <= 0 ? '/' : path.slice(0, idx)
+}
+
+const getBaseName = (path: string) => {
+	if (path === '/') return '/'
+	const idx = path.lastIndexOf('/')
+	return path.slice(idx + 1)
+}
+
+const toUint8Array = (content: Uint8Array | string) => {
+	if (typeof content === 'string') {
+		return new TextEncoder().encode(content)
+	}
+	return content
+}
+
+class MemoryFs {
+	#entries = new Map<string, FsEntry>()
+
+	constructor() {
+		this.#ensureDir('/')
+	}
+
+	#now() {
+		return Date.now()
+	}
+
+	#ensureDir(path: string) {
+		const normalized = normalizePath(path)
+		if (this.#entries.has(normalized)) return
+		const timestamp = this.#now()
+		this.#entries.set(normalized, {
+			type: 'dir',
+			mtimeMs: timestamp,
+			ctimeMs: timestamp,
+		})
+		const parent = getDirName(normalized)
+		if (parent && !this.#entries.has(parent)) {
+			this.#ensureDir(parent)
+		}
+	}
+
+	#assertEntry(path: string) {
+		const normalized = normalizePath(path)
+		const entry = this.#entries.get(normalized)
+		if (!entry) {
+			throw new Error(`ENOENT: no such file or directory, ${normalized}`)
+		}
+		return { normalized, entry }
+	}
+
+	#isChild(parent: string, candidate: string) {
+		if (parent === '/') {
+			return candidate.startsWith('/') && candidate.split('/').length === 2
+		}
+		if (!candidate.startsWith(`${parent}/`)) return false
+		const remainder = candidate.slice(parent.length + 1)
+		return !remainder.includes('/')
+	}
+
+	#listChildren(path: string) {
+		const normalized = normalizePath(path)
+		const names: string[] = []
+		for (const key of this.#entries.keys()) {
+			if (key === normalized) continue
+			if (this.#isChild(normalized, key)) {
+				names.push(getBaseName(key))
+			}
+		}
+		return names
+	}
+
+	listFiles(root: string) {
+		const normalizedRoot = normalizePath(root)
+		const files: Array<{ path: string; fullPath: string }> = []
+
+		for (const [path, entry] of this.#entries) {
+			if (entry.type !== 'file') continue
+			if (!path.startsWith(`${normalizedRoot}/`)) continue
+			const relative = path.slice(normalizedRoot.length + 1)
+			if (
+				relative === '.git' ||
+				relative.startsWith('.git/') ||
+				relative.includes('/.git/')
+			) {
+				continue
+			}
+			files.push({ path: relative, fullPath: path })
+		}
+		return files
+	}
+
+	get promises() {
+		return {
+			readFile: async (
+				path: string,
+				options?: { encoding?: string } | string
+			) => {
+				const { entry } = this.#assertEntry(path)
+				if (entry.type !== 'file') {
+					throw new Error(`EISDIR: illegal operation on directory, ${path}`)
+				}
+				const encoding =
+					typeof options === 'string' ? options : options?.encoding
+				if (encoding) {
+					return new TextDecoder().decode(entry.content)
+				}
+				return entry.content
+			},
+			writeFile: async (path: string, content: Uint8Array | string) => {
+				const normalized = normalizePath(path)
+				const parent = getDirName(normalized)
+				if (parent) {
+					this.#ensureDir(parent)
+				}
+				const timestamp = this.#now()
+				this.#entries.set(normalized, {
+					type: 'file',
+					content: toUint8Array(content),
+					mtimeMs: timestamp,
+					ctimeMs: timestamp,
+				})
+			},
+			unlink: async (path: string) => {
+				const { normalized, entry } = this.#assertEntry(path)
+				if (entry.type === 'dir') {
+					throw new Error(`EISDIR: illegal operation on directory, ${path}`)
+				}
+				this.#entries.delete(normalized)
+			},
+			readdir: async (path: string) => {
+				const { entry } = this.#assertEntry(path)
+				if (entry.type !== 'dir') {
+					throw new Error(`ENOTDIR: not a directory, ${path}`)
+				}
+				return this.#listChildren(path)
+			},
+			mkdir: async (path: string, options?: { recursive?: boolean }) => {
+				const normalized = normalizePath(path)
+				const existing = this.#entries.get(normalized)
+				if (existing) {
+					if (existing.type === 'dir') return
+					throw new Error(`ENOTDIR: path exists and is not a directory, ${path}`)
+				}
+				if (options?.recursive) {
+					this.#ensureDir(normalized)
+					return
+				}
+				const parent = getDirName(normalized)
+				if (parent && !this.#entries.has(parent)) {
+					throw new Error(`ENOENT: no such file or directory, ${parent}`)
+				}
+				this.#ensureDir(normalized)
+			},
+			rmdir: async (path: string) => {
+				const { normalized, entry } = this.#assertEntry(path)
+				if (entry.type !== 'dir') {
+					throw new Error(`ENOTDIR: not a directory, ${path}`)
+				}
+				const children = this.#listChildren(normalized)
+				if (children.length > 0) {
+					throw new Error(`ENOTEMPTY: directory not empty, ${path}`)
+				}
+				if (normalized !== '/') {
+					this.#entries.delete(normalized)
+				}
+			},
+			stat: async (path: string): Promise<FsStats> => {
+				const { entry } = this.#assertEntry(path)
+				const size = entry.type === 'file' ? entry.content.byteLength : 0
+				return {
+					size,
+					mtimeMs: entry.mtimeMs,
+					ctimeMs: entry.ctimeMs,
+					isFile: () => entry.type === 'file',
+					isDirectory: () => entry.type === 'dir',
+					isSymbolicLink: () => entry.type === 'symlink',
+				}
+			},
+			lstat: async (path: string): Promise<FsStats> => {
+				return this.promises.stat(path)
+			},
+			readlink: async (path: string) => {
+				const { entry } = this.#assertEntry(path)
+				if (entry.type !== 'symlink') {
+					throw new Error(`EINVAL: invalid argument, readlink ${path}`)
+				}
+				return entry.target
+			},
+			symlink: async (target: string, path: string) => {
+				const normalized = normalizePath(path)
+				const parent = getDirName(normalized)
+				if (parent) {
+					this.#ensureDir(parent)
+				}
+				const timestamp = this.#now()
+				this.#entries.set(normalized, {
+					type: 'symlink',
+					target,
+					mtimeMs: timestamp,
+					ctimeMs: timestamp,
+				})
+			},
+			chmod: async () => {},
+		}
+	}
+}
+
+const normalizeProxy = (proxyUrl?: string) => {
+	if (!proxyUrl) return undefined
+	return proxyUrl.endsWith('?') ? proxyUrl : `${proxyUrl}?`
+}
+
+const resolveRuntimeConfig = (
+	request: GitCloneRequest
+): GitCloneRuntimeConfig => ({
+	corsProxy: normalizeProxy(request.proxyUrl ?? baseConfig.proxyUrl),
+	authToken: request.authToken ?? baseConfig.authToken,
+	userAgent: baseConfig.userAgent ?? DEFAULT_USER_AGENT,
+})
+
+const emitFile = async (
+	callback: ((file: GitFile) => void | Promise<void>) | undefined,
+	file: GitFile
+) => {
+	if (!callback) return
+	const transfer = Comlink.transfer(file, [file.content.buffer])
+	await callback(transfer)
+}
+
+const clone = async (request: GitCloneRequest): Promise<GitCloneResult> => {
+	const config = resolveRuntimeConfig(request)
+	const fs = new MemoryFs()
+	const dir = '/repo'
+	const headers = config.authToken
+		? { Authorization: `Bearer ${config.authToken}` }
+		: undefined
+
+	await emitProgress(request.onProgress, {
+		stage: 'refs',
+		message: `Cloning ${request.repoUrl}`,
+	})
+
+	await git.clone({
+		fs,
+		http,
+		dir,
+		url: request.repoUrl,
+		ref: request.ref,
+		corsProxy: config.corsProxy,
+		headers,
+		onProgress: async (progress) => {
+			await emitProgress(request.onProgress, {
+				stage: 'pack',
+				message: `${progress.phase}: ${progress.loaded} / ${progress.total}`,
+			})
+		},
+		onMessage: async (message) => {
+			await emitProgress(request.onProgress, {
+				stage: 'pack',
+				message,
+			})
+		},
+	})
+
+	const commitHash = await git.resolveRef({ fs, dir, ref: 'HEAD' })
+
+	const files = fs.listFiles(dir)
+	let written = 0
+
+	await emitProgress(request.onProgress, {
+		stage: 'objects',
+		message: `Writing ${files.length} files`,
+	})
+
+	for (const file of files) {
+		const content = (await fs.promises.readFile(
+			file.fullPath
+		)) as Uint8Array
+		await emitFile(request.onFile, {
+			path: file.path,
+			content,
+		})
+		written += 1
+		if (written % 50 === 0) {
+			await emitProgress(request.onProgress, {
+				stage: 'objects',
+				message: `Wrote ${written}/${files.length} files`,
+			})
+		}
+	}
+
+	await emitProgress(request.onProgress, {
+		stage: 'done',
+		message: `Clone complete (${written} files)`,
+	})
+
+	return {
+		commitHash,
+		ref: request.ref ?? 'HEAD',
+		fileCount: written,
+	}
+}
+
+const init = (config?: GitWorkerConfig) => {
+	baseConfig = config ?? {}
+}
+
+const workerApi: GitWorkerApi = {
+	init,
+	clone,
+}
+
+Comlink.expose(workerApi)

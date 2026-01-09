@@ -4,6 +4,8 @@ import { grepStream } from '@repo/fs'
 import { VfsBashAdapter } from './VfsBashAdapter'
 import type { ShellContext } from './commands'
 import { IGNORED_SEGMENTS } from '../fs/config/constants'
+import { cloneIntoVfs } from '../git/gitService'
+import type { GitProgressMessage } from '../git/types'
 
 export type JustBashAdapter = {
 	exec: (
@@ -29,6 +31,101 @@ function formatGrepMatch(match: GrepMatch): string {
 	}
 	return `${ANSI_CYAN}${path}${ANSI_RESET}:${ANSI_YELLOW}${lineNumber}${ANSI_RESET}: ${displayContent}`
 }
+
+type GitCloneArgs = {
+	repoUrl?: string
+	targetDir?: string
+	ref?: string
+	proxyUrl?: string
+	authToken?: string
+	error?: string
+	showHelp?: boolean
+}
+
+const parseGitCloneArgs = (args: string[]): GitCloneArgs => {
+	const positional: string[] = []
+	let ref: string | undefined
+	let proxyUrl: string | undefined
+	let authToken: string | undefined
+
+	let i = 0
+	while (i < args.length) {
+		const arg = args[i]
+		if (!arg) {
+			i += 1
+			continue
+		}
+
+		if (arg === '-h' || arg === '--help') {
+			return { showHelp: true }
+		}
+
+		if (arg === '--ref') {
+			ref = args[i + 1]
+			if (!ref) {
+				return { error: 'git clone: missing value for --ref' }
+			}
+			i += 2
+			continue
+		}
+
+		if (arg === '--proxy') {
+			proxyUrl = args[i + 1]
+			if (!proxyUrl) {
+				return { error: 'git clone: missing value for --proxy' }
+			}
+			i += 2
+			continue
+		}
+
+		if (arg === '--token') {
+			authToken = args[i + 1]
+			if (!authToken) {
+				return { error: 'git clone: missing value for --token' }
+			}
+			i += 2
+			continue
+		}
+
+		if (arg.startsWith('-')) {
+			return { error: `git clone: unknown option ${arg}` }
+		}
+
+		positional.push(arg)
+		i += 1
+	}
+
+	return {
+		repoUrl: positional[0],
+		targetDir: positional[1],
+		ref,
+		proxyUrl,
+		authToken,
+	}
+}
+
+const deriveRepoDir = (repoUrl: string) => {
+	try {
+		const url = new URL(repoUrl)
+		const parts = url.pathname.split('/').filter(Boolean)
+		const last = parts[parts.length - 1] ?? 'repo'
+		return last.endsWith('.git') ? last.slice(0, -4) : last
+	} catch {
+		const parts = repoUrl.split('/').filter(Boolean)
+		const last = parts[parts.length - 1] ?? 'repo'
+		return last.endsWith('.git') ? last.slice(0, -4) : last
+	}
+}
+
+const gitHelpText = [
+	'git clone <repo-url> [dir] [--ref <ref>] [--proxy <url>] [--token <token>]',
+	'',
+	'Notes:',
+	'- Clone writes the working tree into the target directory.',
+	'- For GitHub/GitLab you will likely need --proxy due to CORS.',
+	'- Uses GIT_TOKEN from the environment if set.',
+	'',
+].join('\n')
 
 export function createJustBashAdapter(
 	fsContext?: FsContext,
@@ -84,6 +181,86 @@ export function createJustBashAdapter(
 				}
 			},
 			{ category: 'File operations' }
+		),
+		defineCommand(
+			'git',
+			async (args, ctx) => {
+				if (!shellContext) {
+					return {
+						stdout: '',
+						stderr: 'git: shell not available\n',
+						exitCode: 1,
+					}
+				}
+
+				const subcommand = args[0]
+				if (!subcommand || subcommand === '-h' || subcommand === '--help') {
+					return { stdout: `${gitHelpText}\n`, stderr: '', exitCode: 0 }
+				}
+
+				if (subcommand !== 'clone') {
+					return {
+						stdout: '',
+						stderr: `git: unsupported command "${subcommand}"\n`,
+						exitCode: 1,
+					}
+				}
+
+				const parsed = parseGitCloneArgs(args.slice(1))
+				if (parsed.showHelp) {
+					return { stdout: `${gitHelpText}\n`, stderr: '', exitCode: 0 }
+				}
+				if (parsed.error) {
+					return { stdout: '', stderr: `${parsed.error}\n`, exitCode: 1 }
+				}
+
+				const repoUrl = parsed.repoUrl
+				if (!repoUrl) {
+					return {
+						stdout: '',
+						stderr: 'git clone: missing <repo-url>\n',
+						exitCode: 1,
+					}
+				}
+
+				const targetDir = parsed.targetDir ?? deriveRepoDir(repoUrl)
+				const resolved = ctx.fs.resolvePath(ctx.cwd, targetDir)
+				const targetPath = resolved.startsWith('/')
+					? resolved.slice(1)
+					: resolved
+
+				let output = ''
+				const emit = (text: string) => {
+					if (state.outputCallback) {
+						state.outputCallback(text)
+						return
+					}
+					output += text
+				}
+
+				const progress = (message: GitProgressMessage) => {
+					emit(`[git] ${message.stage}: ${message.message}\n`)
+				}
+
+				try {
+					const fsContext = await shellContext.getVfsContext()
+					const token = parsed.authToken ?? ctx.env.GIT_TOKEN
+					await cloneIntoVfs(fsContext, shellContext.actions, {
+						repoUrl,
+						targetPath,
+						ref: parsed.ref,
+						proxyUrl: parsed.proxyUrl,
+						authToken: token,
+						onProgress: progress,
+					})
+					emit(`[git] clone complete: ${targetDir}\n`)
+					return { stdout: output, stderr: '', exitCode: 0 }
+				} catch (error: unknown) {
+					const message = error instanceof Error ? error.message : String(error)
+					return { stdout: '', stderr: `git clone: ${message}\n`, exitCode: 1 }
+				}
+			},
+			{ category: 'Git' }
 		),
 
 		// wg: Fast worker-based grep
