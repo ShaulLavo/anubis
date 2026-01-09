@@ -100,6 +100,7 @@
         "tree-sitter-json": "^0.24.8",
         "tree-sitter-markdown": "^0.7.1",
         "tree-sitter-typescript": "^0.23.2",
+        "wasm-git": "^0.0.13",
         "web-tree-sitter": "^0.25.10",
         "zod": "^4.1.13",
       },
@@ -2826,6 +2827,8 @@
     "w3c-xmlserializer": ["w3c-xmlserializer@5.0.0", "", { "dependencies": { "xml-name-validator": "^5.0.0" } }, "sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA=="],
 
     "walk-up-path": ["walk-up-path@4.0.0", "", {}, "sha512-3hu+tD8YzSLGuFYtPRb48vdhKMi0KQV5sn+uWr8+7dMEq/2G/dtLrdDinkLjqq5TIbIBjYJ4Ax/n3YiaW7QM8A=="],
+
+    "wasm-git": ["wasm-git@0.0.13", "", {}, "sha512-+tXBed4anOsBIX94omuuabzDTrhQDh5sNsgD7Ezq9nuvM9aK8XfDADK0MWOmkMdSrXCaU1YKzWtTErRFvfwdWg=="],
 
     "wcwidth": ["wcwidth@1.0.1", "", { "dependencies": { "defaults": "^1.0.3" } }, "sha512-XHPEwS0q6TaxcvG85+8EYkbiCux2XtWG2mkc47Ng2A77BQu9+DqIOJldST4HgPkuea7dvKSj5VgX3P1d4rW8Tg=="],
 
