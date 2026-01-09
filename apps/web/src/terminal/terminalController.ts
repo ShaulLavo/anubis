@@ -394,11 +394,32 @@ const createXtermRuntime = (
 	})
 
 	let addon: WebglAddon | CanvasAddon | undefined
+	let addonDisposed = false
+
 	if (rendererType === 'webgl') {
 		const webglAddon = new WebglAddon()
+		
+		// Track disposal to prevent double disposal
+		const originalDispose = webglAddon.dispose.bind(webglAddon)
+		webglAddon.dispose = () => {
+			if (addonDisposed) return
+			addonDisposed = true
+			try {
+				// Check if the addon's internal state suggests it's already disposed
+				// The error occurs when trying to access _isDisposed on undefined objects
+				originalDispose()
+			} catch (error) {
+				terminalLogger.warn('WebGL addon disposal error (likely already disposed)', {
+					error: error instanceof Error ? error.message : String(error)
+				})
+			}
+		}
+
 		webglAddon.onContextLoss(() => {
+			terminalLogger.debug('WebGL context lost, disposing addon')
 			webglAddon.dispose()
 		})
+		
 		term.loadAddon(webglAddon)
 		addon = webglAddon
 	} else if (rendererType === 'canvas') {

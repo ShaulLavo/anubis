@@ -1,6 +1,6 @@
 import { Dialog } from '@kobalte/core/dialog'
-import { For, Show, createEffect } from 'solid-js'
-import { useCommandPalette } from './useCommandPalette'
+import { For, Show, createEffect, createSignal } from 'solid-js'
+import { useCommandPaletteContext } from './CommandPaletteProvider'
 import type { PaletteResult } from './useCommandPalette'
 
 interface ResultItemProps {
@@ -8,6 +8,9 @@ interface ResultItemProps {
 	isSelected: boolean
 	resultIndex: number
 	onClick: () => void
+	onMouseEnter?: () => void
+	onMouseMove?: () => void
+	isUsingKeyboard: boolean
 }
 
 function ResultItem(props: ResultItemProps) {
@@ -16,19 +19,45 @@ function ResultItem(props: ResultItemProps) {
 			id={`result-${props.resultIndex}`}
 			role="option"
 			aria-selected={props.isSelected}
-			class={`flex cursor-pointer items-center justify-between px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-				props.isSelected ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+			class={`flex cursor-pointer items-center justify-between px-3 py-2 text-sm ${
+				props.isUsingKeyboard ? '' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+			} ${
+				props.isSelected ? 'bg-gray-100 dark:bg-gray-700' : ''
 			}`}
 			onClick={props.onClick}
+			onMouseEnter={() => {
+				// Update keyboard selection to match mouse hover
+				props.onMouseEnter?.()
+			}}
+			onMouseMove={() => {
+				// Reset keyboard mode on mouse movement
+				props.onMouseMove?.()
+			}}
 		>
-			<div class="flex-1 min-w-0">
-				<div class="font-medium text-gray-900 dark:text-gray-100">
-					{props.result.label}
-				</div>
-				<Show when={props.result.description}>
-					<div class="text-gray-500 dark:text-gray-400 truncate">
-						{props.result.kind === 'file' ? props.result.description : `${props.result.description}`}
-					</div>
+			<div class="flex-1 min-w-0 flex items-center space-x-2">
+				<Show 
+					when={props.result.kind === 'file'}
+					fallback={
+						<>
+							<span class="font-medium text-gray-900 dark:text-gray-100">
+								{props.result.label}
+							</span>
+							<Show when={props.result.description}>
+								<span class="text-gray-500 dark:text-gray-400">
+									{props.result.description}
+								</span>
+							</Show>
+						</>
+					}
+				>
+					<span class="font-medium text-gray-900 dark:text-gray-100">
+						{props.result.label}
+					</span>
+					<Show when={props.result.description}>
+						<span class="text-gray-500 dark:text-gray-400 truncate">
+							{props.result.description}
+						</span>
+					</Show>
 				</Show>
 			</div>
 			<Show when={props.result.shortcut}>
@@ -41,19 +70,40 @@ function ResultItem(props: ResultItemProps) {
 }
 
 export function CommandPalette() {
-	const [state, actions] = useCommandPalette()
+	const { state, actions } = useCommandPaletteContext()
 	let inputRef: HTMLInputElement | undefined
+	let resultsContainerRef: HTMLDivElement | undefined
+	const [isUsingKeyboard, setIsUsingKeyboard] = createSignal(false)
+
+	// Scroll selected item into view
+	const scrollToSelected = () => {
+		if (!resultsContainerRef) return
+		
+		const selectedElement = resultsContainerRef.querySelector(`#result-${state().selectedIndex}`)
+		if (selectedElement) {
+			selectedElement.scrollIntoView({
+				behavior: 'auto',
+				block: 'nearest'
+			})
+		}
+	}
 
 	// Handle keyboard navigation
 	const handleKeyDown = (e: KeyboardEvent) => {
 		switch (e.key) {
 			case 'ArrowDown':
 				e.preventDefault()
+				setIsUsingKeyboard(true)
 				actions.selectNext()
+				// Scroll after state update
+				setTimeout(scrollToSelected, 0)
 				break
 			case 'ArrowUp':
 				e.preventDefault()
+				setIsUsingKeyboard(true)
 				actions.selectPrevious()
+				// Scroll after state update
+				setTimeout(scrollToSelected, 0)
 				break
 			case 'Enter':
 				e.preventDefault()
@@ -81,15 +131,16 @@ export function CommandPalette() {
 		}}>
 			<Dialog.Portal>
 				<Dialog.Overlay 
-					class="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" 
+					class="fixed inset-0 z-50" 
+					style="backdrop-filter: blur(1px);"
 					onClick={() => actions.close()} 
 				/>
 				<Dialog.Content 
-					class="fixed left-1/2 top-1/2 z-50 w-full max-w-lg -translate-x-1/2 -translate-y-1/2 transform rounded-lg border border-gray-200 bg-white p-0 shadow-lg dark:border-gray-700 dark:bg-gray-800"
+					class="fixed left-1/2 top-[30%] z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 transform rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800"
 					aria-label="Command Palette"
 				>
 					{/* Search Input */}
-					<div class="border-b border-gray-200 p-4 dark:border-gray-700">
+					<div class="border-b border-gray-200 px-3 py-2 dark:border-gray-700">
 						<input
 							ref={inputRef}
 							type="text"
@@ -108,11 +159,16 @@ export function CommandPalette() {
 					</div>
 					
 					{/* Results List */}
-					<div class="max-h-96 overflow-y-auto" role="listbox" aria-label="Search results">
+					<div 
+						ref={resultsContainerRef}
+						class="max-h-80 overflow-y-auto" 
+						role="listbox" 
+						aria-label="Search results"
+					>
 						<Show
 							when={!state().loading}
 							fallback={
-								<div class="p-4 text-center">
+								<div class="px-3 py-8 text-center">
 									<div class="flex items-center justify-center space-x-2">
 										<div class="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"></div>
 										<p class="text-sm text-gray-500">Searching...</p>
@@ -123,7 +179,7 @@ export function CommandPalette() {
 							<Show
 								when={state().results.length > 0}
 								fallback={
-									<div class="p-4 text-center">
+									<div class="px-3 py-8 text-center">
 										<p class="text-sm text-gray-500">No results found</p>
 									</div>
 								}
@@ -135,26 +191,21 @@ export function CommandPalette() {
 											isSelected={index() === state().selectedIndex}
 											resultIndex={index()}
 											onClick={() => {
-												// For click handling, we need to simulate selecting the clicked item
-												// and then activating it. Since we don't have a direct setSelectedIndex action,
-												// we'll need to work with the current selection logic.
-												
-												// Find the clicked result and activate it directly
-												const currentResults = state().results
-												const clickedResult = currentResults[index()]
-												
-												if (clickedResult) {
-													if (clickedResult.kind === 'file') {
-														console.log('File selected:', clickedResult.description)
-														actions.close()
-													} else if (clickedResult.kind === 'command') {
-														const commandId = clickedResult.id.replace('cmd:', '')
-														// We'll need to access the registry directly for click handling
-														// This is a temporary solution until we have better click integration
-														actions.close()
-													}
+												// Set the selected index to the clicked item and then activate it
+												actions.setSelectedIndex(index())
+												actions.activateSelected()
+											}}
+											onMouseEnter={() => {
+												// Only update selection if not using keyboard
+												if (!isUsingKeyboard()) {
+													actions.setSelectedIndex(index())
 												}
 											}}
+											onMouseMove={() => {
+												// Reset keyboard mode on mouse movement
+												setIsUsingKeyboard(false)
+											}}
+											isUsingKeyboard={isUsingKeyboard()}
 										/>
 									)}
 								</For>

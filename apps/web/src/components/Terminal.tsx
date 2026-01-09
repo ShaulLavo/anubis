@@ -85,7 +85,12 @@ export const Terminal: Component = () => {
 		const disposeController = () => {
 			const active = controller()
 			if (!active) return
-			active.dispose()
+			try {
+				active.dispose()
+			} catch (error) {
+				console.warn('Terminal controller disposal error:', error)
+				// Continue with cleanup even if disposal fails
+			}
 			setController(() => null)
 		}
 

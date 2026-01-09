@@ -31,6 +31,7 @@ export interface PaletteActions {
 	setQuery(query: string): void
 	selectNext(): void
 	selectPrevious(): void
+	setSelectedIndex(index: number): void
 	activateSelected(): void
 }
 
@@ -184,6 +185,13 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 			setSelectedIndex(prev => prev > 0 ? prev - 1 : prev)
 		},
 
+		setSelectedIndex(index: number) {
+			const currentResults = results()
+			if (index >= 0 && index < currentResults.length) {
+				setSelectedIndex(index)
+			}
+		},
+
 		activateSelected() {
 			const currentResults = results()
 			const currentIndex = selectedIndex()
@@ -205,7 +213,6 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 						actions.close()
 					}).catch((error) => {
 						console.error('Failed to open file:', error)
-						// Don't close palette on file opening failure
 					})
 				} else {
 					console.error('File path not found in result')
@@ -220,7 +227,6 @@ export function useCommandPalette(): [() => PaletteState, PaletteActions] {
 					actions.close()
 				}).catch((error) => {
 					console.error('Command execution failed:', error)
-					// Don't close palette on command failure
 				})
 			}
 		}

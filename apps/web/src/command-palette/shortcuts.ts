@@ -76,7 +76,11 @@ export function registerCommandPaletteShortcuts(
 	const openFileModeCommand = controller.registerCommand({
 		id: 'command-palette.open-file-mode',
 		run: () => {
-			actions.open('file')
+			if (isOpen()) {
+				actions.close()
+			} else {
+				actions.open('file')
+			}
 		},
 	})
 
@@ -84,7 +88,11 @@ export function registerCommandPaletteShortcuts(
 	const openCommandModeCommand = controller.registerCommand({
 		id: 'command-palette.open-command-mode',
 		run: () => {
-			actions.open('command')
+			if (isOpen()) {
+				actions.close()
+			} else {
+				actions.open('command')
+			}
 		},
 	})
 
