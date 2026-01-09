@@ -4,6 +4,36 @@ import { env } from './env'
 import { serverLogger } from './logger'
 import { getExtractedFont, getNerdFontLinks } from './fonts'
 
+const isAllowedGitHost = (host: string) => {
+	if (env.gitProxyAllowedHosts.length === 0) return false
+	return env.gitProxyAllowedHosts.some(
+		(allowed) => host === allowed || host.endsWith(`.${allowed}`)
+	)
+}
+
+const buildGitProxyHeaders = (source: Headers) => {
+	const headers = new Headers()
+	const allowed = ['accept', 'content-type', 'git-protocol', 'authorization']
+	for (const name of allowed) {
+		const value = source.get(name)
+		if (value) headers.set(name, value)
+	}
+	return headers
+}
+
+const buildGitProxyResponse = (upstream: Response) => {
+	const headers = new Headers()
+	const allowed = ['content-type', 'content-encoding', 'cache-control']
+	for (const name of allowed) {
+		const value = upstream.headers.get(name)
+		if (value) headers.set(name, value)
+	}
+	return new Response(upstream.body, {
+		status: upstream.status,
+		headers,
+	})
+}
+
 const app = new Elysia()
 	.use(
 		cors({
@@ -35,6 +65,46 @@ const app = new Elysia()
 				'Cache-Control': 'public, max-age=31536000, immutable',
 			},
 		})
+	})
+	.post('/git/proxy', async ({ request, set }) => {
+		const requestUrl = new URL(request.url)
+		const urlParam = requestUrl.searchParams.get('url')
+		const rawSearch = requestUrl.search
+		const proxiedUrl =
+			urlParam ??
+			(rawSearch && rawSearch.startsWith('?') && !rawSearch.startsWith('?url=')
+				? decodeURIComponent(rawSearch.slice(1))
+				: undefined)
+		if (!proxiedUrl) {
+			set.status = 400
+			return 'Missing url query param'
+		}
+
+		let target: URL
+		try {
+			target = new URL(proxiedUrl)
+		} catch {
+			set.status = 400
+			return 'Invalid url'
+		}
+
+		if (!isAllowedGitHost(target.host)) {
+			set.status = 403
+			return 'Host not allowed'
+		}
+
+		if (request.method !== 'POST') {
+			set.status = 405
+			return 'Method not allowed'
+		}
+
+		const upstream = await fetch(target.toString(), {
+			method: 'POST',
+			headers: buildGitProxyHeaders(request.headers),
+			body: request.body ?? undefined,
+		})
+
+		return buildGitProxyResponse(upstream)
 	})
 
 serverLogger.ready(

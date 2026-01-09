@@ -46,6 +46,7 @@ const envSchema = z.object({
 	VITE_WEB_PORT: z.coerce.number().int().positive(),
 	VITE_WEB_ORIGIN: z.url().optional(),
 	WEB_ORIGIN: z.url().optional(),
+	GIT_PROXY_ALLOWED_HOSTS: z.string().optional(),
 })
 
 let envData: z.infer<typeof envSchema>
@@ -58,9 +59,15 @@ try {
 const serverPort = envData.VITE_SERVER_PORT
 const webPort = envData.VITE_WEB_PORT
 const webOrigin = envData.VITE_WEB_ORIGIN ?? envData.WEB_ORIGIN
+const gitProxyAllowedHosts = envData.GIT_PROXY_ALLOWED_HOSTS
+	? envData.GIT_PROXY_ALLOWED_HOSTS.split(',')
+			.map((entry) => entry.trim())
+			.filter(Boolean)
+	: []
 
 export const env = {
 	serverPort,
 	webPort,
 	webOrigin: webOrigin ?? `http://localhost:${webPort}`,
+	gitProxyAllowedHosts,
 }
