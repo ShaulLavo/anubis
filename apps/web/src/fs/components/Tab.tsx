@@ -1,15 +1,21 @@
 import { VsClose } from '@repo/icons/vs/VsClose'
+import { VsCircleFilled } from '@repo/icons/vs/VsCircleFilled'
+import { createSignal, Show } from 'solid-js'
+import { FileIcon } from './FileIcon'
 
 type TabProps = {
 	value: string
 	label: string
 	isActive?: boolean
+	isDirty?: boolean
 	onSelect?: (value: string) => void
 	onClose?: (value: string) => void
 	title?: string
 }
 
 export const Tab = (props: TabProps) => {
+	const [isHovering, setIsHovering] = createSignal(false)
+
 	const handleSelect = () => {
 		props.onSelect?.(props.value)
 	}
@@ -34,15 +40,28 @@ export const Tab = (props: TabProps) => {
 			}
 			aria-selected={props.isActive}
 		>
+			<FileIcon name={props.label} size={14} class="shrink-0" />
 			<span class="max-w-48 truncate">{props.label}</span>
 			{props.onClose && (
 				<button
 					type="button"
 					onClick={handleClose}
-					class="opacity-0 group-hover:opacity-100 hover:bg-muted rounded p-0.5 transition-opacity"
+					onMouseEnter={() => setIsHovering(true)}
+					onMouseLeave={() => setIsHovering(false)}
+					class={
+						'hover:bg-muted rounded p-0.5 transition-opacity ' +
+						(props.isDirty
+							? 'opacity-100'
+							: 'opacity-0 group-hover:opacity-100')
+					}
 					title={`Close ${props.label}`}
 				>
-					<VsClose class="h-3 w-3" />
+					<Show
+						when={props.isDirty && !isHovering()}
+						fallback={<VsClose class="h-3 w-3" />}
+					>
+						<VsCircleFilled class="h-2.5 w-2.5" />
+					</Show>
 				</button>
 			)}
 		</button>

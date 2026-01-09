@@ -90,10 +90,12 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 
 	const handleTabClose = (path: string) => {
 		const isClosingActiveTab = path === state.selectedPath
-		
+
 		// Get the previous tab from history before closing
-		const previousTab = isClosingActiveTab ? tabsActions.getPreviousTab(path) : undefined
-		
+		const previousTab = isClosingActiveTab
+			? tabsActions.getPreviousTab(path)
+			: undefined
+
 		console.log('[handleTabClose]', {
 			path,
 			isClosingActiveTab,
@@ -101,10 +103,10 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			currentSelectedPath: state.selectedPath,
 			tabsCount: tabsState().length,
 		})
-		
+
 		// Close the tab
 		tabsActions.closeTab(path)
-		
+
 		// Switch to the previous tab or clear selection
 		if (isClosingActiveTab) {
 			if (previousTab) {
@@ -222,6 +224,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 				onSelect={handleTabSelect}
 				onClose={handleTabClose}
 				getLabel={tabLabel}
+				dirtyPaths={state.dirtyPaths}
 			/>
 
 			<div

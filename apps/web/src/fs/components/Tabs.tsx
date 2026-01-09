@@ -8,6 +8,7 @@ export type TabsProps = {
 	onClose?: (value: string) => void
 	getLabel?: (value: string) => string
 	emptyLabel?: string
+	dirtyPaths?: Record<string, boolean>
 }
 
 export const Tabs: Component<TabsProps> = (props) => {
@@ -35,6 +36,7 @@ export const Tabs: Component<TabsProps> = (props) => {
 							value={value}
 							label={labelFor(value)}
 							isActive={isSelected(value)}
+							isDirty={!!props.dirtyPaths?.[value]}
 							onSelect={props.onSelect}
 							onClose={props.onClose}
 							title={value}
