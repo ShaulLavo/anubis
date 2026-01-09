@@ -35,28 +35,83 @@ const loadDirectoryTarget = async (
 	target: PrefetchTarget
 ): Promise<FsDirTreeNode | undefined> => {
 	const context = ensureContext()
+	console.log(`[treePrefetch.worker] loadDirectoryTarget called for path: ${target.path}`)
 	
 	// Check cache first if available
 	if (workerCache) {
 		try {
+			console.log(`[treePrefetch.worker] Checking cache for: ${target.path}`)
 			const cached = await workerCache.getDirectory(target.path)
 			if (cached) {
-				// TODO: Add freshness validation here when modification time checking is implemented
-				// For now, we'll always scan to ensure data is fresh
+				console.log(`[treePrefetch.worker] Cache HIT for: ${target.path}`, {
+					childrenCount: cached.children?.length ?? 0,
+					cachedAt: cached.cachedAt,
+					isLoaded: cached.isLoaded,
+				})
+				
+				// Convert cached entry back to tree node
+				const children = cached.children.map(child => {
+					if (child.kind === 'file') {
+						return {
+							kind: 'file' as const,
+							name: child.name,
+							path: child.path,
+							depth: child.depth,
+							parentPath: child.parentPath,
+							size: child.size,
+							lastModified: child.lastModified,
+						}
+					} else {
+						return {
+							kind: 'dir' as const,
+							name: child.name,
+							path: child.path,
+							depth: child.depth,
+							parentPath: child.parentPath,
+							children: [],
+							isLoaded: child.isLoaded ?? false,
+						}
+					}
+				})
+				
+				const treeNode: FsDirTreeNode = {
+					kind: 'dir',
+					name: cached.name,
+					path: cached.path,
+					depth: cached.depth,
+					parentPath: cached.parentPath,
+					children,
+					isLoaded: cached.isLoaded,
+				}
+				
+				console.log(`[treePrefetch.worker] Returning cached tree node for: ${target.path}`)
+				return treeNode
+			} else {
+				console.log(`[treePrefetch.worker] Cache MISS for: ${target.path}`)
 			}
 		} catch (error) {
 			console.warn(`Worker cache check failed for ${target.path}:`, error)
 		}
+	} else {
+		console.log(`[treePrefetch.worker] No workerCache available for: ${target.path}`)
 	}
 	
 	// Perform filesystem scan
+	console.log(`[treePrefetch.worker] Performing FS scan for: ${target.path}`)
 	const result = await walkDirectory(
 		context,
 		{ path: target.path, name: target.name || deriveDirName(target.path) },
 		{ includeDirs: true, includeFiles: true, withMeta: false }
 	)
 
-	if (!result) return undefined
+	if (!result) {
+		console.log(`[treePrefetch.worker] walkDirectory returned undefined for: ${target.path}`)
+		return undefined
+	}
+	console.log(`[treePrefetch.worker] FS scan complete for: ${target.path}`, {
+		dirsCount: result.dirs?.length ?? 0,
+		filesCount: result.files?.length ?? 0,
+	})
 
 	const treeNode = normalizeDirNodeMetadata(
 		{
@@ -107,6 +162,11 @@ const loadDirectoryTarget = async (
 
 const api: TreePrefetchWorkerApi = {
 	async init(payload) {
+		console.log(`[treePrefetch.worker] init called`, {
+			rootPath: payload.rootPath,
+			rootName: payload.rootName,
+			source: payload.source,
+		})
 		ctx = createFs(payload.rootHandle)
 		fallbackRootName = payload.rootName || 'root'
 		
@@ -116,12 +176,14 @@ const api: TreePrefetchWorkerApi = {
 				dbName: 'tree-cache', // Same as main thread
 				storeName: 'directories' // Same as main thread
 			})
+			console.log(`[treePrefetch.worker] workerCache initialized successfully`)
 		} catch (error) {
 			console.warn('Worker cache initialization failed:', error)
 			workerCache = undefined
 		}
 		
 		initialized = true
+		console.log(`[treePrefetch.worker] init complete, initialized=${initialized}`)
 	},
 	async loadDirectory(target) {
 		if (!initialized) return undefined
