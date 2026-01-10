@@ -126,6 +126,7 @@
         "vite": "^7.3.0",
         "vite-plugin-solid": "^2.11.8",
         "vitest": "^4.0.16",
+        "vitest-browser-solid": "*",
       },
     },
     "packages/code-editor": {
