@@ -43,7 +43,6 @@ export class FontMetadataService {
 			// In test environment, we can still mark as initialized to allow testing
 			if (process.env.NODE_ENV === 'test' || typeof window === 'undefined') {
 				this.initialized = true
-				console.log('FontMetadataService initialized in test mode')
 			} else {
 				throw error
 			}
@@ -55,7 +54,6 @@ export class FontMetadataService {
 
 		try {
 			await this.store.setItem(metadata.name, metadata)
-			console.log(`Stored metadata for font: ${metadata.name}`)
 		} catch (error) {
 			console.error(
 				`Failed to store metadata for font ${metadata.name}:`,
@@ -106,7 +104,6 @@ export class FontMetadataService {
 
 		try {
 			await this.store.removeItem(name)
-			console.log(`Removed metadata for font: ${name}`)
 		} catch (error) {
 			console.error(`Failed to remove metadata for font ${name}:`, error)
 			throw error
@@ -180,7 +177,6 @@ export class FontMetadataService {
 	async getLRUFonts(limit: number): Promise<FontMetadata[]> {
 		const metadata = await this.getAllFontMetadata()
 
-		// Sort by lastAccessed (oldest first)
 		return metadata
 			.sort((a, b) => a.lastAccessed.getTime() - b.lastAccessed.getTime())
 			.slice(0, limit)
@@ -211,10 +207,6 @@ export class FontMetadataService {
 
 		if (fontsToRemove.length > 0) {
 			await this.setLastCleanup(new Date())
-			console.log(
-				`LRU cleanup removed ${fontsToRemove.length} fonts:`,
-				fontsToRemove
-			)
 		}
 
 		return fontsToRemove
@@ -234,7 +226,6 @@ export class FontMetadataService {
 				FontMetadataService.AVAILABLE_FONTS_KEY,
 				cacheData
 			)
-			console.log('Cached available fonts list')
 		} catch (error) {
 			console.error('Failed to cache available fonts:', error)
 		}
@@ -251,19 +242,16 @@ export class FontMetadataService {
 
 			if (!cacheData) return null
 
-			// Check if cache is expired
 			const cachedAt = new Date(cacheData.cachedAt)
 			const expiryTime =
 				cachedAt.getTime() +
 				FontMetadataService.CACHE_EXPIRY_HOURS * 60 * 60 * 1000
 
 			if (Date.now() > expiryTime) {
-				console.log('Available fonts cache expired')
 				await this.store.removeItem(FontMetadataService.AVAILABLE_FONTS_KEY)
 				return null
 			}
 
-			console.log('Serving available fonts from cache')
 			return cacheData.fonts
 		} catch (error) {
 			console.error('Failed to get cached available fonts:', error)
@@ -276,7 +264,6 @@ export class FontMetadataService {
 
 		try {
 			await this.store.clear()
-			console.log('Cleared all font metadata')
 		} catch (error) {
 			console.error('Failed to clear font metadata:', error)
 			throw error

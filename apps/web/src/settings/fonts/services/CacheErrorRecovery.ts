@@ -1,4 +1,4 @@
-import { fontMetadataService } from './FontMetadataService'
+import { fontMetadataService, type FontMetadata } from './FontMetadataService'
 
 export type CacheErrorType =
 	| 'cache_api_unavailable'
@@ -29,7 +29,7 @@ export type CacheRecoveryResult = {
 export class CacheErrorRecoveryService {
 	private static instance: CacheErrorRecoveryService | null = null
 	private fallbackStorage = new Map<string, ArrayBuffer>()
-	private fallbackMetadata = new Map<string, any>()
+	private fallbackMetadata = new Map<string, FontMetadata>()
 	private cacheApiAvailable = true
 	private indexedDBAvailable = true
 	private fallbackMode = false
@@ -41,9 +41,6 @@ export class CacheErrorRecoveryService {
 		return CacheErrorRecoveryService.instance
 	}
 
-	/**
-	 * Detect and categorize cache errors
-	 */
 	categorizeError(error: Error): CacheErrorType {
 		const message = error.message.toLowerCase()
 
@@ -70,9 +67,6 @@ export class CacheErrorRecoveryService {
 		return 'cache_corruption' // Default fallback
 	}
 
-	/**
-	 * Determine the best recovery strategy for a given error type
-	 */
 	getRecoveryStrategy(errorType: CacheErrorType): CacheRecoveryStrategy {
 		switch (errorType) {
 			case 'cache_api_unavailable':
@@ -96,16 +90,9 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Execute recovery strategy for cache errors
-	 */
 	async recoverFromError(error: Error): Promise<CacheRecoveryResult> {
 		const errorType = this.categorizeError(error)
 		const strategy = this.getRecoveryStrategy(errorType)
-
-		console.log(
-			`[CacheErrorRecovery] Attempting recovery with strategy: ${strategy} for error: ${errorType}`
-		)
 
 		try {
 			switch (strategy) {
@@ -140,12 +127,7 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Enable memory-only fallback storage
-	 */
 	private async enableMemoryFallback(): Promise<CacheRecoveryResult> {
-		console.log('[CacheErrorRecovery] Enabling memory-only fallback')
-
 		this.fallbackMode = true
 		this.cacheApiAvailable = false
 		this.indexedDBAvailable = false
@@ -159,12 +141,7 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Enable localStorage fallback for metadata
-	 */
 	private async enableLocalStorageFallback(): Promise<CacheRecoveryResult> {
-		console.log('[CacheErrorRecovery] Enabling localStorage fallback')
-
 		try {
 			// Test localStorage availability
 			const testKey = 'font-cache-test'
@@ -187,18 +164,12 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Clear corrupted cache and rebuild
-	 */
 	private async clearAndRebuildCache(): Promise<CacheRecoveryResult> {
-		console.log('[CacheErrorRecovery] Clearing and rebuilding cache')
-
 		try {
 			// Clear Cache API if available
 			if ('caches' in window) {
 				try {
 					await caches.delete('nerdfonts-v1')
-					console.log('[CacheErrorRecovery] Cache API cleared')
 				} catch (error) {
 					console.warn('[CacheErrorRecovery] Failed to clear Cache API:', error)
 				}
@@ -207,7 +178,6 @@ export class CacheErrorRecoveryService {
 			// Clear IndexedDB if available
 			try {
 				await fontMetadataService.clearAllMetadata()
-				console.log('[CacheErrorRecovery] IndexedDB metadata cleared')
 			} catch (error) {
 				console.warn('[CacheErrorRecovery] Failed to clear IndexedDB:', error)
 			}
@@ -220,7 +190,6 @@ export class CacheErrorRecoveryService {
 						localStorage.removeItem(key)
 					}
 				}
-				console.log('[CacheErrorRecovery] localStorage font data cleared')
 			} catch (error) {
 				console.warn(
 					'[CacheErrorRecovery] Failed to clear localStorage:',
@@ -241,12 +210,7 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Reduce cache size by removing oldest fonts
-	 */
 	private async reduceCacheSize(): Promise<CacheRecoveryResult> {
-		console.log('[CacheErrorRecovery] Reducing cache size')
-
 		try {
 			// Get all font metadata sorted by last accessed
 			const allMetadata = await fontMetadataService.getAllFontMetadata()
@@ -270,8 +234,6 @@ export class CacheErrorRecoveryService {
 
 					// Remove metadata
 					await fontMetadataService.removeFontMetadata(metadata.name)
-
-					console.log(`[CacheErrorRecovery] Removed font: ${metadata.name}`)
 				} catch (error) {
 					console.warn(
 						`[CacheErrorRecovery] Failed to remove font ${metadata.name}:`,
@@ -292,12 +254,7 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Disable caching entirely
-	 */
 	private async disableCaching(): Promise<CacheRecoveryResult> {
-		console.log('[CacheErrorRecovery] Disabling caching entirely')
-
 		this.fallbackMode = true
 		this.cacheApiAvailable = false
 		this.indexedDBAvailable = false
@@ -311,21 +268,14 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Store font data in fallback storage
-	 */
 	async storeFontFallback(name: string, data: ArrayBuffer): Promise<void> {
 		if (!this.fallbackMode) {
 			throw new Error('Fallback mode not enabled')
 		}
 
 		this.fallbackStorage.set(name, data)
-		console.log(`[CacheErrorRecovery] Stored font ${name} in fallback storage`)
 	}
 
-	/**
-	 * Retrieve font data from fallback storage
-	 */
 	async getFontFallback(name: string): Promise<ArrayBuffer | null> {
 		if (!this.fallbackMode) {
 			return null
@@ -334,10 +284,10 @@ export class CacheErrorRecoveryService {
 		return this.fallbackStorage.get(name) || null
 	}
 
-	/**
-	 * Store metadata in fallback storage
-	 */
-	async storeMetadataFallback(name: string, metadata: any): Promise<void> {
+	async storeMetadataFallback(
+		name: string,
+		metadata: FontMetadata
+	): Promise<void> {
 		if (!this.fallbackMode) {
 			throw new Error('Fallback mode not enabled')
 		}
@@ -357,15 +307,9 @@ export class CacheErrorRecoveryService {
 
 		// Fall back to memory storage
 		this.fallbackMetadata.set(name, metadata)
-		console.log(
-			`[CacheErrorRecovery] Stored metadata for ${name} in fallback storage`
-		)
 	}
 
-	/**
-	 * Retrieve metadata from fallback storage
-	 */
-	async getMetadataFallback(name: string): Promise<any | null> {
+	async getMetadataFallback(name: string): Promise<FontMetadata | null> {
 		if (!this.fallbackMode) {
 			return null
 		}
@@ -389,16 +333,10 @@ export class CacheErrorRecoveryService {
 		return this.fallbackMetadata.get(name) || null
 	}
 
-	/**
-	 * Check if fallback mode is active
-	 */
 	isFallbackMode(): boolean {
 		return this.fallbackMode
 	}
 
-	/**
-	 * Get current cache availability status
-	 */
 	getCacheStatus(): {
 		cacheAPI: boolean
 		indexedDB: boolean
@@ -411,9 +349,6 @@ export class CacheErrorRecoveryService {
 		}
 	}
 
-	/**
-	 * Reset recovery service (for testing)
-	 */
 	reset(): void {
 		this.fallbackStorage.clear()
 		this.fallbackMetadata.clear()

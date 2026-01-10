@@ -44,15 +44,10 @@ export class ServiceWorkerManager {
 		}
 
 		try {
-			console.log('[ServiceWorkerManager] Registering service worker...')
-
 			this.registration = await navigator.serviceWorker.register('/sw.js', {
 				scope: '/',
 			})
 
-			console.log(
-				'[ServiceWorkerManager] Service worker registered successfully'
-			)
 			this.isRegistered = true
 
 			// Set up message listener
@@ -63,7 +58,6 @@ export class ServiceWorkerManager {
 
 			// Handle service worker updates
 			this.registration.addEventListener('updatefound', () => {
-				console.log('[ServiceWorkerManager] Service worker update found')
 				const newWorker = this.registration!.installing
 
 				if (newWorker) {
@@ -72,9 +66,6 @@ export class ServiceWorkerManager {
 							newWorker.state === 'installed' &&
 							navigator.serviceWorker.controller
 						) {
-							console.log(
-								'[ServiceWorkerManager] New service worker installed, reload recommended'
-							)
 							// Optionally notify the user about the update
 							this.notifyServiceWorkerUpdate()
 						}
@@ -141,7 +132,7 @@ export class ServiceWorkerManager {
 		}
 
 		try {
-			const stats = await this.getCacheStats()
+			await this.getCacheStats()
 			// Return list of cached font URLs
 			const cache = await caches.open('nerdfonts-v1')
 			const keys = await cache.keys()
@@ -184,7 +175,7 @@ export class ServiceWorkerManager {
 			const messageChannel = new MessageChannel()
 
 			messageChannel.port1.onmessage = (event) => {
-				const { type: responseType, data: responseData, error } = event.data
+				const { data: responseData, error } = event.data
 
 				if (error) {
 					reject(new Error(error))
@@ -208,12 +199,12 @@ export class ServiceWorkerManager {
 	 * Handle messages from service worker
 	 */
 	private handleServiceWorkerMessage(event: MessageEvent): void {
-		const { type, fontName, timestamp, metadata } = event.data
+		const { type, fontName, metadata } = event.data
 
 		switch (type) {
 			case 'FONT_ACCESSED':
 				// Handle font access time update
-				this.handleFontAccessed(fontName, timestamp)
+				this.handleFontAccessed(fontName)
 				break
 
 			case 'STORE_FONT_METADATA':
@@ -221,29 +212,24 @@ export class ServiceWorkerManager {
 				this.handleStoreMetadata(fontName, metadata)
 				break
 
-			default:
+			default: {
 				// Check for custom handlers
 				const handler = this.messageHandlers.get(type)
 				if (handler) {
 					handler(event.data)
 				}
+			}
 		}
 	}
 
 	/**
 	 * Handle font accessed notification from service worker
 	 */
-	private async handleFontAccessed(
-		fontName: string,
-		timestamp: string
-	): Promise<void> {
+	private async handleFontAccessed(fontName: string): Promise<void> {
 		try {
 			// Update font access time in IndexedDB via FontMetadataService
 			const { fontMetadataService } = await import('./FontMetadataService')
 			await fontMetadataService.updateLastAccessed(fontName)
-			console.log(
-				`[ServiceWorkerManager] Updated access time for font: ${fontName}`
-			)
 		} catch (error) {
 			console.warn(
 				'[ServiceWorkerManager] Failed to update font access time:',
@@ -273,9 +259,6 @@ export class ServiceWorkerManager {
 			}
 
 			await fontMetadataService.storeFontMetadata(fontMetadata)
-			console.log(
-				`[ServiceWorkerManager] Stored metadata for font: ${fontName}`
-			)
 		} catch (error) {
 			console.warn(
 				'[ServiceWorkerManager] Failed to store font metadata:',
@@ -319,9 +302,6 @@ export class ServiceWorkerManager {
 
 		try {
 			await this.registration.update()
-			console.log(
-				'[ServiceWorkerManager] Service worker update check completed'
-			)
 		} catch (error) {
 			console.error(
 				'[ServiceWorkerManager] Failed to update service worker:',
@@ -343,7 +323,6 @@ export class ServiceWorkerManager {
 			await this.registration.unregister()
 			this.registration = null
 			this.isRegistered = false
-			console.log('[ServiceWorkerManager] Service worker unregistered')
 		} catch (error) {
 			console.error(
 				'[ServiceWorkerManager] Failed to unregister service worker:',

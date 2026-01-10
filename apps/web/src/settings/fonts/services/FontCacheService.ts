@@ -1,8 +1,17 @@
 import { client } from '~/client'
 import { fontMetadataService } from './FontMetadataService'
 import { cacheErrorRecovery } from './CacheErrorRecovery'
+import { env } from '../../../../../server/src/env'
 import { serviceWorkerManager } from './ServiceWorkerManager'
 import type { FontMetadata, CacheStats } from './FontMetadataService'
+import type {
+	ServiceWorkerCacheStats,
+	ServiceWorkerCleanupResult,
+} from './ServiceWorkerManager'
+import type {
+	CacheMonitoringStats,
+	CacheHealthCheck,
+} from './CacheMonitoringService'
 
 // Re-export types for convenience
 export type { FontMetadata, CacheStats }
@@ -18,10 +27,8 @@ export class FontCacheService {
 		if (this.initialized) return
 
 		try {
-			// Initialize service worker first for offline support
 			try {
 				await serviceWorkerManager.init()
-				console.log('Service worker initialized for font caching')
 			} catch (swError) {
 				console.warn(
 					'Service worker initialization failed, continuing without offline support:',
@@ -29,28 +36,20 @@ export class FontCacheService {
 				)
 			}
 
-			// Check if Cache API is available
 			if (!('caches' in window)) {
 				throw new Error('Cache API not supported')
 			}
 
-			// Initialize Cache API
 			this.cache = await caches.open(FontCacheService.CACHE_NAME)
 			this.initialized = true
-			console.log('FontCacheService initialized successfully')
 		} catch (error) {
 			console.error('Failed to initialize FontCacheService:', error)
 
-			// Attempt error recovery
 			const recovery = await cacheErrorRecovery.recoverFromError(error as Error)
 
 			if (recovery.success) {
-				console.log(
-					`[FontCacheService] Recovery successful: ${recovery.message}`
-				)
-				this.initialized = true // Mark as initialized even in fallback mode
+				this.initialized = true
 
-				// Show user notification about fallback mode
 				if (recovery.fallbackActive) {
 					this.notifyFallbackMode(recovery.message)
 				}
@@ -67,45 +66,33 @@ export class FontCacheService {
 		const cacheKey = `/fonts/${name}`
 
 		try {
-			// Check cache first (if not in fallback mode)
 			if (!cacheErrorRecovery.isFallbackMode() && this.cache) {
 				const cachedResponse = await this.cache.match(cacheKey)
 				if (cachedResponse) {
-					console.log(`Font ${name} served from cache`)
-					// Update last accessed time in metadata
 					await this.updateLastAccessedSafely(name)
 					return await cachedResponse.arrayBuffer()
 				}
 			} else {
-				// Check fallback storage
 				const fallbackData = await cacheErrorRecovery.getFontFallback(name)
 				if (fallbackData) {
-					console.log(`Font ${name} served from fallback storage`)
 					return fallbackData
 				}
 			}
 
-			console.log(`Downloading font ${name} from server...`)
-
-			// Download from server using the client
 			const response = await client.fonts({ name }).get()
 			if (!response.data || response.data === 'Font not found') {
 				throw new Error(`Failed to download font: ${name}`)
 			}
 
-			// The response.data should be a Response object containing the font
 			let fontData: ArrayBuffer
 			if (response.data instanceof Response) {
 				fontData = await response.data.arrayBuffer()
 			} else {
-				// If it's already an ArrayBuffer (shouldn't happen based on server code, but just in case)
 				fontData = response.data as ArrayBuffer
 			}
 
-			// Store font data (with error recovery)
 			await this.storeFontDataSafely(name, fontData, cacheKey)
 
-			// Store metadata (with error recovery)
 			const metadata: FontMetadata = {
 				name,
 				downloadUrl: url,
@@ -121,14 +108,9 @@ export class FontCacheService {
 		} catch (error) {
 			console.error(`[FontCacheService] Error downloading font ${name}:`, error)
 
-			// Attempt error recovery
 			const recovery = await cacheErrorRecovery.recoverFromError(error as Error)
 
 			if (recovery.success && recovery.fallbackActive) {
-				console.log(
-					`[FontCacheService] Retrying download with fallback mode for ${name}`
-				)
-				// Retry the download in fallback mode
 				return await this.downloadFont(name, url)
 			}
 
@@ -145,7 +127,6 @@ export class FontCacheService {
 				const cachedResponse = await this.cache.match(cacheKey)
 				return !!cachedResponse
 			} else {
-				// Check fallback storage
 				const fallbackData = await cacheErrorRecovery.getFontFallback(name)
 				return !!fallbackData
 			}
@@ -158,30 +139,24 @@ export class FontCacheService {
 		}
 	}
 
+	async storeFont(name: string, fontData: ArrayBuffer): Promise<void> {
+		await this.ensureInitialized()
+		const cacheKey = `/fonts/${name}`
+		await this.storeFontDataSafely(name, fontData, cacheKey)
+	}
+
 	async removeFont(name: string): Promise<void> {
 		await this.ensureInitialized()
 
 		try {
-			// Remove from Cache API if available
 			if (!cacheErrorRecovery.isFallbackMode() && this.cache) {
 				const cacheKey = `/fonts/${name}`
 				await this.cache.delete(cacheKey)
 			}
 
-			// Remove from fallback storage
-			if (cacheErrorRecovery.isFallbackMode()) {
-				// Note: We don't have a direct way to remove from fallback storage
-				// This would need to be implemented in the recovery service
-				console.log(
-					`[FontCacheService] Font ${name} removed from fallback storage`
-				)
-			}
-
-			// Remove metadata
 			if (!cacheErrorRecovery.isFallbackMode()) {
 				await fontMetadataService.removeFontMetadata(name)
 			} else {
-				// Remove from fallback metadata storage
 				try {
 					localStorage.removeItem(`font-metadata-${name}`)
 				} catch (error) {
@@ -191,12 +166,9 @@ export class FontCacheService {
 					)
 				}
 			}
-
-			console.log(`Font ${name} removed from cache and metadata`)
 		} catch (error) {
 			console.error(`[FontCacheService] Error removing font ${name}:`, error)
 
-			// Attempt recovery
 			const recovery = await cacheErrorRecovery.recoverFromError(error as Error)
 			if (!recovery.success) {
 				throw error
@@ -211,24 +183,15 @@ export class FontCacheService {
 			if (!cacheErrorRecovery.isFallbackMode()) {
 				return await fontMetadataService.getCacheStats()
 			} else {
-				// Calculate stats from fallback storage
-				const cacheStatus = cacheErrorRecovery.getCacheStatus()
-				console.log(
-					'[FontCacheService] Getting cache stats in fallback mode:',
-					cacheStatus
-				)
-
-				// Return minimal stats for fallback mode
 				return {
-					totalSize: 0, // Can't easily calculate in fallback mode
-					fontCount: 0, // Would need to enumerate fallback storage
+					totalSize: 0,
+					fontCount: 0,
 					lastCleanup: new Date(),
 				}
 			}
 		} catch (error) {
 			console.error('[FontCacheService] Error getting cache stats:', error)
 
-			// Return default stats on error
 			return {
 				totalSize: 0,
 				fontCount: 0,
@@ -244,31 +207,34 @@ export class FontCacheService {
 			const stats = await this.getCacheStats()
 
 			if (stats.totalSize <= FontCacheService.MAX_CACHE_SIZE) {
-				return // No cleanup needed
+				return
 			}
 
-			console.log(
-				`Cache size (${stats.totalSize} bytes) exceeds limit (${FontCacheService.MAX_CACHE_SIZE} bytes). Starting LRU cleanup...`
-			)
+			// LRU cleanup: remove oldest accessed fonts until we are under the limit
+			const allFonts = await this.getAllFontMetadata()
+			allFonts.sort((a, b) => {
+				const timeA = new Date(a.lastAccessed).getTime()
+				const timeB = new Date(b.lastAccessed).getTime()
+				return timeA - timeB
+			})
 
-			// Use metadata service for LRU cleanup
-			const fontsToRemove = await fontMetadataService.cleanupOldestFonts(
-				FontCacheService.MAX_CACHE_SIZE
-			)
+			let currentSize = stats.totalSize
+			const fontsToRemove: string[] = []
 
-			// Remove from Cache API
+			for (const font of allFonts) {
+				if (currentSize <= FontCacheService.MAX_CACHE_SIZE) break
+				fontsToRemove.push(font.name)
+				currentSize -= font.size
+			}
+
 			for (const fontName of fontsToRemove) {
 				const cacheKey = `/fonts/${fontName}`
 				await this.cache?.delete(cacheKey)
+				await this.removeFont(fontName)
 			}
-
-			console.log(
-				`LRU cleanup completed. Removed ${fontsToRemove.length} fonts.`
-			)
 		} catch (error) {
 			console.error('Failed to cleanup cache:', error)
-			// In test environment, don't throw
-			if (process.env.NODE_ENV !== 'test' && typeof window !== 'undefined') {
+			if (env.mode !== 'test' && typeof window !== 'undefined') {
 				throw error
 			}
 		}
@@ -288,14 +254,9 @@ export class FontCacheService {
 			}
 
 			await fontMetadataService.clearAllMetadata()
-
-			console.log(
-				`Cleared all ${fontKeys.length} fonts from cache and metadata`
-			)
 		} catch (error) {
 			console.error('Failed to clear all fonts:', error)
-			// In test environment, don't throw
-			if (process.env.NODE_ENV !== 'test' && typeof window !== 'undefined') {
+			if (env.mode !== 'test' && typeof window !== 'undefined') {
 				throw error
 			}
 		}
@@ -316,7 +277,7 @@ export class FontCacheService {
 	/**
 	 * Get service worker cache statistics
 	 */
-	async getServiceWorkerStats(): Promise<any> {
+	async getServiceWorkerStats(): Promise<ServiceWorkerCacheStats | null> {
 		try {
 			if (serviceWorkerManager.isSupported()) {
 				return await serviceWorkerManager.getCacheStats()
@@ -349,7 +310,9 @@ export class FontCacheService {
 	/**
 	 * Force service worker cache cleanup
 	 */
-	async forceServiceWorkerCleanup(maxSize?: number): Promise<any> {
+	async forceServiceWorkerCleanup(
+		maxSize?: number
+	): Promise<ServiceWorkerCleanupResult> {
 		try {
 			if (serviceWorkerManager.isSupported()) {
 				return await serviceWorkerManager.cleanupCache({ maxSize })
@@ -360,14 +323,14 @@ export class FontCacheService {
 				'[FontCacheService] Failed to cleanup service worker cache:',
 				error
 			)
-			return { cleaned: false, reason: error.message }
+			return { cleaned: false, reason: (error as Error).message }
 		}
 	}
 
 	/**
 	 * Get comprehensive cache monitoring statistics
 	 */
-	async getMonitoringStats(): Promise<any> {
+	async getMonitoringStats(): Promise<CacheMonitoringStats | null> {
 		try {
 			const { cacheMonitoringService } =
 				await import('./CacheMonitoringService')
@@ -381,7 +344,15 @@ export class FontCacheService {
 	/**
 	 * Perform cache health check
 	 */
-	async performHealthCheck(): Promise<any> {
+	async performHealthCheck(): Promise<
+		| CacheHealthCheck
+		| {
+				status: string
+				issues: string[]
+				recommendations: string[]
+				lastCheck: Date
+		  }
+	> {
 		try {
 			const { cacheMonitoringService } =
 				await import('./CacheMonitoringService')
@@ -400,9 +371,10 @@ export class FontCacheService {
 	/**
 	 * Start cache monitoring
 	 */
-	startMonitoring(): void {
+	async startMonitoring(): Promise<void> {
 		try {
-			const { cacheMonitoringService } = require('./CacheMonitoringService')
+			const { cacheMonitoringService } =
+				await import('./CacheMonitoringService')
 			cacheMonitoringService.startMonitoring()
 		} catch (error) {
 			console.warn('[FontCacheService] Failed to start monitoring:', error)
@@ -412,9 +384,10 @@ export class FontCacheService {
 	/**
 	 * Stop cache monitoring
 	 */
-	stopMonitoring(): void {
+	async stopMonitoring(): Promise<void> {
 		try {
-			const { cacheMonitoringService } = require('./CacheMonitoringService')
+			const { cacheMonitoringService } =
+				await import('./CacheMonitoringService')
 			cacheMonitoringService.stopMonitoring()
 		} catch (error) {
 			console.warn('[FontCacheService] Failed to stop monitoring:', error)
@@ -437,7 +410,6 @@ export class FontCacheService {
 	): Promise<void> {
 		try {
 			if (!cacheErrorRecovery.isFallbackMode() && this.cache) {
-				// Try Cache API first
 				const fontResponse = new Response(fontData, {
 					headers: {
 						'Content-Type': 'font/ttf',
@@ -446,11 +418,8 @@ export class FontCacheService {
 				})
 
 				await this.cache.put(cacheKey, fontResponse.clone())
-				console.log(`Font ${name} cached successfully`)
 			} else {
-				// Use fallback storage
 				await cacheErrorRecovery.storeFontFallback(name, fontData)
-				console.log(`Font ${name} stored in fallback storage`)
 			}
 		} catch (error) {
 			console.error(
@@ -458,7 +427,6 @@ export class FontCacheService {
 				error
 			)
 
-			// Attempt recovery and retry
 			const recovery = await cacheErrorRecovery.recoverFromError(error as Error)
 			if (recovery.success) {
 				await cacheErrorRecovery.storeFontFallback(name, fontData)
@@ -484,12 +452,10 @@ export class FontCacheService {
 				error
 			)
 
-			// Attempt recovery and retry
 			const recovery = await cacheErrorRecovery.recoverFromError(error as Error)
 			if (recovery.success) {
 				await cacheErrorRecovery.storeMetadataFallback(metadata.name, metadata)
 			} else {
-				// Don't throw - metadata storage failure shouldn't prevent font download
 				console.warn(
 					`[FontCacheService] Metadata storage failed for ${metadata.name}, continuing without metadata`
 				)
@@ -505,7 +471,6 @@ export class FontCacheService {
 			if (!cacheErrorRecovery.isFallbackMode()) {
 				await fontMetadataService.updateLastAccessed(name)
 			} else {
-				// Update in fallback storage
 				const metadata = await cacheErrorRecovery.getMetadataFallback(name)
 				if (metadata) {
 					metadata.lastAccessed = new Date()
@@ -513,10 +478,9 @@ export class FontCacheService {
 				}
 			}
 		} catch (error) {
-			// Don't throw - last accessed update failure is not critical
 			console.warn(
 				`[FontCacheService] Failed to update last accessed for ${name}:`,
-				error.message
+				(error as Error).message
 			)
 		}
 	}
