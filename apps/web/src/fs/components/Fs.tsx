@@ -1,4 +1,3 @@
-import { Button } from '@repo/ui/button'
 import { Flex } from '@repo/ui/flex'
 import { Resizable } from '~/components/Resizable'
 import { useFs } from '../../fs/context/FsContext'
@@ -8,7 +7,7 @@ import { TreeView } from './TreeView'
 import { ExplorerAccordion } from './ExplorerAccordion'
 
 export const Fs = () => {
-	const [state, actions] = useFs()
+	const [state] = useFs()
 
 	// A file is selected only if there's an actual selectedPath pointing to a file
 	const isFileSelected = () => {
@@ -22,9 +21,6 @@ export const Fs = () => {
 			flexDirection="col"
 			class="h-full min-h-0 overflow-hidden rounded-lg border border-border/30 bg-muted/60 shadow-xl"
 		>
-			<Button variant="outline" onClick={() => void actions.pickNewRoot()}>
-				Pick New Folder
-			</Button>
 			<Resizable
 				orientation="horizontal"
 				storageKey="fs-horizontal-panel-size"

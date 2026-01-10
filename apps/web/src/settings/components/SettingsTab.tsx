@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js'
 import { createMemo, createSignal } from 'solid-js'
+import { Button } from '@repo/ui/button'
 import {
 	SettingsSearch,
 	SettingsSidebar,
@@ -8,6 +9,7 @@ import {
 import type { SettingsCategory } from '@repo/ui/settings'
 import { Resizable } from '../../components/Resizable'
 import { useSettings } from '../SettingsProvider'
+import { useFs } from '../../fs/context/FsContext'
 import { FontsSubcategoryUI } from '../fonts/components/FontsSubcategoryUI'
 import { FontFamilySelect } from './FontFamilySelect'
 import { FontCategory } from '../../fonts'
@@ -21,6 +23,7 @@ export type SettingsTabProps = {
 
 export const SettingsTab: Component<SettingsTabProps> = (props) => {
 	const [settingsState, settingsActions] = useSettings()
+	const [, fsActions] = useFs()
 
 	const [searchValue, setSearchValue] = createSignal('')
 
@@ -140,12 +143,17 @@ export const SettingsTab: Component<SettingsTabProps> = (props) => {
 			class="h-full min-h-0 bg-background"
 			alignItems="stretch"
 		>
-			<div class="shrink-0 px-2 py-2 border-b border-border/60">
-				<SettingsSearch
-					value={searchValue()}
-					onInput={setSearchValue}
-					placeholder="Search settings"
-				/>
+			<div class="shrink-0 px-2 py-2 border-b border-border/60 flex items-center gap-2">
+				<div class="flex-1">
+					<SettingsSearch
+						value={searchValue()}
+						onInput={setSearchValue}
+						placeholder="Search settings"
+					/>
+				</div>
+				<Button variant="outline" onClick={() => void fsActions.pickNewRoot()}>
+					Pick New Folder
+				</Button>
 			</div>
 			<Resizable
 				orientation="horizontal"
