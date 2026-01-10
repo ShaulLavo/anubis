@@ -69,6 +69,8 @@ export const SettingsSidebarItem: Component<SettingsSidebarItemProps> = (
 		isSelected() || isParentOfSelected() ? [props.category.id] : []
 	)
 
+	const isExpanded = () => expandedItems().includes(props.category.id)
+
 	const handleExpandedChange = (value: string[] | string | null) => {
 		if (Array.isArray(value)) {
 			setExpandedItems(value)
@@ -79,6 +81,13 @@ export const SettingsSidebarItem: Component<SettingsSidebarItemProps> = (
 			return
 		}
 		setExpandedItems([])
+	}
+
+	const handleTriggerClick = () => {
+		if (isExpanded()) return
+		const nextId = fullId()
+		if (selectedCategory() === nextId) return
+		queueMicrotask(() => props.onCategorySelect(nextId))
 	}
 
 	createEffect(() => {
@@ -129,7 +138,7 @@ export const SettingsSidebarItem: Component<SettingsSidebarItemProps> = (
 							itemClass(),
 							'data-[expanded]:[&_[data-accordion-toggle=true]_svg]:rotate-90'
 						)}
-						onClick={() => props.onCategorySelect(fullId())}
+						onClick={handleTriggerClick}
 					>
 						<div class="flex items-center gap-2">
 							{renderIcon()}

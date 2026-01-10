@@ -2,7 +2,6 @@ import { describe, expect, it } from 'bun:test'
 import { Elysia } from 'elysia'
 import { routes } from './routes'
 
-// Create a test app with all routes
 const app = new Elysia().use(routes)
 
 describe('Server Routes', () => {

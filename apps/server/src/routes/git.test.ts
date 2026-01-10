@@ -8,7 +8,6 @@ import {
 } from './git'
 import { env } from '../env'
 
-// Create a test app with just the git routes
 const app = new Elysia().use(gitRoutes)
 
 describe('Git Routes', () => {
@@ -20,7 +19,6 @@ describe('Git Routes', () => {
 				if (hasAllowedHosts) {
 					expect(isAllowedGitHost(env.gitProxyAllowedHosts[0])).toBe(true)
 				}
-				// Unknown host should always be false
 				expect(isAllowedGitHost('definitely-not-allowed-xyz123.invalid')).toBe(
 					false
 				)

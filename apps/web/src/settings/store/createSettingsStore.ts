@@ -8,7 +8,6 @@ import {
 import { ensureFs } from '../../fs/runtime/fsRuntime'
 import type { FsSource } from '../../fs/types'
 
-// Import schemas from package
 import editorSchema from '@repo/settings/schemas/editor.json'
 import terminalSchema from '@repo/settings/schemas/terminal.json'
 import uiSchema from '@repo/settings/schemas/ui.json'
@@ -54,7 +53,6 @@ export const createSettingsStore = (
 			uiSchema,
 			appearanceSchema,
 		]
-		// Validate schema structure with Zod
 		return validateSchemas(rawSchemas)
 	}
 

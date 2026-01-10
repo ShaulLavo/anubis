@@ -15,14 +15,6 @@ import { detectAvailableViewModes } from '../utils/viewModeDetection'
 import type { ViewMode } from '../types/ViewMode'
 import type { ParseResult } from '@repo/utils'
 
-// Mock the file system context and hooks
-vi.mock('../context/FsProvider', () => ({
-	useFsProvider: () => ({
-		getFileStats: vi.fn().mockResolvedValue({ isBinary: false }),
-		readFile: vi.fn().mockResolvedValue('{"test": "content"}'),
-	}),
-}))
-
 describe('File View Modes Integration Tests', () => {
 	let registry: ViewModeRegistry
 

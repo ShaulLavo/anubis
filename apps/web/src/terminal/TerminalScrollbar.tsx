@@ -56,7 +56,6 @@ export const TerminalScrollbar = (props: TerminalScrollbarProps) => {
 		if (!source && !element) {
 			if (!warnedMissingSource) {
 				// warnedMissingSource = true
-				// console.log('terminal-scrollbar: missing scroll source and element')
 			}
 			return
 		}
@@ -67,11 +66,6 @@ export const TerminalScrollbar = (props: TerminalScrollbarProps) => {
 		const hasOverflow = scrollSize > clientSize
 		if (hasOverflow && !scrollbar.isVisible()) {
 			warnedHiddenScrollbar = true
-			// console.log('terminal-scrollbar: hidden despite overflow', {
-			// 	scrollSize,
-			// 	clientSize,
-			// 	scrollOffset: source.getScrollOffset(),
-			// })
 		}
 	})
 

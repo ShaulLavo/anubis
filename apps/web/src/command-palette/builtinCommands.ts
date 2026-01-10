@@ -1,6 +1,6 @@
 import type { CommandDescriptor, CommandPaletteRegistry } from './types'
 import type { FsActions, SelectPathOptions } from '../fs/context/FsContext'
-import type { ViewMode } from '../fs/types/TabIdentity'
+import type { ViewMode } from '../fs/types/ViewMode'
 
 /**
  * Subset of FsActions needed for settings commands

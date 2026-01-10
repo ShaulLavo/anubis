@@ -75,7 +75,6 @@ export const Terminal: Component = () => {
 
 		const setup = async (focusOnMount: boolean) => {
 			disposeController()
-			// Clear any leftover DOM elements from the previous terminal
 			containerRef.innerHTML = ''
 
 			const nextController = await createTerminalController(containerRef, {
@@ -139,7 +138,6 @@ export const Terminal: Component = () => {
 			)
 		)
 
-		// Watch terminal font settings and update terminal when they change
 		createEffect(
 			on(
 				() => [
