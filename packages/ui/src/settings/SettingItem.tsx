@@ -1,5 +1,5 @@
 import type { Component, JSX } from 'solid-js'
-import { Match, Switch } from 'solid-js'
+import { Match, Switch, children } from 'solid-js'
 import { SettingCheckbox } from './SettingCheckbox'
 import { SettingSelect } from './SettingSelect'
 import { SettingInput } from './SettingInput'
@@ -24,7 +24,9 @@ export type SettingItemProps = {
 
 export const SettingItem: Component<SettingItemProps> = (props) => {
 	// Check if there's a custom component for this setting
-	const customComponent = () => props.customComponents?.[props.setting.key]
+	const customComponent = children(() =>
+		props.customComponents?.[props.setting.key]?.()
+	)
 
 	// Infer type from default value
 	const inferredType = () => {
@@ -46,7 +48,7 @@ export const SettingItem: Component<SettingItemProps> = (props) => {
 	return (
 		<div class={cn('py-2.5', props.class)}>
 			<Switch>
-				<Match when={customComponent()}>{customComponent()!()}</Match>
+				<Match when={customComponent()}>{customComponent()}</Match>
 
 				<Match when={inferredType() === 'boolean'}>
 					<SettingCheckbox

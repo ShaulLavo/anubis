@@ -78,7 +78,12 @@ describe('SettingItem', () => {
 							.string({ minLength: 3, maxLength: 50 })
 							.filter((s) => /^[a-z]+(\\.[a-z]+)+$/.test(s)),
 						default: fc.boolean(),
-						description: fc.option(fc.string({ minLength: 1, maxLength: 200 })),
+						description: fc.option(
+							fc.string({ minLength: 1, maxLength: 200 }),
+							{
+								nil: undefined,
+							}
+						),
 					}),
 					// String setting with options (select) - inferred from string default + options
 					fc.record({
@@ -89,7 +94,12 @@ describe('SettingItem', () => {
 							.string({ minLength: 3, maxLength: 50 })
 							.filter((s) => /^[a-z]+(\\.[a-z]+)+$/.test(s)),
 						default: fc.string(),
-						description: fc.option(fc.string({ minLength: 1, maxLength: 200 })),
+						description: fc.option(
+							fc.string({ minLength: 1, maxLength: 200 }),
+							{
+								nil: undefined,
+							}
+						),
 						options: fc.array(
 							fc.record({
 								value: fc.string({ minLength: 1, maxLength: 20 }),
@@ -107,7 +117,12 @@ describe('SettingItem', () => {
 							.string({ minLength: 3, maxLength: 50 })
 							.filter((s) => /^[a-z]+(\\.[a-z]+)+$/.test(s)),
 						default: fc.string(),
-						description: fc.option(fc.string({ minLength: 1, maxLength: 200 })),
+						description: fc.option(
+							fc.string({ minLength: 1, maxLength: 200 }),
+							{
+								nil: undefined,
+							}
+						),
 					}),
 					// Number setting - inferred from number default
 					fc.record({
@@ -118,7 +133,12 @@ describe('SettingItem', () => {
 							.string({ minLength: 3, maxLength: 50 })
 							.filter((s) => /^[a-z]+(\\.[a-z]+)+$/.test(s)),
 						default: fc.integer(),
-						description: fc.option(fc.string({ minLength: 1, maxLength: 200 })),
+						description: fc.option(
+							fc.string({ minLength: 1, maxLength: 200 }),
+							{
+								nil: undefined,
+							}
+						),
 					})
 				),
 				(setting: SettingDefinition) => {

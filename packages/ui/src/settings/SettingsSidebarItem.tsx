@@ -4,6 +4,7 @@ import * as Accordion from '@corvu/accordion'
 import { VsChevronRight } from '@repo/icons/vs/VsChevronRight'
 import { VsTextSize } from '@repo/icons/vs/VsTextSize'
 import { cn } from '../utils'
+import { Button } from '../button'
 
 // Icon mapping for category icons
 const iconMap = {
@@ -80,11 +81,13 @@ export const SettingsSidebarItem: Component<SettingsSidebarItemProps> = (
 		}
 	})
 
+	// ...
+
 	const itemClass = () =>
 		cn(
-			'group flex w-full items-center justify-between gap-2 text-left text-sm',
-			'py-1 pr-2.5',
-			'border-l-2 border-transparent',
+			'group w-full justify-between gap-2 text-left text-sm',
+			'h-auto py-1 pr-2.5', // Override button height/padding
+			'border-l-2 border-transparent rounded-none', // Sidebar styling
 			'transition-colors',
 			'text-foreground/80 hover:bg-muted/50 hover:text-foreground',
 			// Only highlight the exact selected item due to user request
@@ -97,16 +100,16 @@ export const SettingsSidebarItem: Component<SettingsSidebarItemProps> = (
 		<Show
 			when={hasChildren()}
 			fallback={
-				<button
-					type="button"
+				<Button
 					onClick={() => props.onCategorySelect(fullId())}
+					variant="ghost"
 					class={itemClass()}
 				>
 					<div class="flex items-center gap-2">
 						{renderIcon()}
 						<span class="truncate">{props.category.label}</span>
 					</div>
-				</button>
+				</Button>
 			}
 		>
 			<Accordion.Root
