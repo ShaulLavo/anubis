@@ -186,48 +186,50 @@ const VfsPathResultsTable = (props: { data: ScenarioState[] }) => {
 	})
 
 	return (
-		<div>
-			<Table class="text-left text-sm text-foreground">
-				<TableHeader>
-					<For each={table.getHeaderGroups()}>
-						{(headerGroup) => (
-							<TableRow class="bg-muted/50 border-b border-border">
-								<For each={headerGroup.headers}>
-									{(header) => (
-										<TableHead class="px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">
-											{header.isPlaceholder
-												? null
-												: flexRender(
-														header.column.columnDef.header,
-														header.getContext()
-													)}
-										</TableHead>
-									)}
-								</For>
-							</TableRow>
-						)}
-					</For>
-				</TableHeader>
-				<TableBody class="divide-y divide-border">
-					<For each={table.getRowModel().rows}>
-						{(row) => (
-							<TableRow class="hover:bg-muted/50 transition-colors">
-								<For each={row.getVisibleCells()}>
-									{(cell) => (
-										<TableCell class="px-4 py-3">
-											{flexRender(
-												cell.column.columnDef.cell,
-												cell.getContext()
-											)}
-										</TableCell>
-									)}
-								</For>
-							</TableRow>
-						)}
-					</For>
-				</TableBody>
-			</Table>
-			<div class="px-4 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
+		<div class="flex flex-col flex-1 min-h-0">
+			<div class="flex-1 overflow-auto min-h-0">
+				<Table class="text-left text-sm text-foreground relative">
+					<TableHeader class="sticky top-0 z-10 bg-card shadow-sm">
+						<For each={table.getHeaderGroups()}>
+							{(headerGroup) => (
+								<TableRow class="bg-muted/50 border-b border-border hover:bg-muted/50">
+									<For each={headerGroup.headers}>
+										{(header) => (
+											<TableHead class="px-4 py-3 font-medium text-muted-foreground whitespace-nowrap bg-card">
+												{header.isPlaceholder
+													? null
+													: flexRender(
+															header.column.columnDef.header,
+															header.getContext()
+														)}
+											</TableHead>
+										)}
+									</For>
+								</TableRow>
+							)}
+						</For>
+					</TableHeader>
+					<TableBody class="divide-y divide-border">
+						<For each={table.getRowModel().rows}>
+							{(row) => (
+								<TableRow class="hover:bg-muted/50 transition-colors">
+									<For each={row.getVisibleCells()}>
+										{(cell) => (
+											<TableCell class="px-4 py-3">
+												{flexRender(
+													cell.column.columnDef.cell,
+													cell.getContext()
+												)}
+											</TableCell>
+										)}
+									</For>
+								</TableRow>
+							)}
+						</For>
+					</TableBody>
+				</Table>
+			</div>
+			<div class="px-4 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground flex items-center justify-between shrink-0">
 				<span>
 					Showing{' '}
 					{table.getState().pagination.pageIndex *
@@ -389,9 +391,9 @@ export const VfsPathBenchDashboard = () => {
 		scenarioStates().filter((s) => s.status === 'complete').length
 
 	return (
-		<div class="min-h-screen bg-background text-foreground font-sans selection:bg-primary/30">
+		<div class="h-screen flex flex-col overflow-hidden bg-background text-foreground font-sans selection:bg-primary/30">
 			{/* Header */}
-			<header class="border-b border-border bg-card">
+			<header class="border-b border-border bg-card shrink-0">
 				<div class="max-w-6xl mx-auto px-6 py-6">
 					<Flex justifyContent="between">
 						<div>
@@ -429,12 +431,12 @@ export const VfsPathBenchDashboard = () => {
 				</div>
 			</header>
 
-			<main class="max-w-6xl mx-auto px-6 py-6">
+			<main class="flex-1 flex flex-col min-h-0 w-full max-w-6xl mx-auto px-6 py-6">
 				{/* Error */}
 				<Show when={error()}>
 					<Alert
 						variant="destructive"
-						class="mb-6 bg-rose-500/10 border-rose-500/20"
+						class="mb-6 bg-rose-500/10 border-rose-500/20 shrink-0"
 					>
 						<AlertDescription>{error()}</AlertDescription>
 					</Alert>
@@ -442,7 +444,7 @@ export const VfsPathBenchDashboard = () => {
 
 				{/* Progress */}
 				<Show when={progress()}>
-					<div class="mb-6">
+					<div class="mb-6 shrink-0">
 						<div class="flex items-center justify-between text-sm text-muted-foreground mb-2">
 							<span>
 								{progress()!.current} / {progress()!.total} scenarios
@@ -466,9 +468,9 @@ export const VfsPathBenchDashboard = () => {
 
 				{/* Results Table */}
 				<Show when={scenarioStates().length > 0}>
-					<div class="rounded-lg border border-border overflow-hidden bg-card shadow-sm">
+					<div class="rounded-lg border border-border overflow-hidden bg-card shadow-sm flex flex-col flex-1 min-h-0">
 						<VfsPathResultsTable data={scenarioStates()} />
-						<div class="px-4 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground flex justify-between">
+						<div class="px-4 py-2 bg-muted/30 border-t border-border text-xs text-muted-foreground flex justify-between shrink-0">
 							<span>
 								{completedCount()} of {scenarioStates().length} scenarios
 								complete
@@ -480,7 +482,7 @@ export const VfsPathBenchDashboard = () => {
 
 				{/* Empty State */}
 				<Show when={!running() && scenarioStates().length === 0}>
-					<div class="flex flex-col items-center justify-center py-24 text-center">
+					<div class="flex flex-col items-center justify-center flex-1 text-center">
 						<div class="w-16 h-16 mb-6 rounded-full bg-muted flex items-center justify-center">
 							<svg
 								class="w-8 h-8 text-muted-foreground"
