@@ -59,7 +59,6 @@ export async function* streamChunksWithOverlap(
 				break
 			}
 
-			// Append new data to buffer
 			buffer = concatUint8Arrays(buffer, value)
 
 			while (buffer.length >= chunkSize) {

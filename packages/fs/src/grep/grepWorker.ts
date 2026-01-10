@@ -78,7 +78,6 @@ async function grepFile(task: GrepFileTask): Promise<GrepFileResult> {
 					const lineEnd = findByteForward(chunk, NEWLINE, lineStart)
 					if (lineEnd === chunk.length && !isLast) break
 
-					// Check if this line has any match
 					let hasMatch = false
 					for (const off of validOffsets) {
 						if (off >= lineStart && off < lineEnd) {
@@ -118,7 +117,6 @@ async function grepFile(task: GrepFileTask): Promise<GrepFileResult> {
 
 					const lineInfo = extractLine(chunk, offset, prevChunkLineCount)
 
-					// Context extraction
 					let context = undefined
 					if (
 						options.context ||

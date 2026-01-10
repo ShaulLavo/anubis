@@ -74,7 +74,6 @@ export function findPatternInChunkCaseInsensitive(
 ): number[] {
 	const matches: number[] = []
 
-	// Edge cases
 	if (pattern.length === 0) return matches
 	if (chunk.length < pattern.length) return matches
 	if (startOffset >= chunk.length) return matches

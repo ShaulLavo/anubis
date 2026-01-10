@@ -1,7 +1,3 @@
-/**
- * Line Extractor Tests
- */
-
 import { describe, it, expect } from 'vitest'
 import { extractLine, isBinaryChunk, trimLine } from '../lineExtractor'
 
@@ -19,7 +15,6 @@ describe('extractLine', () => {
 
 	it('extracts line from multi-line chunk', () => {
 		const chunk = encode('line1\nline2\nline3')
-		// Match 'l' in 'line2' - offset 6
 		const result = extractLine(chunk, 6, 0)
 
 		expect(result.lineNumber).toBe(2)

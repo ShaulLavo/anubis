@@ -25,10 +25,6 @@ import { logger } from '@repo/logger'
 
 const log = logger.withTag('fs:grep')
 
-// ============================================================================
-// Configuration
-// ============================================================================
-
 const FILE_TYPES: Record<string, string[]> = {
 	ts: ['*.ts', '*.tsx'],
 	js: ['*.js', '*.jsx', '*.mjs', '*.cjs'],
@@ -73,7 +69,6 @@ export class GrepCoordinator {
 		const workerCount = options.workerCount ?? DEFAULT_WORKER_COUNT
 		await this.#ensureWorkerPool(workerCount)
 
-		// Pre-process options
 		const chunkSize = options.chunkSize ?? DEFAULT_CHUNK_SIZE
 		const searchPaths = options.paths ?? ['']
 		const effectiveOptions = this.#resolveOptions(options)
@@ -86,7 +81,6 @@ export class GrepCoordinator {
 		let reachedLimit = false
 		let nextWorkerIndex = 0
 
-		// Semaphore for limiting concurrent tasks
 		let activeTasks = 0
 		const taskQueue: (() => void)[] = []
 
@@ -109,10 +103,8 @@ export class GrepCoordinator {
 			if (next) next()
 		}
 
-		// Track all pending tasks for final await
 		const pendingTasks: Promise<void>[] = []
 
-		// Process a single file (non-blocking dispatch)
 		const processFile = async (path: string): Promise<void> => {
 			if (reachedLimit) return
 
@@ -128,7 +120,6 @@ export class GrepCoordinator {
 					options: effectiveOptions,
 				}
 
-				// Round-robin worker selection
 				const workerIndex = nextWorkerIndex
 				nextWorkerIndex = (nextWorkerIndex + 1) % this.#workerPool.length
 				const worker = this.#workerPool[workerIndex]!.proxy
@@ -136,10 +127,8 @@ export class GrepCoordinator {
 				const result = await worker.grepFile(task)
 
 				if (!result.error) {
-					// Handle files-with-matches / files-without-match logic
 					if (options.filesWithMatches) {
 						if (result.matchCount && result.matchCount > 0) {
-							// Return a dummy match with just the path
 							allMatches.push({
 								path,
 								lineNumber: 0,
@@ -157,7 +146,6 @@ export class GrepCoordinator {
 							})
 						}
 					} else {
-						// Normal results
 						allMatches.push(...result.matches)
 					}
 
@@ -168,7 +156,7 @@ export class GrepCoordinator {
 				onProgress?.({
 					filesScanned,
 					filesTotal: filesFound,
-					matchesFound: matchesFoundTotal, // Report actual match count
+					matchesFound: matchesFoundTotal,
 					currentFile: result.path,
 				})
 
@@ -185,11 +173,9 @@ export class GrepCoordinator {
 			}
 		}
 
-		// Walk directories and dispatch files immediately
 		for (const searchPath of searchPaths) {
 			if (reachedLimit) break
 
-			// 1. Try to treat as explicit file first
 			try {
 				if (searchPath && searchPath !== '.' && searchPath !== '/') {
 					await this.#fs.getFileHandleForRelative(searchPath, false)
@@ -214,7 +200,6 @@ export class GrepCoordinator {
 
 					if (entry.kind === 'file') {
 						filesFound++
-						// Fire and forget - don't await here!
 						const task = processFile(entry.path)
 						pendingTasks.push(task)
 					}
@@ -224,10 +209,8 @@ export class GrepCoordinator {
 			}
 		}
 
-		// Wait for all tasks to complete
 		await Promise.all(pendingTasks)
 
-		// Final progress update
 		onProgress?.({
 			filesScanned,
 			filesTotal: filesFound,
@@ -262,7 +245,6 @@ export class GrepCoordinator {
 		const patternBytes = textEncoder.encode(options.pattern)
 
 		for (const searchPath of searchPaths) {
-			// 1. Try to treat as explicit file first
 			try {
 				if (searchPath && searchPath !== '.' && searchPath !== '/') {
 					const handle = await this.#fs.getFileHandleForRelative(
@@ -356,7 +338,6 @@ export class GrepCoordinator {
 	}
 
 	#resolveOptions(options: GrepOptions): GrepFileTask['options'] {
-		// Smart case: enable case-insensitive if smartCase is on AND pattern has no uppercase
 		let caseInsensitive = options.caseInsensitive ?? false
 		if (options.smartCase && !options.caseInsensitive) {
 			const hasUppercase = options.pattern !== options.pattern.toLowerCase()
@@ -388,11 +369,10 @@ export class GrepCoordinator {
 			return false
 		}
 
-		if (entry.kind === 'directory') return true // Recurse into all dirs unless hidden
+		if (entry.kind === 'directory') return true
 
 		const name = entry.name
 
-		// 1. Check exclude patterns
 		if (
 			options.excludePatterns &&
 			this.#matchesPattern(name, options.excludePatterns)
@@ -400,7 +380,6 @@ export class GrepCoordinator {
 			return false
 		}
 
-		// 2. Check type exclusions
 		if (options.typeNot) {
 			const typePatterns = FILE_TYPES[options.typeNot]
 			if (typePatterns && this.#matchesPattern(name, typePatterns)) {
@@ -408,15 +387,12 @@ export class GrepCoordinator {
 			}
 		}
 
-		// 3. Check include patterns (whitelisting)
-		// If includePatterns are present, file must match at least one
 		let matchedInclude = true
 		if (options.includePatterns && options.includePatterns.length > 0) {
 			matchedInclude = this.#matchesPattern(name, options.includePatterns)
 		}
 		if (!matchedInclude) return false
 
-		// 4. Check type inclusions
 		if (options.type) {
 			const typePatterns = FILE_TYPES[options.type]
 			if (typePatterns) {

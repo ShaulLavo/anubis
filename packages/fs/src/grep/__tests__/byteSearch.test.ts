@@ -1,7 +1,3 @@
-/**
- * Byte Search Tests
- */
-
 import { describe, it, expect } from 'vitest'
 import {
 	findPatternInChunk,
@@ -126,7 +122,6 @@ describe('countByte', () => {
 
 	it('counts within range', () => {
 		const chunk = encode('a\nb\nc\nd\n')
-		// Count newlines from index 0 to 4 (exclusive)
 		expect(countByte(chunk, 0x0a, 0, 4)).toBe(2)
 	})
 
