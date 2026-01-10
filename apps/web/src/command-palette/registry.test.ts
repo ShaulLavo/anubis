@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import * as fc from 'fast-check'
-import { createCommandPaletteRegistry, resetCommandPaletteRegistry } from './registry'
+import {
+	createCommandPaletteRegistry,
+	resetCommandPaletteRegistry,
+} from './registry'
 import { registerBuiltinCommands } from './builtinCommands'
 import type { CommandDescriptor, CommandCategory } from './types'
 
@@ -16,7 +19,7 @@ describe('CommandPaletteRegistry', () => {
 	/**
 	 * **Feature: command-palette, Property 2: Command Registration Uniqueness**
 	 * **Validates: Requirements 4.4**
-	 * 
+	 *
 	 * For any two commands with the same id, registering the second command SHALL throw an error.
 	 */
 	it('property: command registration uniqueness', () => {
@@ -26,7 +29,13 @@ describe('CommandPaletteRegistry', () => {
 				fc.record({
 					id: fc.string({ minLength: 1 }),
 					label: fc.string({ minLength: 1 }),
-					category: fc.constantFrom('File', 'View', 'Editor', 'Navigation', 'General') as fc.Arbitrary<CommandCategory>,
+					category: fc.constantFrom(
+						'File',
+						'View',
+						'Editor',
+						'Navigation',
+						'General'
+					) as fc.Arbitrary<CommandCategory>,
 					shortcut: fc.option(fc.string(), { nil: undefined }),
 				}),
 				(commandData) => {
@@ -60,8 +69,8 @@ describe('CommandPaletteRegistry', () => {
 	/**
 	 * **Feature: command-palette, Property 3: Command Registration Round-Trip**
 	 * **Validates: Requirements 4.1, 4.2, 4.3**
-	 * 
-	 * For any valid CommandDescriptor, after registering it with the registry, 
+	 *
+	 * For any valid CommandDescriptor, after registering it with the registry,
 	 * calling getAll() SHALL return a list containing a command with matching properties.
 	 */
 	it('property: command registration round-trip', () => {
@@ -71,7 +80,13 @@ describe('CommandPaletteRegistry', () => {
 				fc.record({
 					id: fc.string({ minLength: 1 }),
 					label: fc.string({ minLength: 1 }),
-					category: fc.constantFrom('File', 'View', 'Editor', 'Navigation', 'General') as fc.Arbitrary<CommandCategory>,
+					category: fc.constantFrom(
+						'File',
+						'View',
+						'Editor',
+						'Navigation',
+						'General'
+					) as fc.Arbitrary<CommandCategory>,
 					shortcut: fc.option(fc.string(), { nil: undefined }),
 				}),
 				(commandData) => {
@@ -92,7 +107,7 @@ describe('CommandPaletteRegistry', () => {
 
 					// Verify it appears in getAll()
 					const allCommands2 = registry.getAll()
-					const foundCommand = allCommands2.find(c => c.id === command.id)
+					const foundCommand = allCommands2.find((c) => c.id === command.id)
 
 					expect(foundCommand).toBeDefined()
 					expect(foundCommand!.id).toBe(command.id)
@@ -109,8 +124,8 @@ describe('CommandPaletteRegistry', () => {
 	/**
 	 * **Feature: command-palette, Property 4: Command Unregistration**
 	 * **Validates: Requirements 4.5**
-	 * 
-	 * For any registered command id, after calling unregister(id), 
+	 *
+	 * For any registered command id, after calling unregister(id),
 	 * the command SHALL NOT appear in getAll() results.
 	 */
 	it('property: command unregistration', () => {
@@ -120,7 +135,13 @@ describe('CommandPaletteRegistry', () => {
 				fc.record({
 					id: fc.string({ minLength: 1 }),
 					label: fc.string({ minLength: 1 }),
-					category: fc.constantFrom('File', 'View', 'Editor', 'Navigation', 'General') as fc.Arbitrary<CommandCategory>,
+					category: fc.constantFrom(
+						'File',
+						'View',
+						'Editor',
+						'Navigation',
+						'General'
+					) as fc.Arbitrary<CommandCategory>,
 					shortcut: fc.option(fc.string(), { nil: undefined }),
 				}),
 				(commandData) => {
@@ -140,14 +161,14 @@ describe('CommandPaletteRegistry', () => {
 
 					// Verify it's registered
 					let allCommands2 = registry.getAll()
-					expect(allCommands2.some(c => c.id === command.id)).toBe(true)
+					expect(allCommands2.some((c) => c.id === command.id)).toBe(true)
 
 					// Unregister the command
 					registry.unregister(command.id)
 
 					// Verify it's no longer in the registry
 					allCommands2 = registry.getAll()
-					expect(allCommands2.some(c => c.id === command.id)).toBe(false)
+					expect(allCommands2.some((c) => c.id === command.id)).toBe(false)
 				}
 			),
 			{ numRuns: 100 }
@@ -164,20 +185,20 @@ describe('CommandPaletteRegistry', () => {
 
 		// Verify commands are registered
 		const allCommands = registry.getAll()
-		
+
 		// Should have all expected built-in commands
 		const expectedCommands = [
 			'theme.toggle',
-			'fileTree.pickFolder', 
+			'fileTree.pickFolder',
 			'fileTree.collapseAll',
 			'focus.editor',
 			'focus.terminal',
 			'focus.fileTree',
-			'file.save'
+			'file.save',
 		]
 
 		for (const expectedId of expectedCommands) {
-			const command = allCommands.find(c => c.id === expectedId)
+			const command = allCommands.find((c) => c.id === expectedId)
 			expect(command).toBeDefined()
 			expect(command!.label).toBeTruthy()
 			expect(command!.category).toBeTruthy()
@@ -190,7 +211,9 @@ describe('CommandPaletteRegistry', () => {
 		// Verify commands are unregistered
 		const commandsAfterCleanup = registry.getAll()
 		for (const expectedId of expectedCommands) {
-			expect(commandsAfterCleanup.find(c => c.id === expectedId)).toBeUndefined()
+			expect(
+				commandsAfterCleanup.find((c) => c.id === expectedId)
+			).toBeUndefined()
 		}
 	})
 })

@@ -1,4 +1,9 @@
-export type CommandCategory = 'File' | 'View' | 'Editor' | 'Navigation' | 'General'
+export type CommandCategory =
+	| 'File'
+	| 'View'
+	| 'Editor'
+	| 'Navigation'
+	| 'General'
 
 export interface CommandDescriptor {
 	id: string

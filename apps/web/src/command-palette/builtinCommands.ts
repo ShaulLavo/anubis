@@ -3,17 +3,19 @@ import type { CommandDescriptor, CommandPaletteRegistry } from './types'
 /**
  * Registers all built-in commands with the command palette registry.
  * This includes theme commands, file tree commands, focus commands, save commands, and settings commands.
- * 
+ *
  * Note: This function should be called within a SolidJS component context
  * where hooks like useTheme, useFs, and useFocusManager are available.
  */
-export function registerBuiltinCommands(registry: CommandPaletteRegistry): () => void {
+export function registerBuiltinCommands(
+	registry: CommandPaletteRegistry
+): () => void {
 	const unregisterFunctions: Array<() => void> = []
 
 	// Theme commands
 	unregisterFunctions.push(registerThemeCommands(registry))
 
-	// File tree commands  
+	// File tree commands
 	unregisterFunctions.push(registerFileTreeCommands(registry))
 
 	// Focus commands
@@ -27,7 +29,7 @@ export function registerBuiltinCommands(registry: CommandPaletteRegistry): () =>
 
 	// Return function to unregister all commands
 	return () => {
-		unregisterFunctions.forEach(fn => fn())
+		unregisterFunctions.forEach((fn) => fn())
 	}
 }
 
@@ -44,18 +46,18 @@ function registerThemeCommands(registry: CommandPaletteRegistry): () => void {
 			// Dynamic import to avoid issues in test environment
 			const { useTheme } = await import('@repo/theme')
 			const { mode, setMode } = useTheme()
-			
+
 			// Get current mode with fallback
 			const currentMode = mode() || 'light'
 			const modes = ['light', 'dark', 'system'] as const
-			const currentIndex = modes.indexOf(currentMode as typeof modes[number])
-			
+			const currentIndex = modes.indexOf(currentMode as (typeof modes)[number])
+
 			// Calculate next mode (with fallback to light if not found)
 			const safeIndex = currentIndex === -1 ? 0 : currentIndex
 			const nextMode = modes[(safeIndex + 1) % modes.length]!
-			
+
 			setMode(nextMode)
-		}
+		},
 	}
 
 	return registry.register(toggleThemeCommand)
@@ -64,7 +66,9 @@ function registerThemeCommands(registry: CommandPaletteRegistry): () => void {
 /**
  * Registers file tree related commands
  */
-function registerFileTreeCommands(registry: CommandPaletteRegistry): () => void {
+function registerFileTreeCommands(
+	registry: CommandPaletteRegistry
+): () => void {
 	const unregisterFunctions: Array<() => void> = []
 
 	const pickFolderCommand: CommandDescriptor = {
@@ -76,7 +80,7 @@ function registerFileTreeCommands(registry: CommandPaletteRegistry): () => void 
 			const { useFs } = await import('../fs/context/FsContext')
 			const [, actions] = useFs()
 			await actions.pickNewRoot()
-		}
+		},
 	}
 
 	const collapseAllCommand: CommandDescriptor = {
@@ -88,14 +92,14 @@ function registerFileTreeCommands(registry: CommandPaletteRegistry): () => void 
 			const { useFs } = await import('../fs/context/FsContext')
 			const [, actions] = useFs()
 			actions.collapseAll()
-		}
+		},
 	}
 
 	unregisterFunctions.push(registry.register(pickFolderCommand))
 	unregisterFunctions.push(registry.register(collapseAllCommand))
 
 	return () => {
-		unregisterFunctions.forEach(fn => fn())
+		unregisterFunctions.forEach((fn) => fn())
 	}
 }
 
@@ -114,7 +118,7 @@ function registerFocusCommands(registry: CommandPaletteRegistry): () => void {
 			const { useFocusManager } = await import('../focus/focusManager')
 			const focusManager = useFocusManager()
 			focusManager.setActiveArea('editor')
-		}
+		},
 	}
 
 	const focusTerminalCommand: CommandDescriptor = {
@@ -126,7 +130,7 @@ function registerFocusCommands(registry: CommandPaletteRegistry): () => void {
 			const { useFocusManager } = await import('../focus/focusManager')
 			const focusManager = useFocusManager()
 			focusManager.setActiveArea('terminal')
-		}
+		},
 	}
 
 	const focusFileTreeCommand: CommandDescriptor = {
@@ -138,7 +142,7 @@ function registerFocusCommands(registry: CommandPaletteRegistry): () => void {
 			const { useFocusManager } = await import('../focus/focusManager')
 			const focusManager = useFocusManager()
 			focusManager.setActiveArea('fileTree')
-		}
+		},
 	}
 
 	unregisterFunctions.push(registry.register(focusEditorCommand))
@@ -146,7 +150,7 @@ function registerFocusCommands(registry: CommandPaletteRegistry): () => void {
 	unregisterFunctions.push(registry.register(focusFileTreeCommand))
 
 	return () => {
-		unregisterFunctions.forEach(fn => fn())
+		unregisterFunctions.forEach((fn) => fn())
 	}
 }
 
@@ -164,7 +168,7 @@ function registerSaveCommand(registry: CommandPaletteRegistry): () => void {
 			const { useFs } = await import('../fs/context/FsContext')
 			const [, actions] = useFs()
 			await actions.saveFile()
-		}
+		},
 	}
 
 	return registry.register(saveFileCommand)
@@ -173,7 +177,9 @@ function registerSaveCommand(registry: CommandPaletteRegistry): () => void {
 /**
  * Registers settings-related commands
  */
-function registerSettingsCommands(registry: CommandPaletteRegistry): () => void {
+function registerSettingsCommands(
+	registry: CommandPaletteRegistry
+): () => void {
 	const unregisterFunctions: Array<() => void> = []
 
 	const openSettingsCommand: CommandDescriptor = {
@@ -183,10 +189,11 @@ function registerSettingsCommands(registry: CommandPaletteRegistry): () => void 
 		shortcut: '⌘,',
 		handler: async () => {
 			// Dynamic import to avoid issues in test environment
-			const { useSettingsIntegration } = await import('../settings/hooks/useSettingsIntegration')
+			const { useSettingsIntegration } =
+				await import('../settings/hooks/useSettingsIntegration')
 			const { openSettings } = useSettingsIntegration()
 			await openSettings()
-		}
+		},
 	}
 
 	const openSettingsJSONCommand: CommandDescriptor = {
@@ -195,16 +202,17 @@ function registerSettingsCommands(registry: CommandPaletteRegistry): () => void 
 		category: 'View',
 		handler: async () => {
 			// Dynamic import to avoid issues in test environment
-			const { useSettingsIntegration } = await import('../settings/hooks/useSettingsIntegration')
+			const { useSettingsIntegration } =
+				await import('../settings/hooks/useSettingsIntegration')
 			const { openJSONView } = useSettingsIntegration()
 			await openJSONView()
-		}
+		},
 	}
 
 	unregisterFunctions.push(registry.register(openSettingsCommand))
 	unregisterFunctions.push(registry.register(openSettingsJSONCommand))
 
 	return () => {
-		unregisterFunctions.forEach(fn => fn())
+		unregisterFunctions.forEach((fn) => fn())
 	}
 }

@@ -3,10 +3,10 @@ import type { PaletteActions } from './useCommandPalette'
 
 /**
  * Registers command palette keyboard shortcuts with the KeymapController
- * 
+ *
  * Shortcuts:
  * - Cmd/Ctrl+P: Open palette in file mode
- * - Cmd/Ctrl+K: Open palette in file mode  
+ * - Cmd/Ctrl+K: Open palette in file mode
  * - Cmd/Ctrl+Shift+P: Open palette in command mode
  * - Escape: Close palette (when open)
  */
@@ -21,7 +21,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.open-file-mode-meta-p',
 		options: {
 			preventDefault: true,
-		}
+		},
 	})
 
 	const ctrlPBinding = controller.registerKeybinding({
@@ -29,7 +29,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.open-file-mode-ctrl-p',
 		options: {
 			preventDefault: true,
-		}
+		},
 	})
 
 	const cmdKBinding = controller.registerKeybinding({
@@ -37,7 +37,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.open-file-mode-meta-k',
 		options: {
 			preventDefault: true,
-		}
+		},
 	})
 
 	const ctrlKBinding = controller.registerKeybinding({
@@ -45,7 +45,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.open-file-mode-ctrl-k',
 		options: {
 			preventDefault: true,
-		}
+		},
 	})
 
 	const cmdShiftPBinding = controller.registerKeybinding({
@@ -53,7 +53,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.open-command-mode-meta-shift-p',
 		options: {
 			preventDefault: true,
-		}
+		},
 	})
 
 	const ctrlShiftPBinding = controller.registerKeybinding({
@@ -61,7 +61,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.open-command-mode-ctrl-shift-p',
 		options: {
 			preventDefault: true,
-		}
+		},
 	})
 
 	const escapeBinding = controller.registerKeybinding({
@@ -69,7 +69,7 @@ export function registerCommandPaletteShortcuts(
 		id: 'command-palette.close',
 		options: {
 			preventDefault: false, // Don't prevent default for escape - let other handlers run too
-		}
+		},
 	})
 
 	// Register commands for opening palette in file mode

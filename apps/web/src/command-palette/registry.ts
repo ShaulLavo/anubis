@@ -30,9 +30,10 @@ class CommandPaletteRegistryImpl implements CommandPaletteRegistry {
 		}
 
 		const lowerQuery = query.toLowerCase()
-		return this.getAll().filter(command => 
-			command.label.toLowerCase().includes(lowerQuery) ||
-			command.category.toLowerCase().includes(lowerQuery)
+		return this.getAll().filter(
+			(command) =>
+				command.label.toLowerCase().includes(lowerQuery) ||
+				command.category.toLowerCase().includes(lowerQuery)
 		)
 	}
 
@@ -70,7 +71,9 @@ export function createCommandPaletteRegistry(): CommandPaletteRegistry {
 
 export function getCommandPaletteRegistry(): CommandPaletteRegistry {
 	if (!registryInstance) {
-		throw new Error('CommandPaletteRegistry not initialized. Call createCommandPaletteRegistry() first.')
+		throw new Error(
+			'CommandPaletteRegistry not initialized. Call createCommandPaletteRegistry() first.'
+		)
 	}
 	return registryInstance
 }
