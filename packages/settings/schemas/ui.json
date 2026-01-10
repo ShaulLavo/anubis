@@ -17,6 +17,21 @@
                     "description": "Controls the font family for the entire user interface."
                 }
             ]
+        },
+        {
+            "id": "fileSelection",
+            "label": "File Selection",
+            "settings": [
+                {
+                    "id": "animation",
+                    "default": "blur",
+                    "options": [
+                        "blur",
+                        "none"
+                    ],
+                    "description": "Controls the animation when selecting files."
+                }
+            ]
         }
     ]
 }

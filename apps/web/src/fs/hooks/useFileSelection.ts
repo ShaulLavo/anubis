@@ -22,6 +22,7 @@ import type { FileCacheController } from '../cache/fileCacheController'
 import { parseBufferWithTreeSitter } from '../../treeSitter/workerClient'
 import { viewTransitionBatched } from '@repo/utils/viewTransition'
 import { toast } from '@repo/ui/toaster'
+import { useSettings } from '~/settings/SettingsProvider'
 
 const textDecoder = new TextDecoder()
 
@@ -36,8 +37,6 @@ export const enum FileSelectionAnimation {
 	Blur = 'blur',
 	None = 'none',
 }
-
-const CURRENT_ANIMATION = FileSelectionAnimation.Blur as FileSelectionAnimation
 
 type UseFileSelectionOptions = {
 	state: FsState
@@ -62,7 +61,24 @@ export const useFileSelection = ({
 	setDirtyPath,
 	fileCache,
 }: UseFileSelectionOptions) => {
+	const [settingsState] = useSettings()
 	let selectRequestId = 0
+	const getSelectionAnimation = (): FileSelectionAnimation => {
+		const selectionAnimationValue =
+			settingsState.values['ui.fileSelection.animation']
+		const selectionAnimationDefault =
+			settingsState.defaults['ui.fileSelection.animation']
+		const resolvedSelectionAnimation =
+			(selectionAnimationValue ?? selectionAnimationDefault) as
+				| string
+				| undefined
+
+		if (resolvedSelectionAnimation === FileSelectionAnimation.None) {
+			return FileSelectionAnimation.None
+		}
+
+		return FileSelectionAnimation.Blur
+	}
 
 	const handleReadError = (error: unknown) => {
 		if (error instanceof DOMException && error.name === 'AbortError') return
@@ -265,11 +281,13 @@ export const useFileSelection = ({
 							}
 						}
 
-						if (CURRENT_ANIMATION === FileSelectionAnimation.Blur) {
-							viewTransitionBatched(updateState)
-						} else {
+						const selectionAnimation = getSelectionAnimation()
+						if (selectionAnimation !== FileSelectionAnimation.Blur) {
 							batch(updateState)
+							return
 						}
+
+						viewTransitionBatched(updateState)
 					})
 				},
 				{
