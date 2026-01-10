@@ -31,6 +31,8 @@ export function findPatternInChunk(
 ): number[] {
 	const matches: number[] = []
 
+	if (pattern.length === 0) return matches
+
 	const firstByte = pattern[0]!
 	const patternLen = pattern.length
 	const searchEnd = chunk.length - patternLen + 1

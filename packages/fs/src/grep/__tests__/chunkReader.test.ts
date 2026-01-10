@@ -23,14 +23,17 @@ describe('chunkReader', () => {
 			chunks.push(chunk)
 		}
 
-		expect(chunks.length).toBe(3)
+		expect(chunks.length).toBe(4)
 		expect(chunks[0]!.chunk).toEqual(
 			new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 		)
 		expect(chunks[1]!.chunk).toEqual(
+			new Uint8Array([5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+		)
+		expect(chunks[2]!.chunk).toEqual(
 			new Uint8Array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
 		)
-		expect(chunks[2]!.chunk).toEqual(new Uint8Array([15, 16, 17, 18, 19]))
+		expect(chunks[3]!.chunk).toEqual(new Uint8Array([15, 16, 17, 18, 19]))
 	})
 
 	it('should prevent infinite loop by clamping overlapSize', async () => {
@@ -57,15 +60,15 @@ describe('chunkReader', () => {
 			if (count > 100) throw new Error('Infinite loop detected')
 		}
 
-		expect(chunks.length).toBe(3)
+		expect(chunks.length).toBe(12)
 		expect(chunks[0]!.chunk).toEqual(
 			new Uint8Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
 		)
 		expect(chunks[1]!.chunk).toEqual(
-			new Uint8Array([10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+			new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
 		)
 		expect(chunks[2]!.chunk).toEqual(
-			new Uint8Array([11, 12, 13, 14, 15, 16, 17, 18, 19])
+			new Uint8Array([2, 3, 4, 5, 6, 7, 8, 9, 10, 11])
 		)
 	})
 })
