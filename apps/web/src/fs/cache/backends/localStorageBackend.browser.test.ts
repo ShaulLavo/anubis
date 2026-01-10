@@ -3,14 +3,26 @@ import * as fc from 'fast-check'
 import { createLocalStorageBackend } from './localStorageBackend'
 import type { FileCacheEntry } from '../fileCacheController'
 
-// Mock localStorage for test environment
+// Mock localStorage for test environment with actual storage behavior
+const mockStorage = new Map<string, string>()
 const mockLocalStorage = {
-	getItem: vi.fn(),
-	setItem: vi.fn(),
-	removeItem: vi.fn(),
-	clear: vi.fn(),
-	length: 0,
-	key: vi.fn(),
+	getItem: vi.fn((key: string) => mockStorage.get(key) || null),
+	setItem: vi.fn((key: string, value: string) => {
+		mockStorage.set(key, value)
+	}),
+	removeItem: vi.fn((key: string) => {
+		mockStorage.delete(key)
+	}),
+	clear: vi.fn(() => {
+		mockStorage.clear()
+	}),
+	get length() {
+		return mockStorage.size
+	},
+	key: vi.fn((index: number) => {
+		const keys = Array.from(mockStorage.keys())
+		return keys[index] || null
+	}),
 }
 
 Object.defineProperty(global, 'localStorage', {
@@ -21,12 +33,12 @@ Object.defineProperty(global, 'localStorage', {
 describe('LocalStorageBackend Browser Tests', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
-		mockLocalStorage.clear()
+		mockStorage.clear()
 	})
 
 	afterEach(() => {
 		vi.clearAllMocks()
-		mockLocalStorage.clear()
+		mockStorage.clear()
 	})
 
 	/**
