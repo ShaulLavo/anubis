@@ -34,13 +34,17 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 
 		this.originalLoadDirectory = originalLoader
 		this.callbacks = options.callbacks
-		
+
 		// Initialize cache controller with error handling
 		try {
-			this.cacheController = options.cacheController ?? new TreeCacheController()
+			this.cacheController =
+				options.cacheController ?? new TreeCacheController()
 			cacheLogger.debug('CachedPrefetchQueue initialized with caching enabled')
 		} catch (error) {
-			cacheLogger.warn('Cache initialization failed, continuing in cache-disabled mode', { error })
+			cacheLogger.warn(
+				'Cache initialization failed, continuing in cache-disabled mode',
+				{ error }
+			)
 			// Create a fallback cache controller that always returns null/does nothing
 			this.cacheController = this.createFallbackCacheController()
 		}
@@ -92,17 +96,17 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 				totalEntries: 0,
 				estimatedSizeBytes: 0,
 				oldestEntry: 0,
-				newestEntry: 0
+				newestEntry: 0,
 			}),
 			validateCacheIntegrity: async () => ({
 				validEntries: 0,
 				corruptedEntries: 0,
 				repairedEntries: 0,
-				issues: []
+				issues: [],
 			}),
 			compactCache: async () => ({
 				removedEntries: 0,
-				spaceSaved: 0
+				spaceSaved: 0,
 			}),
 		} as any
 	}
@@ -206,13 +210,13 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 		try {
 			// First, try to get cached data for immediate display
 			let cachedNode: FsDirTreeNode | null = null
-			
+
 			try {
 				cachedNode = await this.cacheController.getCachedDirectory(target.path)
 			} catch (error) {
 				cacheLogger.warn('Cache read failed, falling back to filesystem', {
 					path: target.path,
-					error
+					error,
 				})
 				// Continue with filesystem fallback - don't throw
 			}
@@ -251,10 +255,13 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 					freshNode
 				)
 			} catch (error) {
-				cacheLogger.warn('Failed to cache fresh data, continuing without caching', {
-					path: target.path,
-					error
-				})
+				cacheLogger.warn(
+					'Failed to cache fresh data, continuing without caching',
+					{
+						path: target.path,
+						error,
+					}
+				)
 				// Continue without caching - don't throw
 			}
 
@@ -267,11 +274,14 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 
 			return freshNode
 		} catch (error) {
-			cacheLogger.warn('Failed to load directory with cache, attempting direct filesystem load', {
-				path: target.path,
-				error,
-			})
-			
+			cacheLogger.warn(
+				'Failed to load directory with cache, attempting direct filesystem load',
+				{
+					path: target.path,
+					error,
+				}
+			)
+
 			// Final fallback - try direct filesystem load without any caching
 			try {
 				return await this.originalLoadDirectory(target)
@@ -279,7 +289,7 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 				cacheLogger.error('All loading methods failed', {
 					path: target.path,
 					originalError: error,
-					fallbackError
+					fallbackError,
 				})
 				throw fallbackError
 			}
@@ -495,34 +505,49 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 	 * Load directory with lazy loading support for large directories
 	 */
 	async loadDirectoryLazy(
-		target: PrefetchTarget, 
+		target: PrefetchTarget,
 		maxChildrenToLoad: number = 100,
-		onProgress?: (progress: { completed: number; total: number; currentOperation: string }) => void
+		onProgress?: (progress: {
+			completed: number
+			total: number
+			currentOperation: string
+		}) => void
 	): Promise<FsDirTreeNode | undefined> {
 		const startTime = performance.now()
 
 		try {
-			onProgress?.({ completed: 0, total: 3, currentOperation: 'Checking cache...' })
-			
+			onProgress?.({
+				completed: 0,
+				total: 3,
+				currentOperation: 'Checking cache...',
+			})
+
 			// First, try to get cached data with lazy loading
 			let cachedNode: FsDirTreeNode | null = null
-			
+
 			try {
-				cachedNode = await this.cacheController.getCachedDirectoryLazy(target.path, maxChildrenToLoad)
+				cachedNode = await this.cacheController.getCachedDirectoryLazy(
+					target.path,
+					maxChildrenToLoad
+				)
 			} catch (error) {
 				cacheLogger.warn('Lazy cache read failed, falling back to filesystem', {
 					path: target.path,
-					error
+					error,
 				})
 			}
 
 			if (cachedNode) {
-				onProgress?.({ completed: 1, total: 3, currentOperation: 'Displaying cached data...' })
-				
+				onProgress?.({
+					completed: 1,
+					total: 3,
+					currentOperation: 'Displaying cached data...',
+				})
+
 				cacheLogger.debug('Displaying lazily loaded cached data', {
 					path: target.path,
 					childrenCount: cachedNode.children.length,
-					isFullyLoaded: cachedNode.isLoaded
+					isFullyLoaded: cachedNode.isLoaded,
 				})
 
 				// Trigger background validation (don't await)
@@ -535,12 +560,20 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 					})
 				}, 0)
 
-				onProgress?.({ completed: 3, total: 3, currentOperation: 'Lazy loading complete' })
+				onProgress?.({
+					completed: 3,
+					total: 3,
+					currentOperation: 'Lazy loading complete',
+				})
 				return cachedNode
 			}
 
-			onProgress?.({ completed: 1, total: 3, currentOperation: 'Loading from filesystem...' })
-			
+			onProgress?.({
+				completed: 1,
+				total: 3,
+				currentOperation: 'Loading from filesystem...',
+			})
+
 			// No cached data available, perform fresh load
 			const freshNode = await this.originalLoadDirectory(target)
 
@@ -548,7 +581,11 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 				return undefined
 			}
 
-			onProgress?.({ completed: 2, total: 3, currentOperation: 'Caching fresh data...' })
+			onProgress?.({
+				completed: 2,
+				total: 3,
+				currentOperation: 'Caching fresh data...',
+			})
 
 			// Try to cache the fresh data, but don't fail if caching fails
 			try {
@@ -557,10 +594,13 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 					freshNode
 				)
 			} catch (error) {
-				cacheLogger.warn('Failed to cache fresh data, continuing without caching', {
-					path: target.path,
-					error
-				})
+				cacheLogger.warn(
+					'Failed to cache fresh data, continuing without caching',
+					{
+						path: target.path,
+						error,
+					}
+				)
 			}
 
 			const loadTime = performance.now() - startTime
@@ -570,14 +610,18 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 				loadTime,
 			})
 
-			onProgress?.({ completed: 3, total: 3, currentOperation: 'Loading complete' })
+			onProgress?.({
+				completed: 3,
+				total: 3,
+				currentOperation: 'Loading complete',
+			})
 			return freshNode
 		} catch (error) {
 			cacheLogger.warn('Failed to load directory with lazy loading', {
 				path: target.path,
 				error,
 			})
-			
+
 			// Final fallback - try direct filesystem load without any caching
 			try {
 				return await this.originalLoadDirectory(target)
@@ -585,7 +629,7 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 				cacheLogger.error('All loading methods failed', {
 					path: target.path,
 					originalError: error,
-					fallbackError
+					fallbackError,
 				})
 				throw fallbackError
 			}
@@ -596,32 +640,52 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 	 * Load more children for a lazily loaded directory
 	 */
 	async loadMoreChildren(
-		path: string, 
-		currentChildrenCount: number, 
+		path: string,
+		currentChildrenCount: number,
 		batchSize: number = 100,
-		onProgress?: (progress: { completed: number; total: number; currentOperation: string }) => void
+		onProgress?: (progress: {
+			completed: number
+			total: number
+			currentOperation: string
+		}) => void
 	): Promise<FsDirTreeNode | null> {
 		try {
-			onProgress?.({ completed: 0, total: 2, currentOperation: 'Loading more children...' })
-			
-			const updatedNode = await this.cacheController.loadMoreChildren(path, currentChildrenCount, batchSize)
-			
+			onProgress?.({
+				completed: 0,
+				total: 2,
+				currentOperation: 'Loading more children...',
+			})
+
+			const updatedNode = await this.cacheController.loadMoreChildren(
+				path,
+				currentChildrenCount,
+				batchSize
+			)
+
 			if (updatedNode) {
-				onProgress?.({ completed: 1, total: 2, currentOperation: 'Updating UI...' })
-				
+				onProgress?.({
+					completed: 1,
+					total: 2,
+					currentOperation: 'Updating UI...',
+				})
+
 				// Notify UI of the update
 				this.callbacks.onDirectoryLoaded({
 					node: updatedNode,
 				})
-				
+
 				cacheLogger.debug('Loaded more children for directory', {
 					path,
 					newChildrenCount: updatedNode.children.length,
-					isFullyLoaded: updatedNode.isLoaded
+					isFullyLoaded: updatedNode.isLoaded,
 				})
 			}
-			
-			onProgress?.({ completed: 2, total: 2, currentOperation: 'Load more complete' })
+
+			onProgress?.({
+				completed: 2,
+				total: 2,
+				currentOperation: 'Load more complete',
+			})
 			return updatedNode
 		} catch (error) {
 			cacheLogger.warn('Failed to load more children', { path, error })
@@ -636,38 +700,47 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 		operation: 'clear' | 'cleanup' | 'validate' | 'compact',
 		options?: {
 			maxAgeMs?: number
-			onProgress?: (progress: { completed: number; total: number; currentOperation: string; issues?: string[] }) => void
+			onProgress?: (progress: {
+				completed: number
+				total: number
+				currentOperation: string
+				issues?: string[]
+			}) => void
 		}
 	): Promise<any> {
 		const { maxAgeMs = 7 * 24 * 60 * 60 * 1000, onProgress } = options || {}
-		
+
 		try {
 			switch (operation) {
 				case 'clear':
 					await this.cacheController.clearCacheWithProgress(onProgress)
 					cacheLogger.info('Cache cleared successfully')
 					return { success: true, message: 'Cache cleared successfully' }
-					
+
 				case 'cleanup':
 					await this.cacheController.cleanupOldEntries(maxAgeMs, onProgress)
 					cacheLogger.info('Cache cleanup completed')
 					return { success: true, message: 'Cache cleanup completed' }
-					
+
 				case 'validate':
-					const validationResult = await this.cacheController.validateCacheIntegrity(onProgress)
+					const validationResult =
+						await this.cacheController.validateCacheIntegrity(onProgress)
 					cacheLogger.info('Cache validation completed', validationResult)
 					return validationResult
-					
+
 				case 'compact':
-					const compactionResult = await this.cacheController.compactCache(onProgress)
+					const compactionResult =
+						await this.cacheController.compactCache(onProgress)
 					cacheLogger.info('Cache compaction completed', compactionResult)
 					return compactionResult
-					
+
 				default:
 					throw new Error(`Unknown cache management operation: ${operation}`)
 			}
 		} catch (error) {
-			cacheLogger.warn(`Cache management operation '${operation}' failed`, { error })
+			cacheLogger.warn(`Cache management operation '${operation}' failed`, {
+				error,
+			})
 			throw error
 		}
 	}
@@ -677,14 +750,19 @@ export class CachedPrefetchQueue extends PrefetchQueue {
 	 */
 	async getCacheInfo(): Promise<{
 		stats: any
-		size: { totalEntries: number; estimatedSizeBytes: number; oldestEntry: number; newestEntry: number }
+		size: {
+			totalEntries: number
+			estimatedSizeBytes: number
+			oldestEntry: number
+			newestEntry: number
+		}
 	}> {
 		try {
 			const [stats, size] = await Promise.all([
 				this.cacheController.getCacheStats(),
-				this.cacheController.getCacheSize()
+				this.cacheController.getCacheSize(),
 			])
-			
+
 			return { stats, size }
 		} catch (error) {
 			cacheLogger.warn('Failed to get cache info', { error })

@@ -15,7 +15,9 @@ describe('Data Format Compatibility Tests', () => {
 		it('should maintain the same FsDirTreeNode structure for cached and live data', () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping data format compatibility test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping data format compatibility test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -95,11 +97,15 @@ describe('Data Format Compatibility Tests', () => {
 			expect(restoredData.children).toHaveLength(liveData.children.length)
 
 			// Verify file children maintain exact format
-			const restoredReadme = restoredData.children.find(c => c.name === 'README.md')
-			const originalReadme = liveData.children.find(c => c.name === 'README.md')
+			const restoredReadme = restoredData.children.find(
+				(c) => c.name === 'README.md'
+			)
+			const originalReadme = liveData.children.find(
+				(c) => c.name === 'README.md'
+			)
 			expect(restoredReadme).toBeDefined()
 			expect(originalReadme).toBeDefined()
-			
+
 			if (restoredReadme?.kind === 'file' && originalReadme?.kind === 'file') {
 				expect(restoredReadme.size).toBe(originalReadme.size)
 				expect(restoredReadme.lastModified).toBe(originalReadme.lastModified)
@@ -108,11 +114,11 @@ describe('Data Format Compatibility Tests', () => {
 			}
 
 			// Verify directory children maintain exact format
-			const restoredSrc = restoredData.children.find(c => c.name === 'src')
-			const originalSrc = liveData.children.find(c => c.name === 'src')
+			const restoredSrc = restoredData.children.find((c) => c.name === 'src')
+			const originalSrc = liveData.children.find((c) => c.name === 'src')
 			expect(restoredSrc).toBeDefined()
 			expect(originalSrc).toBeDefined()
-			
+
 			if (restoredSrc?.kind === 'dir' && originalSrc?.kind === 'dir') {
 				expect(restoredSrc.isLoaded).toBe(originalSrc.isLoaded)
 				expect(restoredSrc.children).toHaveLength(originalSrc.children.length)
@@ -121,11 +127,13 @@ describe('Data Format Compatibility Tests', () => {
 			}
 
 			// Verify unloaded directories maintain format
-			const restoredTests = restoredData.children.find(c => c.name === 'tests')
-			const originalTests = liveData.children.find(c => c.name === 'tests')
+			const restoredTests = restoredData.children.find(
+				(c) => c.name === 'tests'
+			)
+			const originalTests = liveData.children.find((c) => c.name === 'tests')
 			expect(restoredTests).toBeDefined()
 			expect(originalTests).toBeDefined()
-			
+
 			if (restoredTests?.kind === 'dir' && originalTests?.kind === 'dir') {
 				expect(restoredTests.isLoaded).toBe(originalTests.isLoaded)
 				expect(restoredTests.children).toEqual(originalTests.children)
@@ -135,13 +143,17 @@ describe('Data Format Compatibility Tests', () => {
 		it('should handle property-based testing for data format compatibility', () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping data format compatibility property test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping data format compatibility property test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
 			const validNameArb = fc
 				.string({ minLength: 1, maxLength: 20 })
-				.filter((s) => !s.includes('/') && !s.includes('\0') && s.trim().length > 0)
+				.filter(
+					(s) => !s.includes('/') && !s.includes('\0') && s.trim().length > 0
+				)
 
 			const validPathArb = fc
 				.string({ minLength: 1, maxLength: 50 })
@@ -153,8 +165,12 @@ describe('Data Format Compatibility Tests', () => {
 				path: validPathArb,
 				depth: fc.integer({ min: 0, max: 5 }),
 				parentPath: fc.option(validPathArb, { nil: undefined }),
-				size: fc.option(fc.integer({ min: 0, max: 100000 }), { nil: undefined }),
-				lastModified: fc.option(fc.integer({ min: 0, max: Date.now() }), { nil: undefined }),
+				size: fc.option(fc.integer({ min: 0, max: 100000 }), {
+					nil: undefined,
+				}),
+				lastModified: fc.option(fc.integer({ min: 0, max: Date.now() }), {
+					nil: undefined,
+				}),
 			})
 
 			const dirNodeArb = fc.record({
@@ -176,8 +192,10 @@ describe('Data Format Compatibility Tests', () => {
 
 					try {
 						// Convert to cached format and back
-						const cachedEntry = controllerAny.convertTreeNodeToCached(originalNode)
-						const restoredNode = controllerAny.convertCachedToTreeNode(cachedEntry)
+						const cachedEntry =
+							controllerAny.convertTreeNodeToCached(originalNode)
+						const restoredNode =
+							controllerAny.convertCachedToTreeNode(cachedEntry)
 
 						// Verify all core properties are preserved
 						expect(restoredNode.kind).toBe(originalNode.kind)
@@ -189,7 +207,9 @@ describe('Data Format Compatibility Tests', () => {
 
 						// Verify children array structure
 						expect(Array.isArray(restoredNode.children)).toBe(true)
-						expect(restoredNode.children).toHaveLength(originalNode.children.length)
+						expect(restoredNode.children).toHaveLength(
+							originalNode.children.length
+						)
 
 						// Verify each child maintains format compatibility
 						for (let i = 0; i < originalNode.children.length; i++) {
@@ -206,7 +226,9 @@ describe('Data Format Compatibility Tests', () => {
 								expect(restoredChild.kind).toBe('file')
 								if (restoredChild.kind === 'file') {
 									expect(restoredChild.size).toBe(originalChild.size)
-									expect(restoredChild.lastModified).toBe(originalChild.lastModified)
+									expect(restoredChild.lastModified).toBe(
+										originalChild.lastModified
+									)
 									// Files should not have children or isLoaded properties
 									expect('children' in restoredChild).toBe(false)
 									expect('isLoaded' in restoredChild).toBe(false)
@@ -214,7 +236,9 @@ describe('Data Format Compatibility Tests', () => {
 							} else if (originalChild.kind === 'dir') {
 								expect(restoredChild.kind).toBe('dir')
 								if (restoredChild.kind === 'dir') {
-									expect(restoredChild.isLoaded).toBe(originalChild.isLoaded ?? false)
+									expect(restoredChild.isLoaded).toBe(
+										originalChild.isLoaded ?? false
+									)
 									expect(Array.isArray(restoredChild.children)).toBe(true)
 									// Directories should not have size or lastModified properties
 									expect('size' in restoredChild).toBe(false)
@@ -229,7 +253,11 @@ describe('Data Format Compatibility Tests', () => {
 							return {
 								hasChildren: node.children.length > 0,
 								isDirectory: node.kind === 'dir',
-								pathInfo: { path: node.path, name: node.name, depth: node.depth },
+								pathInfo: {
+									path: node.path,
+									name: node.name,
+									depth: node.depth,
+								},
 							}
 						}
 
@@ -237,9 +265,11 @@ describe('Data Format Compatibility Tests', () => {
 						const restoredResult = testFunction(restoredNode)
 
 						expect(restoredResult).toEqual(originalResult)
-
 					} catch (error) {
-						console.error('Data format compatibility test failed for node:', originalNode)
+						console.error(
+							'Data format compatibility test failed for node:',
+							originalNode
+						)
 						console.error('Error:', error)
 						throw error
 					}
@@ -251,7 +281,9 @@ describe('Data Format Compatibility Tests', () => {
 		it('should preserve optional properties correctly', () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping optional properties test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping optional properties test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -270,7 +302,8 @@ describe('Data Format Compatibility Tests', () => {
 			}
 
 			const cachedMinimal = controllerAny.convertTreeNodeToCached(minimalNode)
-			const restoredMinimal = controllerAny.convertCachedToTreeNode(cachedMinimal)
+			const restoredMinimal =
+				controllerAny.convertCachedToTreeNode(cachedMinimal)
 
 			expect(restoredMinimal.parentPath).toBeUndefined()
 			expect(restoredMinimal.isLoaded).toBe(false) // Should default to false
@@ -311,19 +344,30 @@ describe('Data Format Compatibility Tests', () => {
 			expect(restoredFull.isLoaded).toBe(fullNode.isLoaded)
 
 			// Check file with all properties
-			const fullFile = restoredFull.children.find(c => c.name === 'file-with-all-props.txt')
-			const originalFullFile = fullNode.children.find(c => c.name === 'file-with-all-props.txt')
-			
+			const fullFile = restoredFull.children.find(
+				(c) => c.name === 'file-with-all-props.txt'
+			)
+			const originalFullFile = fullNode.children.find(
+				(c) => c.name === 'file-with-all-props.txt'
+			)
+
 			if (fullFile?.kind === 'file' && originalFullFile?.kind === 'file') {
 				expect(fullFile.size).toBe(originalFullFile.size)
 				expect(fullFile.lastModified).toBe(originalFullFile.lastModified)
 			}
 
 			// Check file with minimal properties
-			const minimalFile = restoredFull.children.find(c => c.name === 'file-minimal.txt')
-			const originalMinimalFile = fullNode.children.find(c => c.name === 'file-minimal.txt')
-			
-			if (minimalFile?.kind === 'file' && originalMinimalFile?.kind === 'file') {
+			const minimalFile = restoredFull.children.find(
+				(c) => c.name === 'file-minimal.txt'
+			)
+			const originalMinimalFile = fullNode.children.find(
+				(c) => c.name === 'file-minimal.txt'
+			)
+
+			if (
+				minimalFile?.kind === 'file' &&
+				originalMinimalFile?.kind === 'file'
+			) {
 				expect(minimalFile.size).toBe(originalMinimalFile.size) // Should be undefined
 				expect(minimalFile.lastModified).toBe(originalMinimalFile.lastModified) // Should be undefined
 			}
@@ -370,9 +414,12 @@ describe('Data Format Compatibility Tests', () => {
 			const processFile = (node: FsDirTreeNode) => {
 				if (node.kind === 'dir') {
 					// Find a file child to process
-					const fileChild = node.children.find(child => child.kind === 'file')
+					const fileChild = node.children.find((child) => child.kind === 'file')
 					if (fileChild && fileChild.kind === 'file') {
-						return { size: fileChild.size, lastModified: fileChild.lastModified }
+						return {
+							size: fileChild.size,
+							lastModified: fileChild.lastModified,
+						}
 					}
 				}
 				return null
@@ -387,8 +434,10 @@ describe('Data Format Compatibility Tests', () => {
 
 			// All these operations should work identically with cached and original data
 			expect(processNode(restored)).toBe(processNode(testNode))
-			expect(processChildren(restored.children)).toBe(processChildren(testNode.children))
-			
+			expect(processChildren(restored.children)).toBe(
+				processChildren(testNode.children)
+			)
+
 			const restoredFileInfo = processFile(restored)
 			const originalFileInfo = processFile(testNode)
 			expect(restoredFileInfo).toEqual(originalFileInfo)
@@ -402,7 +451,7 @@ describe('Data Format Compatibility Tests', () => {
 
 /**
  * **Feature: persistent-tree-cache, Property 25: Data format compatibility**
- * 
+ *
  * This test validates that cached directory data maintains the exact same structure
  * and format as live filesystem data. The FsDirTreeNode interface should be
  * preserved completely, allowing cached data to be used interchangeably with

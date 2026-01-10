@@ -1,12 +1,31 @@
-import type { SyncStorageBackend, AsyncStorageBackend, TierRoutingConfig, CacheStats, CacheMode } from './backends/types'
+import type {
+	SyncStorageBackend,
+	AsyncStorageBackend,
+	TierRoutingConfig,
+	CacheStats,
+	CacheMode,
+} from './backends/types'
 import { DEFAULT_ROUTING } from './backends/types'
 import type { FileCacheEntry, ScrollPosition } from './fileCacheController'
 import { TierRouter } from './tierRouter'
 import { createActiveFileState, type ActiveFileState } from './activeFileState'
-import { createCacheMetadataStore, createCacheEntryMetadata, type CacheMetadataStoreInterface } from './metadataStore'
-import { createMemoryBackend, type MemoryBackendOptions } from './backends/memoryBackend'
-import { createLocalStorageBackend, type LocalStorageBackendOptions } from './backends/localStorageBackend'
-import { createIndexedDBBackend, type IndexedDBBackendOptions } from './backends/indexedDBBackend'
+import {
+	createCacheMetadataStore,
+	createCacheEntryMetadata,
+	type CacheMetadataStoreInterface,
+} from './metadataStore'
+import {
+	createMemoryBackend,
+	type MemoryBackendOptions,
+} from './backends/memoryBackend'
+import {
+	createLocalStorageBackend,
+	type LocalStorageBackendOptions,
+} from './backends/localStorageBackend'
+import {
+	createIndexedDBBackend,
+	type IndexedDBBackendOptions,
+} from './backends/indexedDBBackend'
 
 export interface TieredCacheControllerOptions {
 	hot?: MemoryBackendOptions
@@ -26,7 +45,7 @@ export class TieredCacheController {
 	private readonly hotBackend: SyncStorageBackend<unknown>
 	private readonly warmBackend: SyncStorageBackend<unknown>
 	private readonly coldBackend: AsyncStorageBackend<unknown>
-	
+
 	private pendingWrites = new Map<string, FileCacheEntry>()
 	private writeTimeout: ReturnType<typeof setTimeout> | null = null
 	private readonly writeDebounceMs = 150
@@ -34,26 +53,26 @@ export class TieredCacheController {
 	constructor(options: TieredCacheControllerOptions = {}) {
 		this.routing = options.routing ?? DEFAULT_ROUTING
 		this.getFileMtime = options.getFileMtime
-		
+
 		this.hotBackend = createMemoryBackend({
 			...options.hot,
-			onEvict: (key, value) => this.handleHotEviction(key, value)
+			onEvict: (key, value) => this.handleHotEviction(key, value),
 		})
-		
+
 		this.warmBackend = this.createWarmBackendSafe(options.warm)
 		this.coldBackend = this.createColdBackendSafe(options.cold)
-		
+
 		this.tierRouter = new TierRouter({
 			hot: this.hotBackend,
 			warm: this.warmBackend,
 			cold: this.coldBackend,
-			routing: this.routing
+			routing: this.routing,
 		})
-		
+
 		this.metadataStore = createCacheMetadataStore()
-		
+
 		this.activeFileState = createActiveFileState({
-			onDeactivate: (path, entry) => this.handleFileDeactivation(path, entry)
+			onDeactivate: (path, entry) => this.handleFileDeactivation(path, entry),
 		})
 	}
 
@@ -77,79 +96,85 @@ export class TieredCacheController {
 		if (this.activeFileState.isActive(path)) {
 			return this.activeFileState.getActiveEntry() ?? {}
 		}
-		
+
 		const currentMtime = this.getFileMtime?.(path)
 		if (this.metadataStore.isStale(path, currentMtime)) {
 			await this.clearPath(path)
 			return {}
 		}
-		
+
 		const entry = await this.hydrateFromAllTiers(path)
-		
+
 		if (Object.keys(entry).length > 0) {
 			this.metadataStore.updateLastAccess(path)
 		}
-		
+
 		return entry
 	}
 
 	async set(path: string, entry: FileCacheEntry): Promise<void> {
 		if (!path) return
-		
+
 		if (this.activeFileState.isActive(path)) {
 			this.activeFileState.setActiveEntry(entry)
 		}
-		
+
 		const existing = this.pendingWrites.get(path) || {}
 		this.pendingWrites.set(path, { ...existing, ...entry })
-		
+
 		this.scheduleWrite()
 	}
-	
+
 	private scheduleWrite(): void {
 		if (this.writeTimeout) {
 			clearTimeout(this.writeTimeout)
 		}
-		
+
 		this.writeTimeout = setTimeout(() => {
-			this.flushPendingWrites().catch(error => {
-				console.warn('TieredCacheController: Failed to flush pending writes:', error)
+			this.flushPendingWrites().catch((error) => {
+				console.warn(
+					'TieredCacheController: Failed to flush pending writes:',
+					error
+				)
 			})
 		}, this.writeDebounceMs)
 	}
-	
+
 	private async flushPendingWrites(): Promise<void> {
 		const writes = new Map(this.pendingWrites)
 		this.pendingWrites.clear()
 		this.writeTimeout = null
-		
+
 		const promises: Promise<void>[] = []
-		
+
 		for (const [path, entry] of writes) {
 			const currentMtime = this.getFileMtime?.(path)
-			
+
 			for (const [key, value] of Object.entries(entry)) {
 				if (value !== undefined) {
 					const dataType = key as keyof FileCacheEntry
 					promises.push(this.tierRouter.set(path, dataType, value))
 				}
 			}
-			
+
 			const tier = this.determinePrimaryTier(entry)
-			this.metadataStore.setMetadata(path, createCacheEntryMetadata(tier, currentMtime))
+			this.metadataStore.setMetadata(
+				path,
+				createCacheEntryMetadata(tier, currentMtime)
+			)
 		}
-		
+
 		await Promise.all(promises)
 		this.metadataStore.persist()
 	}
 
 	async clearPath(path: string): Promise<void> {
 		if (!path) return
-		
+
 		if (this.activeFileState.isActive(path)) {
 			this.activeFileState.setActive(null)
 		}
-		
+
 		await this.tierRouter.clearPath(path)
 		this.metadataStore.removeMetadata(path)
 	}
@@ -179,17 +204,17 @@ export class TieredCacheController {
 	async getStats(): Promise<CacheStats> {
 		const tierSizes = await this.tierRouter.getStats()
 		const allKeys = await this.tierRouter.getAllKeys()
-		
+
 		let hotEntries = 0
 		let warmEntries = 0
 		let coldEntries = 0
-		
+
 		for (const key of allKeys) {
 			const match = key.match(/^v1:(.+):(.+)$/)
 			if (match) {
 				const dataType = match[2] as keyof FileCacheEntry
 				const tier = this.getTierForDataType(dataType)
-				
+
 				switch (tier) {
 					case 'hot':
 						hotEntries++
@@ -203,14 +228,14 @@ export class TieredCacheController {
 				}
 			}
 		}
-		
+
 		return {
 			hotEntries,
 			warmEntries,
 			coldEntries,
 			estimatedHotSize: tierSizes.hot,
 			estimatedWarmSize: tierSizes.warm,
-			estimatedColdSize: tierSizes.cold
+			estimatedColdSize: tierSizes.cold,
 		}
 	}
 
@@ -234,21 +259,31 @@ export class TieredCacheController {
 		return this.metadataStore
 	}
 
-	private createWarmBackendSafe(options?: LocalStorageBackendOptions): SyncStorageBackend<unknown> {
+	private createWarmBackendSafe(
+		options?: LocalStorageBackendOptions
+	): SyncStorageBackend<unknown> {
 		try {
 			return createLocalStorageBackend(options)
 		} catch (error) {
-			console.warn('TieredCacheController: localStorage unavailable, using memory-only mode:', error)
+			console.warn(
+				'TieredCacheController: localStorage unavailable, using memory-only mode:',
+				error
+			)
 			this.cacheMode = 'memory-only'
 			return createMemoryBackend({ maxEntries: 500 })
 		}
 	}
 
-	private createColdBackendSafe(options?: IndexedDBBackendOptions): AsyncStorageBackend<unknown> {
+	private createColdBackendSafe(
+		options?: IndexedDBBackendOptions
+	): AsyncStorageBackend<unknown> {
 		try {
 			return createIndexedDBBackend(options)
 		} catch (error) {
-			console.warn('TieredCacheController: IndexedDB unavailable, using warm-only mode:', error)
+			console.warn(
+				'TieredCacheController: IndexedDB unavailable, using warm-only mode:',
+				error
+			)
 			if (this.cacheMode !== 'memory-only') {
 				this.cacheMode = 'warm-only'
 			}
@@ -264,53 +299,76 @@ export class TieredCacheController {
 			has: async () => false,
 			keys: async () => [],
 			clear: async () => {},
-			estimateSize: async () => 0
+			estimateSize: async () => 0,
 		}
 	}
 
 	private handleHotEviction(key: string, value: unknown): void {
 		const match = key.match(/^v1:(.+):(.+)$/)
 		if (!match) return
-		
+
 		const path = match[1]
 		const dataType = match[2] as keyof FileCacheEntry
-		
-		if (path && (this.activeFileState.isActive(path) || this.activeFileState.isOpenTab(path))) {
+
+		if (
+			path &&
+			(this.activeFileState.isActive(path) ||
+				this.activeFileState.isOpenTab(path))
+		) {
 			this.hotBackend.set(key, value)
 			return
 		}
-		
+
 		const targetTier = this.getTierForDataType(dataType)
-		
+
 		if (targetTier === 'warm') {
 			try {
 				this.warmBackend.set(key, value)
 			} catch (error) {
-				console.warn(`TieredCacheController: Failed to cascade ${key} to warm tier:`, error)
-				this.coldBackend.set(key, value).catch(coldError => {
-					console.warn(`TieredCacheController: Failed to cascade ${key} to cold tier:`, coldError)
+				console.warn(
+					`TieredCacheController: Failed to cascade ${key} to warm tier:`,
+					error
+				)
+				this.coldBackend.set(key, value).catch((coldError) => {
+					console.warn(
+						`TieredCacheController: Failed to cascade ${key} to cold tier:`,
+						coldError
+					)
 				})
 			}
 		} else if (targetTier === 'cold') {
-			this.coldBackend.set(key, value).catch(error => {
-				console.warn(`TieredCacheController: Failed to cascade ${key} to cold tier:`, error)
+			this.coldBackend.set(key, value).catch((error) => {
+				console.warn(
+					`TieredCacheController: Failed to cascade ${key} to cold tier:`,
+					error
+				)
 			})
 		}
 	}
 
 	private handleFileDeactivation(path: string, entry: FileCacheEntry): void {
-		this.set(path, entry).catch(error => {
-			console.warn(`TieredCacheController: Failed to cache deactivated file ${path}:`, error)
+		this.set(path, entry).catch((error) => {
+			console.warn(
+				`TieredCacheController: Failed to cache deactivated file ${path}:`,
+				error
+			)
 		})
 	}
 
 	private getFromHotCache(path: string): FileCacheEntry {
 		const entry: FileCacheEntry = {}
 		const dataTypes: Array<keyof FileCacheEntry> = [
-			'pieceTable', 'stats', 'previewBytes', 'highlights', 'folds',
-			'brackets', 'errors', 'scrollPosition', 'visibleContent'
+			'pieceTable',
+			'stats',
+			'previewBytes',
+			'highlights',
+			'folds',
+			'brackets',
+			'errors',
+			'scrollPosition',
+			'visibleContent',
 		]
-		
+
 		for (const dataType of dataTypes) {
 			const key = `v1:${path}:${dataType}`
 			const value = this.hotBackend.get(key)
@@ -318,17 +376,24 @@ export class TieredCacheController {
 				;(entry as Record<string, unknown>)[dataType] = value
 			}
 		}
-		
+
 		return entry
 	}
 
 	private async hydrateFromAllTiers(path: string): Promise<FileCacheEntry> {
 		const entry: FileCacheEntry = {}
 		const dataTypes: Array<keyof FileCacheEntry> = [
-			'pieceTable', 'stats', 'previewBytes', 'highlights', 'folds',
-			'brackets', 'errors', 'scrollPosition', 'visibleContent'
+			'pieceTable',
+			'stats',
+			'previewBytes',
+			'highlights',
+			'folds',
+			'brackets',
+			'errors',
+			'scrollPosition',
+			'visibleContent',
 		]
-		
+
 		const promises = dataTypes.map(async (dataType) => {
 			try {
 				const value = await this.tierRouter.get(path, dataType)
@@ -336,19 +401,22 @@ export class TieredCacheController {
 					return { dataType, value }
 				}
 			} catch (error) {
-				console.warn(`TieredCacheController: Failed to hydrate ${dataType} for ${path}:`, error)
+				console.warn(
+					`TieredCacheController: Failed to hydrate ${dataType} for ${path}:`,
+					error
+				)
 			}
 			return null
 		})
-		
+
 		const results = await Promise.all(promises)
-		
+
 		for (const result of results) {
 			if (result) {
 				;(entry as Record<string, unknown>)[result.dataType] = result.value
 			}
 		}
-		
+
 		return entry
 	}
 
@@ -358,17 +426,19 @@ export class TieredCacheController {
 				return 'cold'
 			}
 		}
-		
+
 		for (const dataType of this.routing.warm) {
 			if (entry[dataType] !== undefined) {
 				return 'warm'
 			}
 		}
-		
+
 		return 'hot'
 	}
 
-	private getTierForDataType(dataType: keyof FileCacheEntry): 'hot' | 'warm' | 'cold' {
+	private getTierForDataType(
+		dataType: keyof FileCacheEntry
+	): 'hot' | 'warm' | 'cold' {
 		if (this.routing.hotOnly.includes(dataType)) {
 			return 'hot'
 		}
@@ -382,6 +452,8 @@ export class TieredCacheController {
 	}
 }
 
-export function createTieredCacheController(options?: TieredCacheControllerOptions): TieredCacheController {
+export function createTieredCacheController(
+	options?: TieredCacheControllerOptions
+): TieredCacheController {
 	return new TieredCacheController(options)
 }

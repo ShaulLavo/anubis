@@ -4,7 +4,10 @@ import type { FsDirTreeNode } from '@repo/fs'
 import { createTreePrefetchClient } from '../prefetch/treePrefetchClient'
 import { TreeCacheController } from './treeCacheController'
 import { CachedPrefetchQueue } from './cachedPrefetchQueue'
-import type { TreePrefetchWorkerCallbacks, TreePrefetchWorkerInitPayload } from '../prefetch/treePrefetchWorkerTypes'
+import type {
+	TreePrefetchWorkerCallbacks,
+	TreePrefetchWorkerInitPayload,
+} from '../prefetch/treePrefetchWorkerTypes'
 
 // Mock the worker pool and related dependencies
 vi.mock('../../workers/comlinkPool', () => ({
@@ -14,7 +17,7 @@ vi.mock('../../workers/comlinkPool', () => ({
 		}
 		broadcast = vi.fn().mockResolvedValue(undefined)
 		destroy = vi.fn().mockResolvedValue(undefined)
-	}
+	},
 }))
 
 vi.mock('../prefetch/treePrefetch.worker.ts', () => ({}))
@@ -30,9 +33,9 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		vi.clearAllMocks()
 
 		// Create cache controller with unique test database
-		cacheController = new TreeCacheController({ 
+		cacheController = new TreeCacheController({
 			dbName: testDbName,
-			storeName: 'integration-test-directories'
+			storeName: 'integration-test-directories',
 		})
 
 		// Create mock callbacks that track invocations
@@ -65,7 +68,9 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should handle complete cache lifecycle from empty to populated to updated', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping integration test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping integration test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -73,40 +78,64 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 				fc.asyncProperty(
 					// Generate realistic directory structure
 					fc.record({
-						rootPath: fc.string({ minLength: 1, maxLength: 10 }).map(s => `/${s.replace(/[\0\/]/g, '_')}`),
-						rootName: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
+						rootPath: fc
+							.string({ minLength: 1, maxLength: 10 })
+							.map((s) => `/${s.replace(/[\0\/]/g, '_')}`),
+						rootName: fc
+							.string({ minLength: 1, maxLength: 10 })
+							.map((s) => s.replace(/[\0\/]/g, '_')),
 						initialDirectories: fc.array(
 							fc.record({
-								name: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
+								name: fc
+									.string({ minLength: 1, maxLength: 10 })
+									.map((s) => s.replace(/[\0\/]/g, '_')),
 								fileCount: fc.integer({ min: 0, max: 5 }),
-								subdirCount: fc.integer({ min: 0, max: 2 })
+								subdirCount: fc.integer({ min: 0, max: 2 }),
 							}),
 							{ minLength: 1, maxLength: 4 }
 						),
 						updatedDirectories: fc.array(
 							fc.record({
-								name: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
+								name: fc
+									.string({ minLength: 1, maxLength: 10 })
+									.map((s) => s.replace(/[\0\/]/g, '_')),
 								fileCount: fc.integer({ min: 0, max: 6 }),
-								subdirCount: fc.integer({ min: 0, max: 3 })
+								subdirCount: fc.integer({ min: 0, max: 3 }),
 							}),
 							{ minLength: 1, maxLength: 5 }
-						)
+						),
 					}),
 					async (testData) => {
-						const { rootPath, rootName, initialDirectories, updatedDirectories } = testData
+						const {
+							rootPath,
+							rootName,
+							initialDirectories,
+							updatedDirectories,
+						} = testData
 
 						// Phase 1: Initial empty cache state
-						const emptyCacheResult = await cacheController.getCachedTree(rootPath)
+						const emptyCacheResult =
+							await cacheController.getCachedTree(rootPath)
 						expect(emptyCacheResult).toBeNull()
 
 						// Phase 2: Populate cache with initial directory structure
-						const initialTree = createTestDirectoryTree(rootPath, rootName, initialDirectories)
+						const initialTree = createTestDirectoryTree(
+							rootPath,
+							rootName,
+							initialDirectories
+						)
 						await cacheController.setCachedTree(rootPath, initialTree)
 
 						// Cache individual directories
 						for (const dir of initialDirectories) {
 							const dirPath = `${rootPath}/${dir.name}`
-							const dirNode = createTestDirectoryNode(dirPath, dir.name, dir.fileCount, dir.subdirCount, rootPath)
+							const dirNode = createTestDirectoryNode(
+								dirPath,
+								dir.name,
+								dir.fileCount,
+								dir.subdirCount,
+								rootPath
+							)
 							await cacheController.setCachedDirectory(dirPath, dirNode)
 						}
 
@@ -120,29 +149,47 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 						// Verify individual directories are cached
 						for (const dir of initialDirectories) {
 							const dirPath = `${rootPath}/${dir.name}`
-							const cachedDir = await cacheController.getCachedDirectory(dirPath)
+							const cachedDir =
+								await cacheController.getCachedDirectory(dirPath)
 							expect(cachedDir).not.toBeNull()
 							expect(cachedDir!.path).toBe(dirPath)
-							expect(cachedDir!.children).toHaveLength(dir.fileCount + dir.subdirCount)
+							expect(cachedDir!.children).toHaveLength(
+								dir.fileCount + dir.subdirCount
+							)
 						}
 
 						// Phase 4: Simulate directory structure changes
-						const updatedTree = createTestDirectoryTree(rootPath, rootName, updatedDirectories)
-						
+						const updatedTree = createTestDirectoryTree(
+							rootPath,
+							rootName,
+							updatedDirectories
+						)
+
 						// Perform incremental updates
 						const directoryMtimes = new Map<string, number>()
 						const currentTime = Date.now()
-						
+
 						for (const dir of updatedDirectories) {
 							const dirPath = `${rootPath}/${dir.name}`
-							const dirNode = createTestDirectoryNode(dirPath, dir.name, dir.fileCount, dir.subdirCount, rootPath)
+							const dirNode = createTestDirectoryNode(
+								dirPath,
+								dir.name,
+								dir.fileCount,
+								dir.subdirCount,
+								rootPath
+							)
 							directoryMtimes.set(dirPath, currentTime)
-							
-							await cacheController.performIncrementalUpdate(dirPath, dirNode, currentTime)
+
+							await cacheController.performIncrementalUpdate(
+								dirPath,
+								dirNode,
+								currentTime
+							)
 						}
 
 						// Phase 5: Verify updates were applied correctly
-						const updatedCachedTree = await cacheController.getCachedTree(rootPath)
+						const updatedCachedTree =
+							await cacheController.getCachedTree(rootPath)
 						expect(updatedCachedTree).not.toBeNull()
 
 						// Verify cache statistics reflect the operations
@@ -152,15 +199,19 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 						expect(stats.missRate).toBeGreaterThanOrEqual(0)
 
 						// Phase 6: Test cache freshness validation
-						const staleDirectories = await cacheController.getDirectoriesNeedingUpdate(directoryMtimes)
+						const staleDirectories =
+							await cacheController.getDirectoriesNeedingUpdate(directoryMtimes)
 						// Should be empty since we just updated everything
 						expect(staleDirectories).toHaveLength(0)
 
 						// Phase 7: Test cache cleanup
-						await cacheController.validateAndCleanupStaleEntries(directoryMtimes)
-						
+						await cacheController.validateAndCleanupStaleEntries(
+							directoryMtimes
+						)
+
 						// Cache should still contain our fresh data
-						const finalCachedTree = await cacheController.getCachedTree(rootPath)
+						const finalCachedTree =
+							await cacheController.getCachedTree(rootPath)
 						expect(finalCachedTree).not.toBeNull()
 					}
 				),
@@ -171,43 +222,52 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should handle large directory structures with lazy loading', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping large directory test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping large directory test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
 			const rootPath = '/large-test-root'
 			const rootName = 'large-test-root'
-			
+
 			// Create a moderately large directory structure
 			const largeDirectoryCount = 10
 			const filesPerDirectory = 20
-			
-			const largeDirectories = Array.from({ length: largeDirectoryCount }, (_, i) => ({
-				name: `large-dir-${i}`,
-				fileCount: filesPerDirectory,
-				subdirCount: 1
-			}))
 
-			const largeTree = createTestDirectoryTree(rootPath, rootName, largeDirectories)
-			
+			const largeDirectories = Array.from(
+				{ length: largeDirectoryCount },
+				(_, i) => ({
+					name: `large-dir-${i}`,
+					fileCount: filesPerDirectory,
+					subdirCount: 1,
+				})
+			)
+
+			const largeTree = createTestDirectoryTree(
+				rootPath,
+				rootName,
+				largeDirectories
+			)
+
 			// Test caching large structure
 			const startTime = Date.now()
 			await cacheController.setCachedTree(rootPath, largeTree)
 			const cacheTime = Date.now() - startTime
-			
+
 			// Should handle large structures reasonably quickly
 			expect(cacheTime).toBeLessThan(5000) // 5 seconds max for large structure
 
 			// Test basic lazy loading functionality
 			const largeDirPath = `${rootPath}/${largeDirectories[0]!.name}`
 			const largeDirNode = createTestDirectoryNode(
-				largeDirPath, 
-				largeDirectories[0]!.name, 
-				filesPerDirectory, 
-				1, 
+				largeDirPath,
+				largeDirectories[0]!.name,
+				filesPerDirectory,
+				1,
 				rootPath
 			)
-			
+
 			await cacheController.setCachedDirectory(largeDirPath, largeDirNode)
 
 			// Test that we can retrieve the cached directory
@@ -224,14 +284,16 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should integrate seamlessly with TreePrefetchClient', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping TreePrefetchClient integration test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping TreePrefetchClient integration test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
 			// Create TreePrefetchClient with caching enabled
 			const client = createTreePrefetchClient(mockCallbacks, {
 				enableCaching: true,
-				cacheController
+				cacheController,
 			})
 
 			const testTree: FsDirTreeNode = {
@@ -254,10 +316,10 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 								depth: 2,
 								parentPath: '/integration-test/src',
 								size: 1024,
-								lastModified: Date.now() - 10000
-							}
+								lastModified: Date.now() - 10000,
+							},
 						],
-						isLoaded: true
+						isLoaded: true,
 					},
 					{
 						kind: 'file',
@@ -266,10 +328,10 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 						depth: 1,
 						parentPath: '/integration-test',
 						size: 512,
-						lastModified: Date.now() - 5000
-					}
+						lastModified: Date.now() - 5000,
+					},
 				],
-				isLoaded: true
+				isLoaded: true,
 			}
 
 			try {
@@ -300,10 +362,10 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 							depth: 3,
 							parentPath: '/integration-test/src/components',
 							size: 2048,
-							lastModified: Date.now() - 3000
-						}
+							lastModified: Date.now() - 3000,
+						},
 					],
-					isLoaded: true
+					isLoaded: true,
 				}
 
 				await client.ingestSubtree(subtree)
@@ -330,7 +392,9 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should correctly update UI when cached data differs from filesystem', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping UI update test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping UI update test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -338,7 +402,11 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 			const path = '/ui-test-dir'
 			const name = 'ui-test-dir'
 			const cachedFiles = ['cached-file-1.txt', 'cached-file-2.txt']
-			const currentFiles = ['current-file-1.txt', 'current-file-2.txt', 'current-file-3.txt']
+			const currentFiles = [
+				'current-file-1.txt',
+				'current-file-2.txt',
+				'current-file-3.txt',
+			]
 
 			// Create cached directory with specific files
 			const cachedNode: FsDirTreeNode = {
@@ -353,9 +421,9 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 					depth: 1,
 					parentPath: path,
 					size: 100 + i,
-					lastModified: Date.now() - 10000
+					lastModified: Date.now() - 10000,
 				})),
-				isLoaded: true
+				isLoaded: true,
 			}
 
 			// Create current directory with different files
@@ -371,9 +439,9 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 					depth: 1,
 					parentPath: path,
 					size: 200 + i,
-					lastModified: Date.now() - 1000
+					lastModified: Date.now() - 1000,
 				})),
-				isLoaded: true
+				isLoaded: true,
 			}
 
 			// Pre-populate cache with cached data
@@ -381,12 +449,12 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 
 			// Create CachedPrefetchQueue to test UI updates
 			const mockLoadDirectory = vi.fn().mockResolvedValue(currentNode)
-			
+
 			const cachedQueue = new CachedPrefetchQueue({
 				workerCount: 1,
 				loadDirectory: mockLoadDirectory,
 				callbacks: mockCallbacks,
-				cacheController
+				cacheController,
 			})
 
 			// Track UI update callbacks
@@ -408,7 +476,7 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 			}
 
 			// Wait for background validation to complete
-			await new Promise(resolve => setTimeout(resolve, 200))
+			await new Promise((resolve) => setTimeout(resolve, 200))
 
 			// Verify worker was called for fresh data
 			expect(mockLoadDirectory).toHaveBeenCalledWith(target)
@@ -422,11 +490,17 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should handle concurrent UI updates and cache operations', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping concurrent operations test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping concurrent operations test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
-			const concurrentPaths = ['/concurrent-1', '/concurrent-2', '/concurrent-3']
+			const concurrentPaths = [
+				'/concurrent-1',
+				'/concurrent-2',
+				'/concurrent-3',
+			]
 			const concurrentOperations: Promise<void>[] = []
 
 			// Create multiple concurrent cache operations
@@ -444,17 +518,21 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 							depth: 1,
 							parentPath: path,
 							size: 100 + i,
-							lastModified: Date.now() - 1000
+							lastModified: Date.now() - 1000,
 						})),
-						isLoaded: true
+						isLoaded: true,
 					}
 
 					// Perform multiple operations concurrently
 					await cacheController.setCachedDirectory(path, testNode)
 					const cached = await cacheController.getCachedDirectory(path)
 					expect(cached).not.toBeNull()
-					
-					await cacheController.performIncrementalUpdate(path, testNode, Date.now())
+
+					await cacheController.performIncrementalUpdate(
+						path,
+						testNode,
+						Date.now()
+					)
 					const updated = await cacheController.getCachedDirectory(path)
 					expect(updated).not.toBeNull()
 				}
@@ -483,15 +561,17 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should maintain performance with large datasets', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping performance test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping performance test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
 			const largeDatasetSize = 100
 			const performanceThresholds = {
 				cacheWrite: 2000, // 2 seconds max for writing large dataset
-				cacheRead: 1000,  // 1 second max for reading large dataset
-				batchOperation: 3000 // 3 seconds max for batch operations
+				cacheRead: 1000, // 1 second max for reading large dataset
+				batchOperation: 3000, // 3 seconds max for batch operations
 			}
 
 			// Create large dataset
@@ -511,9 +591,9 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 						depth: 2,
 						parentPath: path,
 						size: 1000 + j,
-						lastModified: Date.now() - 5000
+						lastModified: Date.now() - 5000,
 					})),
-					isLoaded: true
+					isLoaded: true,
 				}
 				largeDirectories.set(path, node)
 			}
@@ -543,20 +623,25 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 		it('should handle cache errors gracefully and maintain functionality', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping error handling test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping error handling test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
 			// Test corrupted data handling
 			const corruptedPath = '/corrupted-test'
-			
+
 			// Manually insert corrupted data into cache
 			const corruptedData = { invalid: 'data', missing: 'required fields' }
-			await (cacheController as any).store.setItem(`v1:tree:dir:${corruptedPath}`, corruptedData)
+			await (cacheController as any).store.setItem(
+				`v1:tree:dir:${corruptedPath}`,
+				corruptedData
+			)
 
 			// Attempt to read corrupted data - should handle gracefully
 			const result = await cacheController.getCachedDirectory(corruptedPath)
-			
+
 			// Should return a valid structure even with corrupted data
 			expect(result).not.toBeNull()
 			expect(result!.kind).toBe('dir')
@@ -579,11 +664,16 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 				path: '/valid-after-corruption',
 				depth: 0,
 				children: [],
-				isLoaded: true
+				isLoaded: true,
 			}
 
-			await cacheController.setCachedDirectory('/valid-after-corruption', validNode)
-			const validResult = await cacheController.getCachedDirectory('/valid-after-corruption')
+			await cacheController.setCachedDirectory(
+				'/valid-after-corruption',
+				validNode
+			)
+			const validResult = await cacheController.getCachedDirectory(
+				'/valid-after-corruption'
+			)
 			expect(validResult).not.toBeNull()
 			expect(validResult!.path).toBe('/valid-after-corruption')
 		})
@@ -592,8 +682,8 @@ describe('System Integration Tests - Complete Tree Cache System', () => {
 
 // Helper functions for creating test data
 function createTestDirectoryTree(
-	rootPath: string, 
-	rootName: string, 
+	rootPath: string,
+	rootName: string,
 	directories: Array<{ name: string; fileCount: number; subdirCount: number }>
 ): FsDirTreeNode {
 	return {
@@ -601,7 +691,7 @@ function createTestDirectoryTree(
 		name: rootName,
 		path: rootPath,
 		depth: 0,
-		children: directories.map(dir => ({
+		children: directories.map((dir) => ({
 			kind: 'dir' as const,
 			name: dir.name,
 			path: `${rootPath}/${dir.name}`,
@@ -615,7 +705,7 @@ function createTestDirectoryTree(
 					depth: 2,
 					parentPath: `${rootPath}/${dir.name}`,
 					size: 100 + i,
-					lastModified: Date.now() - 5000
+					lastModified: Date.now() - 5000,
 				})),
 				...Array.from({ length: dir.subdirCount }, (_, i) => ({
 					kind: 'dir' as const,
@@ -624,20 +714,20 @@ function createTestDirectoryTree(
 					depth: 2,
 					parentPath: `${rootPath}/${dir.name}`,
 					children: [],
-					isLoaded: false
-				}))
+					isLoaded: false,
+				})),
 			],
-			isLoaded: true
+			isLoaded: true,
 		})),
-		isLoaded: true
+		isLoaded: true,
 	}
 }
 
 function createTestDirectoryNode(
-	path: string, 
-	name: string, 
-	fileCount: number, 
-	subdirCount: number, 
+	path: string,
+	name: string,
+	fileCount: number,
+	subdirCount: number,
 	parentPath?: string
 ): FsDirTreeNode {
 	return {
@@ -651,28 +741,28 @@ function createTestDirectoryNode(
 				kind: 'file' as const,
 				name: `file-${i}.txt`,
 				path: `${path}/file-${i}.txt`,
-				depth: (parentPath ? 2 : 1),
+				depth: parentPath ? 2 : 1,
 				parentPath: path,
 				size: 100 + i,
-				lastModified: Date.now() - 5000
+				lastModified: Date.now() - 5000,
 			})),
 			...Array.from({ length: subdirCount }, (_, i) => ({
 				kind: 'dir' as const,
 				name: `subdir-${i}`,
 				path: `${path}/subdir-${i}`,
-				depth: (parentPath ? 2 : 1),
+				depth: parentPath ? 2 : 1,
 				parentPath: path,
 				children: [],
-				isLoaded: false
-			}))
+				isLoaded: false,
+			})),
 		],
-		isLoaded: true
+		isLoaded: true,
 	}
 }
 
 /**
  * **Feature: persistent-tree-cache, Integration Tests**
- * 
+ *
  * These tests validate the complete system integration including:
  * - End-to-end cache behavior with real directory structures
  * - UI updates working correctly with cached data

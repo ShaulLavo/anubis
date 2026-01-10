@@ -28,7 +28,7 @@ interface EntryMetadata {
 /**
  * IndexedDB-based persistent cache with async access.
  * Uses localForage for simplified API and better browser compatibility.
- * 
+ *
  * Features:
  * - Async get/set/remove/clear/keys operations
  * - LRU eviction based on entry count limits
@@ -41,48 +41,51 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 	private readonly debounceDelay: number
 	private readonly store: LocalForage
 	private readonly metadataStore: LocalForage
-	
+
 	// Track metadata for LRU eviction
 	private metadata = new Map<string, EntryMetadata>()
 	private metadataLoaded = false
-	
+
 	// Debouncing for batch writes
-	private pendingWrites = new Map<string, { value: T; metadata: EntryMetadata }>()
+	private pendingWrites = new Map<
+		string,
+		{ value: T; metadata: EntryMetadata }
+	>()
 	private writeTimeout: ReturnType<typeof setTimeout> | null = null
-	
+
 	// Track approximate total size
 	private approximateSize = 0
 
 	constructor(options: IndexedDBBackendOptions = {}) {
 		this.maxEntries = options.maxEntries ?? 1000
 		this.debounceDelay = options.debounceDelay ?? 100
-		
+
 		const dbName = options.dbName ?? 'file-cache'
 		const storeName = options.storeName ?? 'entries'
-		
+
 		// Create localForage instances for data and metadata
 		this.store = localforage.createInstance({
 			name: dbName,
 			storeName: storeName,
-			driver: [localforage.INDEXEDDB]
+			driver: [localforage.INDEXEDDB],
 		})
-		
+
 		this.metadataStore = localforage.createInstance({
 			name: dbName,
 			storeName: `${storeName}_metadata`,
-			driver: [localforage.INDEXEDDB]
+			driver: [localforage.INDEXEDDB],
 		})
 	}
 
 	async get(key: string): Promise<T | null> {
 		try {
 			await this.ensureMetadataLoaded()
-			
+
 			const value = await this.store.getItem<T>(key)
 			if (value === null) {
 				return null
 			}
-			
+
 			// Update access timestamp for LRU tracking
 			const metadata = this.metadata.get(key)
 			if (metadata) {
@@ -90,7 +93,7 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 				// Schedule metadata save (debounced)
 				this.scheduleMetadataSave()
 			}
-			
+
 			return value
 		} catch (error) {
 			console.warn(`IndexedDBBackend: Failed to get key "${key}":`, error)
@@ -101,28 +104,28 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 	async set(key: string, value: T): Promise<T> {
 		try {
 			await this.ensureMetadataLoaded()
-			
+
 			const size = this.estimateValueSize(value)
 			const metadata: EntryMetadata = {
 				lastAccess: Date.now(),
-				size
+				size,
 			}
-			
+
 			// Update internal tracking
 			const existingMetadata = this.metadata.get(key)
 			const existingSize = existingMetadata?.size ?? 0
 			this.approximateSize = this.approximateSize - existingSize + size
 			this.metadata.set(key, metadata)
-			
+
 			// Check if we need to evict entries
 			if (this.metadata.size > this.maxEntries) {
 				await this.evictLRU()
 			}
-			
+
 			// Schedule batched write
 			this.pendingWrites.set(key, { value, metadata })
 			this.scheduleBatchWrite()
-			
+
 			return value
 		} catch (error) {
 			console.warn(`IndexedDBBackend: Failed to set key "${key}":`, error)
@@ -133,20 +136,20 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 	async remove(key: string): Promise<void> {
 		try {
 			await this.ensureMetadataLoaded()
-			
+
 			// Update size tracking
 			const metadata = this.metadata.get(key)
 			if (metadata) {
 				this.approximateSize -= metadata.size
 				this.metadata.delete(key)
 			}
-			
+
 			// Remove from pending writes if present
 			this.pendingWrites.delete(key)
-			
+
 			// Remove from storage
 			await this.store.removeItem(key)
-			
+
 			// Schedule metadata save
 			this.scheduleMetadataSave()
 		} catch (error) {
@@ -157,12 +160,12 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 	async has(key: string): Promise<boolean> {
 		try {
 			await this.ensureMetadataLoaded()
-			
+
 			// Check pending writes first
 			if (this.pendingWrites.has(key)) {
 				return true
 			}
-			
+
 			const value = await this.store.getItem(key)
 			return value !== null
 		} catch (error) {
@@ -174,10 +177,10 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 	async keys(): Promise<string[]> {
 		try {
 			await this.ensureMetadataLoaded()
-			
+
 			const storeKeys = await this.store.keys()
 			const pendingKeys = Array.from(this.pendingWrites.keys())
-			
+
 			// Combine store keys with pending write keys, removing duplicates
 			const allKeys = new Set([...storeKeys, ...pendingKeys])
 			return Array.from(allKeys)
@@ -195,11 +198,11 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 				clearTimeout(this.writeTimeout)
 				this.writeTimeout = null
 			}
-			
+
 			// Clear stores
 			await this.store.clear()
 			await this.metadataStore.clear()
-			
+
 			// Reset internal state
 			this.metadata.clear()
 			this.approximateSize = 0
@@ -219,20 +222,28 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		if (this.metadataLoaded) {
 			return
 		}
-		
+
 		try {
-			const storedMetadata = await this.metadataStore.getItem<Record<string, EntryMetadata>>('metadata')
+			const storedMetadata =
+				await this.metadataStore.getItem<Record<string, EntryMetadata>>(
+					'metadata'
+				)
 			if (storedMetadata) {
 				this.metadata = new Map(Object.entries(storedMetadata))
-				
+
 				// Calculate total size
-				this.approximateSize = Array.from(this.metadata.values())
-					.reduce((sum, meta) => sum + meta.size, 0)
+				this.approximateSize = Array.from(this.metadata.values()).reduce(
+					(sum, meta) => sum + meta.size,
+					0
+				)
 			}
-			
+
 			this.metadataLoaded = true
 		} catch (error) {
-			console.warn('IndexedDBBackend: Failed to load metadata, starting fresh:', error)
+			console.warn(
+				'IndexedDBBackend: Failed to load metadata, starting fresh:',
+				error
+			)
 			this.metadata.clear()
 			this.approximateSize = 0
 			this.metadataLoaded = true
@@ -246,9 +257,9 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		if (this.writeTimeout) {
 			clearTimeout(this.writeTimeout)
 		}
-		
+
 		this.writeTimeout = setTimeout(() => {
-			this.flushPendingWrites().catch(error => {
+			this.flushPendingWrites().catch((error) => {
 				console.warn('IndexedDBBackend: Failed to flush pending writes:', error)
 			})
 		}, this.debounceDelay)
@@ -261,15 +272,16 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		if (this.pendingWrites.size === 0) {
 			return
 		}
-		
+
 		const writes = Array.from(this.pendingWrites.entries())
 		this.pendingWrites.clear()
 		this.writeTimeout = null
-		
-		const failedWrites: Array<[string, { value: T; metadata: EntryMetadata }]> = []
+
+		const failedWrites: Array<[string, { value: T; metadata: EntryMetadata }]> =
+			[]
 		let hasSuccessfulWrite = false
 		let hasDroppedWrite = false
-		
+
 		for (const [key, data] of writes) {
 			try {
 				await this.store.setItem(key, data.value)
@@ -296,18 +308,18 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 				failedWrites.push([key, data])
 			}
 		}
-		
+
 		if (failedWrites.length > 0) {
 			for (const [key, data] of failedWrites) {
 				this.pendingWrites.set(key, data)
 			}
-			
+
 			setTimeout(() => {
 				this.scheduleBatchWrite()
 			}, this.debounceDelay * 2)
 			return
 		}
-		
+
 		if (hasSuccessfulWrite || hasDroppedWrite) {
 			await this.saveMetadata()
 		}
@@ -320,7 +332,7 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		// Piggyback on the existing write timeout for efficiency
 		if (!this.writeTimeout) {
 			this.writeTimeout = setTimeout(() => {
-				this.saveMetadata().catch(error => {
+				this.saveMetadata().catch((error) => {
 					console.warn('IndexedDBBackend: Failed to save metadata:', error)
 				})
 				this.writeTimeout = null
@@ -340,7 +352,10 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		}
 	}
 
-	private dropMetadataForKey(key: string, metadataFallback?: EntryMetadata): void {
+	private dropMetadataForKey(
+		key: string,
+		metadataFallback?: EntryMetadata
+	): void {
 		const metadata = this.metadata.get(key) ?? metadataFallback
 		if (metadata) {
 			this.approximateSize = Math.max(0, this.approximateSize - metadata.size)
@@ -370,14 +385,15 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		if (entriesToEvict <= 0) {
 			return
 		}
-		
+
 		// Sort entries by last access time (oldest first)
-		const sortedEntries = Array.from(this.metadata.entries())
-			.sort(([, a], [, b]) => a.lastAccess - b.lastAccess)
-		
+		const sortedEntries = Array.from(this.metadata.entries()).sort(
+			([, a], [, b]) => a.lastAccess - b.lastAccess
+		)
+
 		// Evict the oldest entries
 		const evictionPromises: Promise<void>[] = []
-		
+
 		for (let i = 0; i < entriesToEvict && i < sortedEntries.length; i++) {
 			const entry = sortedEntries[i]
 			if (entry) {
@@ -385,7 +401,7 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 				evictionPromises.push(this.remove(key))
 			}
 		}
-		
+
 		await Promise.all(evictionPromises)
 	}
 
@@ -397,27 +413,29 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 		if (value === null || value === undefined) {
 			return 0
 		}
-		
+
 		if (typeof value === 'string') {
 			return value.length * 2 // Rough estimate for UTF-16
 		}
-		
+
 		if (typeof value === 'number' || typeof value === 'boolean') {
 			return 8
 		}
-		
+
 		if (value instanceof Uint8Array) {
 			return value.byteLength
 		}
-		
+
 		if (value instanceof ArrayBuffer) {
 			return value.byteLength
 		}
-		
+
 		if (Array.isArray(value)) {
-			return value.reduce((sum, item) => sum + this.estimateValueSize(item), 0) + 24 // Array overhead
+			return (
+				value.reduce((sum, item) => sum + this.estimateValueSize(item), 0) + 24
+			) // Array overhead
 		}
-		
+
 		if (typeof value === 'object') {
 			// Rough estimate: JSON string length as proxy for object size
 			try {
@@ -426,7 +444,7 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 				return 100 // Fallback for non-serializable objects
 			}
 		}
-		
+
 		return 50 // Default fallback
 	}
 }
@@ -434,6 +452,8 @@ export class IndexedDBBackend<T = unknown> implements AsyncStorageBackend<T> {
 /**
  * Factory function to create an IndexedDB backend instance.
  */
-export function createIndexedDBBackend<T = unknown>(options?: IndexedDBBackendOptions): AsyncStorageBackend<T> {
+export function createIndexedDBBackend<T = unknown>(
+	options?: IndexedDBBackendOptions
+): AsyncStorageBackend<T> {
 	return new IndexedDBBackend<T>(options)
 }

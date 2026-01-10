@@ -1,6 +1,5 @@
 import type { FileCacheEntry } from '../fileCacheController'
 
-
 export interface SyncStorageBackend<T = unknown> {
 	get(key: string): T | null
 	set(key: string, value: T): T
@@ -10,7 +9,6 @@ export interface SyncStorageBackend<T = unknown> {
 	clear(): void
 	estimateSize?(): number
 }
-
 
 export interface AsyncStorageBackend<T = unknown> {
 	get(key: string): Promise<T | null>
@@ -22,9 +20,9 @@ export interface AsyncStorageBackend<T = unknown> {
 	estimateSize?(): Promise<number>
 }
 
-
-export type StorageBackend<T = unknown> = SyncStorageBackend<T> | AsyncStorageBackend<T>
-
+export type StorageBackend<T = unknown> =
+	| SyncStorageBackend<T>
+	| AsyncStorageBackend<T>
 
 export interface CacheEntryMetadata {
 	lastAccess: number
@@ -32,23 +30,27 @@ export interface CacheEntryMetadata {
 	tier: 'hot' | 'warm' | 'cold'
 }
 
-
 export interface TierRoutingConfig {
 	warm: Array<keyof FileCacheEntry>
 	cold: Array<keyof FileCacheEntry>
 	hotOnly: Array<keyof FileCacheEntry>
 }
 
-
 export const DEFAULT_ROUTING: TierRoutingConfig = {
 	warm: ['scrollPosition', 'visibleContent'],
-	cold: ['stats', 'highlights', 'folds', 'brackets', 'errors', 'pieceTable', 'previewBytes'],
-	hotOnly: []
+	cold: [
+		'stats',
+		'highlights',
+		'folds',
+		'brackets',
+		'errors',
+		'pieceTable',
+		'previewBytes',
+	],
+	hotOnly: [],
 }
 
-
 export type CacheKey = `v1:${string}:${keyof FileCacheEntry}`
-
 
 export interface CacheStats {
 	hotEntries: number
@@ -59,9 +61,7 @@ export interface CacheStats {
 	estimatedColdSize: number
 }
 
-
 export type CacheMode = 'full' | 'warm-only' | 'memory-only'
-
 
 export interface CacheMetadataStore {
 	entries: Record<string, CacheEntryMetadata>

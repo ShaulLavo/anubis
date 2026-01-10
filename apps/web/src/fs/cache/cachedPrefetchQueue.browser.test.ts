@@ -1,21 +1,34 @@
-import { describe, it, expect, beforeEach, afterEach, vi, type MockedFunction } from 'vitest'
+import {
+	describe,
+	it,
+	expect,
+	beforeEach,
+	afterEach,
+	vi,
+	type MockedFunction,
+} from 'vitest'
 import fc from 'fast-check'
 import type { FsDirTreeNode } from '@repo/fs'
 import { CachedPrefetchQueue } from './cachedPrefetchQueue'
 import { TreeCacheController } from './treeCacheController'
-import type { PrefetchTarget, TreePrefetchWorkerCallbacks } from '../prefetch/treePrefetchWorkerTypes'
+import type {
+	PrefetchTarget,
+	TreePrefetchWorkerCallbacks,
+} from '../prefetch/treePrefetchWorkerTypes'
 
 describe('CachedPrefetchQueue', () => {
 	let cacheController: TreeCacheController
 	let cachedQueue: CachedPrefetchQueue
 	let mockCallbacks: TreePrefetchWorkerCallbacks
-	let mockLoadDirectory: MockedFunction<(target: PrefetchTarget) => Promise<FsDirTreeNode | undefined>>
+	let mockLoadDirectory: MockedFunction<
+		(target: PrefetchTarget) => Promise<FsDirTreeNode | undefined>
+	>
 	const testDbName = `test-cached-queue-${Date.now()}-${Math.random().toString(36).substring(7)}`
 
 	beforeEach(async () => {
-		cacheController = new TreeCacheController({ 
+		cacheController = new TreeCacheController({
 			dbName: testDbName,
-			storeName: 'test-directories'
+			storeName: 'test-directories',
 		})
 
 		// Ensure clean state
@@ -24,12 +37,12 @@ describe('CachedPrefetchQueue', () => {
 		} catch {
 			// Ignore cleanup errors
 		}
-		
+
 		mockCallbacks = {
 			onDirectoryLoaded: vi.fn(),
 			onStatus: vi.fn(),
 			onDeferredMetadata: vi.fn(),
-			onError: vi.fn()
+			onError: vi.fn(),
 		}
 
 		mockLoadDirectory = vi.fn()
@@ -38,7 +51,7 @@ describe('CachedPrefetchQueue', () => {
 			workerCount: 2,
 			loadDirectory: mockLoadDirectory,
 			callbacks: mockCallbacks,
-			cacheController
+			cacheController,
 		})
 	})
 
@@ -63,34 +76,51 @@ describe('CachedPrefetchQueue', () => {
 				fc.asyncProperty(
 					// Generate test directory structure
 					fc.record({
-						path: fc.string({ minLength: 1, maxLength: 20 }).map(s => `/${s.replace(/[\0\/]/g, '_')}`),
-						name: fc.string({ minLength: 1, maxLength: 15 }).map(s => s.replace(/[\0\/]/g, '_')),
+						path: fc
+							.string({ minLength: 1, maxLength: 20 })
+							.map((s) => `/${s.replace(/[\0\/]/g, '_')}`),
+						name: fc
+							.string({ minLength: 1, maxLength: 15 })
+							.map((s) => s.replace(/[\0\/]/g, '_')),
 						depth: fc.integer({ min: 0, max: 3 }),
 						cachedChildren: fc.array(
 							fc.record({
 								kind: fc.constant('file' as const),
-								name: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
-								path: fc.string({ minLength: 1, maxLength: 25 }).map(s => `/${s.replace(/[\0\/]/g, '_')}`),
+								name: fc
+									.string({ minLength: 1, maxLength: 10 })
+									.map((s) => s.replace(/[\0\/]/g, '_')),
+								path: fc
+									.string({ minLength: 1, maxLength: 25 })
+									.map((s) => `/${s.replace(/[\0\/]/g, '_')}`),
 								depth: fc.integer({ min: 1, max: 4 }),
 								size: fc.option(fc.integer({ min: 0, max: 10000 })),
-								lastModified: fc.option(fc.integer({ min: 1000000000000, max: Date.now() }))
+								lastModified: fc.option(
+									fc.integer({ min: 1000000000000, max: Date.now() })
+								),
 							}),
 							{ minLength: 0, maxLength: 5 }
 						),
 						freshChildren: fc.array(
 							fc.record({
 								kind: fc.constant('file' as const),
-								name: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
-								path: fc.string({ minLength: 1, maxLength: 25 }).map(s => `/${s.replace(/[\0\/]/g, '_')}`),
+								name: fc
+									.string({ minLength: 1, maxLength: 10 })
+									.map((s) => s.replace(/[\0\/]/g, '_')),
+								path: fc
+									.string({ minLength: 1, maxLength: 25 })
+									.map((s) => `/${s.replace(/[\0\/]/g, '_')}`),
 								depth: fc.integer({ min: 1, max: 4 }),
 								size: fc.option(fc.integer({ min: 0, max: 10000 })),
-								lastModified: fc.option(fc.integer({ min: 1000000000000, max: Date.now() }))
+								lastModified: fc.option(
+									fc.integer({ min: 1000000000000, max: Date.now() })
+								),
 							}),
 							{ minLength: 0, maxLength: 5 }
-						)
+						),
 					}),
 					async (testData) => {
-						const { path, name, depth, cachedChildren, freshChildren } = testData
+						const { path, name, depth, cachedChildren, freshChildren } =
+							testData
 
 						// Create cached directory data
 						const cachedNode: FsDirTreeNode = {
@@ -99,16 +129,16 @@ describe('CachedPrefetchQueue', () => {
 							path,
 							depth,
 							parentPath: depth > 0 ? '/' : undefined,
-							children: cachedChildren.map(child => ({
+							children: cachedChildren.map((child) => ({
 								kind: 'file' as const,
 								name: child.name,
 								path: child.path,
 								depth: child.depth,
 								parentPath: path,
 								size: child.size ?? undefined,
-								lastModified: child.lastModified ?? undefined
+								lastModified: child.lastModified ?? undefined,
 							})),
-							isLoaded: true
+							isLoaded: true,
 						}
 
 						// Create fresh directory data (simulating filesystem scan)
@@ -118,16 +148,16 @@ describe('CachedPrefetchQueue', () => {
 							path,
 							depth,
 							parentPath: depth > 0 ? '/' : undefined,
-							children: freshChildren.map(child => ({
+							children: freshChildren.map((child) => ({
 								kind: 'file' as const,
 								name: child.name,
 								path: child.path,
 								depth: child.depth,
 								parentPath: path,
 								size: child.size ?? undefined,
-								lastModified: child.lastModified ?? undefined
+								lastModified: child.lastModified ?? undefined,
 							})),
-							isLoaded: true
+							isLoaded: true,
 						}
 
 						// Pre-populate cache with cached data
@@ -138,7 +168,7 @@ describe('CachedPrefetchQueue', () => {
 						mockLoadDirectory.mockImplementation(async (target) => {
 							workerCallCount++
 							// Simulate background worker delay
-							await new Promise(resolve => setTimeout(resolve, 20))
+							await new Promise((resolve) => setTimeout(resolve, 20))
 							return target.path === path ? freshNode : undefined
 						})
 
@@ -149,11 +179,16 @@ describe('CachedPrefetchQueue', () => {
 						})
 
 						// Simulate cache-first loading
-						const target: PrefetchTarget = { path, name, depth, parentPath: depth > 0 ? '/' : undefined }
-						
+						const target: PrefetchTarget = {
+							path,
+							name,
+							depth,
+							parentPath: depth > 0 ? '/' : undefined,
+						}
+
 						// The queue should first display cached data, then validate in background
 						const startTime = Date.now()
-						
+
 						// First, check if cached data would be returned immediately
 						const cachedData = await cacheController.getCachedDirectory(path)
 						expect(cachedData).not.toBeNull()
@@ -166,10 +201,12 @@ describe('CachedPrefetchQueue', () => {
 
 						// Now simulate the cache-first loading which should trigger background validation
 						const backgroundStartTime = Date.now()
-						
+
 						// This should return cached data immediately and trigger background validation
-						const result = await (cachedQueue as any).loadDirectoryWithCache(target)
-						
+						const result = await (cachedQueue as any).loadDirectoryWithCache(
+							target
+						)
+
 						// Result should be the cached data (returned immediately)
 						if (result) {
 							expect(result.path).toBe(path)
@@ -177,8 +214,8 @@ describe('CachedPrefetchQueue', () => {
 						}
 
 						// Wait a bit for background validation to potentially complete
-						await new Promise(resolve => setTimeout(resolve, 50))
-						
+						await new Promise((resolve) => setTimeout(resolve, 50))
+
 						// Worker should have been called for background validation
 						expect(workerCallCount).toBeGreaterThan(0)
 					}
@@ -210,9 +247,9 @@ describe('CachedPrefetchQueue', () => {
 					depth: 1,
 					parentPath: testPath,
 					size: 100 + i,
-					lastModified: Date.now() - 10000
+					lastModified: Date.now() - 10000,
 				})),
-				isLoaded: true
+				isLoaded: true,
 			}
 
 			// Create fresh data with different child count (simulating changes)
@@ -228,14 +265,14 @@ describe('CachedPrefetchQueue', () => {
 					depth: 1,
 					parentPath: testPath,
 					size: 200 + i,
-					lastModified: Date.now() - 1000
+					lastModified: Date.now() - 1000,
 				})),
-				isLoaded: true
+				isLoaded: true,
 			}
 
 			// Pre-populate cache with cached data
 			await cacheController.setCachedDirectory(testPath, cachedNode)
-			
+
 			// Verify cache was set correctly
 			const verifyCache = await cacheController.getCachedDirectory(testPath)
 			expect(verifyCache).not.toBeNull()
@@ -257,16 +294,24 @@ describe('CachedPrefetchQueue', () => {
 			await fc.assert(
 				fc.asyncProperty(
 					fc.record({
-						rootPath: fc.string({ minLength: 1, maxLength: 10 }).map(s => `/${s.replace(/[\0\/]/g, '_')}`),
-						rootName: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
+						rootPath: fc
+							.string({ minLength: 1, maxLength: 10 })
+							.map((s) => `/${s.replace(/[\0\/]/g, '_')}`),
+						rootName: fc
+							.string({ minLength: 1, maxLength: 10 })
+							.map((s) => s.replace(/[\0\/]/g, '_')),
 						directories: fc.array(
 							fc.record({
-								path: fc.string({ minLength: 1, maxLength: 15 }).map(s => `/${s.replace(/[\0\/]/g, '_')}`),
-								name: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/]/g, '_')),
-								childCount: fc.integer({ min: 0, max: 3 })
+								path: fc
+									.string({ minLength: 1, maxLength: 15 })
+									.map((s) => `/${s.replace(/[\0\/]/g, '_')}`),
+								name: fc
+									.string({ minLength: 1, maxLength: 10 })
+									.map((s) => s.replace(/[\0\/]/g, '_')),
+								childCount: fc.integer({ min: 0, max: 3 }),
 							}),
 							{ minLength: 1, maxLength: 4 }
-						)
+						),
 					}),
 					async (testData) => {
 						const { rootPath, rootName, directories } = testData
@@ -277,7 +322,7 @@ describe('CachedPrefetchQueue', () => {
 							name: rootName,
 							path: rootPath,
 							depth: 0,
-							children: directories.map(dir => ({
+							children: directories.map((dir) => ({
 								kind: 'dir' as const,
 								name: dir.name,
 								path: dir.path,
@@ -290,16 +335,16 @@ describe('CachedPrefetchQueue', () => {
 									depth: 2,
 									parentPath: dir.path,
 									size: 100 + i,
-									lastModified: Date.now() - 5000
+									lastModified: Date.now() - 5000,
 								})),
-								isLoaded: true
+								isLoaded: true,
 							})),
-							isLoaded: true
+							isLoaded: true,
 						}
 
 						// Pre-populate cache with tree data
 						await cacheController.setCachedTree(rootPath, cachedTree)
-						
+
 						// Also cache individual directories
 						for (const dir of directories) {
 							const dirNode: FsDirTreeNode = {
@@ -315,9 +360,9 @@ describe('CachedPrefetchQueue', () => {
 									depth: 2,
 									parentPath: dir.path,
 									size: 100 + i,
-									lastModified: Date.now() - 5000
+									lastModified: Date.now() - 5000,
 								})),
-								isLoaded: true
+								isLoaded: true,
 							}
 							await cacheController.setCachedDirectory(dir.path, dirNode)
 						}
@@ -327,10 +372,12 @@ describe('CachedPrefetchQueue', () => {
 						mockLoadDirectory.mockImplementation(async (target) => {
 							backgroundValidationCalls++
 							// Simulate background validation delay
-							await new Promise(resolve => setTimeout(resolve, 10))
-							
+							await new Promise((resolve) => setTimeout(resolve, 10))
+
 							// Return fresh data (could be same or different)
-							const matchingDir = directories.find(d => d.path === target.path)
+							const matchingDir = directories.find(
+								(d) => d.path === target.path
+							)
 							if (matchingDir) {
 								return {
 									kind: 'dir' as const,
@@ -338,16 +385,19 @@ describe('CachedPrefetchQueue', () => {
 									path: matchingDir.path,
 									depth: 1,
 									parentPath: rootPath,
-									children: Array.from({ length: matchingDir.childCount }, (_, i) => ({
-										kind: 'file' as const,
-										name: `validated-file-${i}.txt`,
-										path: `${matchingDir.path}/validated-file-${i}.txt`,
-										depth: 2,
-										parentPath: matchingDir.path,
-										size: 200 + i,
-										lastModified: Date.now() - 1000
-									})),
-									isLoaded: true
+									children: Array.from(
+										{ length: matchingDir.childCount },
+										(_, i) => ({
+											kind: 'file' as const,
+											name: `validated-file-${i}.txt`,
+											path: `${matchingDir.path}/validated-file-${i}.txt`,
+											depth: 2,
+											parentPath: matchingDir.path,
+											size: 200 + i,
+											lastModified: Date.now() - 1000,
+										})
+									),
+									isLoaded: true,
 								}
 							}
 							return undefined
@@ -355,27 +405,27 @@ describe('CachedPrefetchQueue', () => {
 
 						// Test cache-first startup
 						const startupStartTime = Date.now()
-						
+
 						// Should load cached tree immediately
 						const cachedTreeData = await cacheController.getCachedTree(rootPath)
-						
+
 						const cacheLoadTime = Date.now() - startupStartTime
-						
+
 						// Cache load should be very fast
 						expect(cacheLoadTime).toBeLessThan(100) // More lenient timing
-						
+
 						// Should have cached tree data
 						expect(cachedTreeData).not.toBeNull()
 						expect(cachedTreeData!.path).toBe(rootPath)
 						expect(cachedTreeData!.children).toHaveLength(directories.length)
 
 						// Simulate background validation of all directories
-						const validationPromises = directories.map(dir => {
+						const validationPromises = directories.map((dir) => {
 							const target: PrefetchTarget = {
 								path: dir.path,
 								name: dir.name,
 								depth: 1,
-								parentPath: rootPath
+								parentPath: rootPath,
 							}
 							return (cachedQueue as any).loadDirectoryWithCache(target)
 						})
@@ -393,14 +443,16 @@ describe('CachedPrefetchQueue', () => {
 						})
 
 						// Wait for background validation to potentially complete
-						await new Promise(resolve => setTimeout(resolve, 50))
+						await new Promise((resolve) => setTimeout(resolve, 50))
 
 						// Background validation should have been triggered
 						expect(backgroundValidationCalls).toBeGreaterThan(0)
-						
+
 						// Cache should potentially be updated with validated data
 						for (const dir of directories) {
-							const updatedCache = await cacheController.getCachedDirectory(dir.path)
+							const updatedCache = await cacheController.getCachedDirectory(
+								dir.path
+							)
 							expect(updatedCache).not.toBeNull()
 							// The cache might have been updated with validated data
 							if (updatedCache && updatedCache.children.length > 0) {

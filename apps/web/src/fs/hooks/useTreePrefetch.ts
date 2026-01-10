@@ -98,14 +98,17 @@ export const makeTreePrefetch = ({
 		registerDeferredMetadata(payload.node)
 	}
 
-	const treePrefetchClient = createTreePrefetchClient({
-		onDirectoryLoaded: handlePrefetchResult,
-		onStatus: handlePrefetchStatus,
-		onError: handlePrefetchError,
-		onDeferredMetadata: handleDeferredMetadata,
-	}, {
-		enableCaching, // Pass through caching configuration
-	})
+	const treePrefetchClient = createTreePrefetchClient(
+		{
+			onDirectoryLoaded: handlePrefetchResult,
+			onStatus: handlePrefetchStatus,
+			onError: handlePrefetchError,
+			onDeferredMetadata: handleDeferredMetadata,
+		},
+		{
+			enableCaching, // Pass through caching configuration
+		}
+	)
 	const disposeTreePrefetchClient = () => treePrefetchClient.dispose()
 
 	if (getOwner()) {

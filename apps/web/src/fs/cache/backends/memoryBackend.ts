@@ -23,7 +23,7 @@ interface LRUNode<T> {
 /**
  * In-memory LRU cache with synchronous access.
  * Evicts least recently used entries when capacity is reached.
- * 
+ *
  * Uses a Map for O(1) key-value access and a doubly-linked list
  * for O(1) LRU order tracking and eviction.
  */
@@ -31,18 +31,18 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 	private readonly maxEntries: number
 	private readonly onEvict?: (key: string, value: unknown) => void
 	private readonly cache = new Map<string, LRUNode<T>>()
-	
+
 	// Doubly-linked list sentinels for LRU tracking
 	private readonly head: LRUNode<T>
 	private readonly tail: LRUNode<T>
-	
+
 	// Track approximate size for monitoring
 	private approximateSize = 0
 
 	constructor(options: MemoryBackendOptions = {}) {
 		this.maxEntries = options.maxEntries ?? 100
 		this.onEvict = options.onEvict
-		
+
 		// Initialize sentinel nodes for doubly-linked list
 		this.head = { key: '', value: null as T, prev: null, next: null }
 		this.tail = { key: '', value: null as T, prev: null, next: null }
@@ -55,7 +55,7 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 		if (!node) {
 			return null
 		}
-		
+
 		// Move to front (most recently used)
 		this.moveToFront(node)
 		return node.value
@@ -63,33 +63,34 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 
 	set(key: string, value: T): T {
 		const existingNode = this.cache.get(key)
-		
+
 		if (existingNode) {
 			// Update existing entry
 			const oldSize = this.estimateValueSize(existingNode.value)
 			existingNode.value = value
-			this.approximateSize = this.approximateSize - oldSize + this.estimateValueSize(value)
+			this.approximateSize =
+				this.approximateSize - oldSize + this.estimateValueSize(value)
 			this.moveToFront(existingNode)
 			return value
 		}
-		
+
 		// Add new entry
 		const newNode: LRUNode<T> = {
 			key,
 			value,
 			prev: null,
-			next: null
+			next: null,
 		}
-		
+
 		this.cache.set(key, newNode)
 		this.addToFront(newNode)
 		this.approximateSize += this.estimateValueSize(value)
-		
+
 		// Evict if over capacity
 		if (this.cache.size > this.maxEntries) {
 			this.evictLRU()
 		}
-		
+
 		return value
 	}
 
@@ -98,7 +99,7 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 		if (!node) {
 			return
 		}
-		
+
 		this.approximateSize -= this.estimateValueSize(node.value)
 		this.cache.delete(key)
 		this.removeFromList(node)
@@ -163,12 +164,12 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 		if (!lru || lru === this.head) {
 			return // No entries to evict
 		}
-		
+
 		// Call eviction callback before removing
 		if (this.onEvict) {
 			this.onEvict(lru.key, lru.value)
 		}
-		
+
 		this.cache.delete(lru.key)
 		this.removeFromList(lru)
 		this.approximateSize -= this.estimateValueSize(lru.value)
@@ -182,23 +183,25 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 		if (value === null || value === undefined) {
 			return 0
 		}
-		
+
 		if (typeof value === 'string') {
 			return value.length * 2 // Rough estimate for UTF-16
 		}
-		
+
 		if (typeof value === 'number' || typeof value === 'boolean') {
 			return 8
 		}
-		
+
 		if (value instanceof Uint8Array) {
 			return value.byteLength
 		}
-		
+
 		if (Array.isArray(value)) {
-			return value.reduce((sum, item) => sum + this.estimateValueSize(item), 0) + 24 // Array overhead
+			return (
+				value.reduce((sum, item) => sum + this.estimateValueSize(item), 0) + 24
+			) // Array overhead
 		}
-		
+
 		if (typeof value === 'object') {
 			// Rough estimate: JSON string length as proxy for object size
 			try {
@@ -207,7 +210,7 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 				return 100 // Fallback for non-serializable objects
 			}
 		}
-		
+
 		return 50 // Default fallback
 	}
 }
@@ -215,6 +218,8 @@ export class MemoryBackend<T = unknown> implements SyncStorageBackend<T> {
 /**
  * Factory function to create a memory backend instance.
  */
-export function createMemoryBackend<T = unknown>(options?: MemoryBackendOptions): SyncStorageBackend<T> {
+export function createMemoryBackend<T = unknown>(
+	options?: MemoryBackendOptions
+): SyncStorageBackend<T> {
 	return new MemoryBackend<T>(options)
 }

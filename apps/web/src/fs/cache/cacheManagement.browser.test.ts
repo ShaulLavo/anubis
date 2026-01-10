@@ -9,7 +9,9 @@ describe('Cache Management Browser Tests', () => {
 		it('should completely remove all specified cached data for clear operations', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping cache management test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping cache management test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -50,8 +52,12 @@ describe('Cache Management Browser Tests', () => {
 				expect(stats.totalEntries).toBeGreaterThan(0)
 
 				// Test clear operation with progress tracking
-				const progressUpdates: Array<{ completed: number; total: number; currentOperation: string }> = []
-				
+				const progressUpdates: Array<{
+					completed: number
+					total: number
+					currentOperation: string
+				}> = []
+
 				await controller.clearCacheWithProgress((progress) => {
 					progressUpdates.push({ ...progress })
 				})
@@ -90,7 +96,9 @@ describe('Cache Management Browser Tests', () => {
 		it('should completely remove specified cached data for invalidate operations', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping cache invalidate test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping cache invalidate test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -175,20 +183,33 @@ describe('Cache Management Browser Tests', () => {
 
 				// Verify all data is cached
 				expect(await controller.getCachedDirectory('/root')).not.toBeNull()
-				expect(await controller.getCachedDirectory('/root/subdir1')).not.toBeNull()
-				expect(await controller.getCachedDirectory('/root/subdir2')).not.toBeNull()
+				expect(
+					await controller.getCachedDirectory('/root/subdir1')
+				).not.toBeNull()
+				expect(
+					await controller.getCachedDirectory('/root/subdir2')
+				).not.toBeNull()
 
 				// Test subtree invalidation with progress tracking
-				const progressUpdates: Array<{ completed: number; total: number; currentOperation: string }> = []
-				
-				await controller.invalidateSubtreeWithProgress('/root/subdir1', (progress) => {
-					progressUpdates.push({ ...progress })
-				})
+				const progressUpdates: Array<{
+					completed: number
+					total: number
+					currentOperation: string
+				}> = []
+
+				await controller.invalidateSubtreeWithProgress(
+					'/root/subdir1',
+					(progress) => {
+						progressUpdates.push({ ...progress })
+					}
+				)
 
 				// Verify only subdir1 is invalidated, others remain
 				expect(await controller.getCachedDirectory('/root')).not.toBeNull()
 				expect(await controller.getCachedDirectory('/root/subdir1')).toBeNull() // Should be invalidated
-				expect(await controller.getCachedDirectory('/root/subdir2')).not.toBeNull()
+				expect(
+					await controller.getCachedDirectory('/root/subdir2')
+				).not.toBeNull()
 
 				// Verify progress tracking worked
 				expect(progressUpdates.length).toBeGreaterThan(0)
@@ -211,7 +232,9 @@ describe('Cache Management Browser Tests', () => {
 		it('should handle property-based testing for cache management operations', () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping cache management property test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping cache management property test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -222,7 +245,12 @@ describe('Cache Management Browser Tests', () => {
 				)
 
 			const cacheEntryCountArb = fc.integer({ min: 1, max: 10 })
-			const operationArb = fc.constantFrom('clear', 'cleanup', 'validate', 'compact')
+			const operationArb = fc.constantFrom(
+				'clear',
+				'cleanup',
+				'validate',
+				'compact'
+			)
 
 			const createTestNode = (name: string, index: number): FsDirTreeNode => ({
 				kind: 'dir',
@@ -248,7 +276,11 @@ describe('Cache Management Browser Tests', () => {
 					validNameArb,
 					cacheEntryCountArb,
 					operationArb,
-					async (baseName: string, entryCount: number, operation: 'clear' | 'cleanup' | 'validate' | 'compact') => {
+					async (
+						baseName: string,
+						entryCount: number,
+						operation: 'clear' | 'cleanup' | 'validate' | 'compact'
+					) => {
 						const mockLoadDirectory = async () => undefined
 						const mockCallbacks = {
 							onDirectoryLoaded: () => {},
@@ -287,20 +319,21 @@ describe('Cache Management Browser Tests', () => {
 								maxAgeMs: 1000, // Very short age for cleanup testing
 								onProgress: (progress) => {
 									progressUpdates.push(progress)
-								}
+								},
 							})
 
 							// For any cache management request, all specified cached data should be removed completely
 							expect(result).toBeDefined()
-							
+
 							if (operation === 'clear') {
 								// Clear should remove all data
 								const finalStats = await queue.getCacheStats()
 								expect(finalStats.totalEntries).toBe(0)
-								
+
 								// Verify no data can be retrieved
 								for (const [path] of testNodes) {
-									const retrieved = await queue['cacheController'].getCachedDirectory(path)
+									const retrieved =
+										await queue['cacheController'].getCachedDirectory(path)
 									expect(retrieved).toBeNull()
 								}
 							} else if (operation === 'validate') {
@@ -319,7 +352,8 @@ describe('Cache Management Browser Tests', () => {
 							if (operation !== 'cleanup' || progressUpdates.length > 0) {
 								expect(progressUpdates.length).toBeGreaterThanOrEqual(0)
 								if (progressUpdates.length > 0) {
-									const finalProgress = progressUpdates[progressUpdates.length - 1]!
+									const finalProgress =
+										progressUpdates[progressUpdates.length - 1]!
 									expect(finalProgress.completed).toBeGreaterThanOrEqual(0)
 									expect(finalProgress.total).toBeGreaterThanOrEqual(0)
 									expect(typeof finalProgress.currentOperation).toBe('string')
@@ -337,7 +371,11 @@ describe('Cache Management Browser Tests', () => {
 								)
 								return
 							}
-							console.error('Cache management test failed:', { baseName, entryCount, operation })
+							console.error('Cache management test failed:', {
+								baseName,
+								entryCount,
+								operation,
+							})
 							console.error('Error:', error)
 							throw error
 						}
@@ -350,7 +388,9 @@ describe('Cache Management Browser Tests', () => {
 		it('should provide accurate cache size and statistics information', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping cache info test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping cache info test - IndexedDB not available in test environment'
+				)
 				return
 			}
 

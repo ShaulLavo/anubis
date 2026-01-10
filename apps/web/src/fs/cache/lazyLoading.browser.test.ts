@@ -8,7 +8,9 @@ describe('Lazy Loading Browser Tests', () => {
 		it('should load children on-demand rather than loading entire trees at once for large directories', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping lazy loading test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping lazy loading test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -44,11 +46,16 @@ describe('Lazy Loading Browser Tests', () => {
 				await controller.setCachedDirectory('/large-dir', largeDirectory)
 
 				// Test lazy loading with maxChildrenToLoad = 50
-				const lazyLoadedNode = await controller.getCachedDirectoryLazy('/large-dir', 50)
-				
+				const lazyLoadedNode = await controller.getCachedDirectoryLazy(
+					'/large-dir',
+					50
+				)
+
 				// If IndexedDB is not working properly, lazyLoadedNode will be null
 				if (lazyLoadedNode === null) {
-					console.warn('Skipping lazy loading test - IndexedDB operations returning null')
+					console.warn(
+						'Skipping lazy loading test - IndexedDB operations returning null'
+					)
 					return
 				}
 
@@ -64,10 +71,16 @@ describe('Lazy Loading Browser Tests', () => {
 				}
 
 				// Test loading more children
-				const moreChildrenNode = await controller.loadMoreChildren('/large-dir', 50, 30)
-				
+				const moreChildrenNode = await controller.loadMoreChildren(
+					'/large-dir',
+					50,
+					30
+				)
+
 				if (moreChildrenNode === null) {
-					console.warn('Skipping load more children test - operation returning null')
+					console.warn(
+						'Skipping load more children test - operation returning null'
+					)
 					return
 				}
 
@@ -76,8 +89,12 @@ describe('Lazy Loading Browser Tests', () => {
 				expect(moreChildrenNode!.isLoaded).toBe(false) // Still not fully loaded
 
 				// Test loading remaining children
-				const finalNode = await controller.loadMoreChildren('/large-dir', 80, 100)
-				
+				const finalNode = await controller.loadMoreChildren(
+					'/large-dir',
+					80,
+					100
+				)
+
 				if (finalNode === null) {
 					console.warn('Skipping final load test - operation returning null')
 					return
@@ -105,7 +122,9 @@ describe('Lazy Loading Browser Tests', () => {
 		it('should handle property-based testing for lazy loading strategy', () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping lazy loading property test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping lazy loading property test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -123,7 +142,7 @@ describe('Lazy Loading Browser Tests', () => {
 				childCount: number
 			): FsDirTreeNode => {
 				const children: FsDirTreeNode['children'] = []
-				
+
 				for (let i = 0; i < childCount; i++) {
 					children.push({
 						kind: 'file',
@@ -158,28 +177,33 @@ describe('Lazy Loading Browser Tests', () => {
 
 						try {
 							const largeDir = createLargeDirectory(dirName, childCount)
-							
+
 							// Cache the large directory
 							await controller.setCachedDirectory(largeDir.path, largeDir)
 
 							// Test lazy loading
-							const lazyNode = await controller.getCachedDirectoryLazy(largeDir.path, batchSize)
-							
+							const lazyNode = await controller.getCachedDirectoryLazy(
+								largeDir.path,
+								batchSize
+							)
+
 							// If IndexedDB is not working properly, lazyNode will be null
 							if (lazyNode === null) {
-								console.warn('Skipping lazy loading property test iteration - IndexedDB operations returning null')
+								console.warn(
+									'Skipping lazy loading property test iteration - IndexedDB operations returning null'
+								)
 								return
 							}
 
 							// For any large directory tree, children should be loaded on-demand rather than loading entire trees at once
 							expect(lazyNode).not.toBeNull()
-							
+
 							if (childCount > batchSize) {
 								// Should only load the batch size, not all children
 								expect(lazyNode!.children.length).toBe(batchSize)
 								expect(lazyNode!.children.length).toBeLessThan(childCount)
 								expect(lazyNode!.isLoaded).toBe(false) // Not fully loaded
-								
+
 								// Verify children are loaded in correct order
 								for (let i = 0; i < batchSize; i++) {
 									const child = lazyNode!.children[i]!
@@ -203,7 +227,11 @@ describe('Lazy Loading Browser Tests', () => {
 								)
 								return
 							}
-							console.error('Lazy loading test failed:', { dirName, childCount, batchSize })
+							console.error('Lazy loading test failed:', {
+								dirName,
+								childCount,
+								batchSize,
+							})
 							console.error('Error:', error)
 							throw error
 						}
@@ -216,7 +244,9 @@ describe('Lazy Loading Browser Tests', () => {
 		it('should maintain correct parent-child relationships during lazy loading', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping lazy loading relationship test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping lazy loading relationship test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -247,13 +277,21 @@ describe('Lazy Loading Browser Tests', () => {
 			}
 
 			try {
-				await controller.setCachedDirectory('/test-relationships', testDirectory)
+				await controller.setCachedDirectory(
+					'/test-relationships',
+					testDirectory
+				)
 
 				// Load with lazy loading (batch size 25)
-				const lazyNode = await controller.getCachedDirectoryLazy('/test-relationships', 25)
-				
+				const lazyNode = await controller.getCachedDirectoryLazy(
+					'/test-relationships',
+					25
+				)
+
 				if (lazyNode === null) {
-					console.warn('Skipping lazy loading relationship test - IndexedDB operations returning null')
+					console.warn(
+						'Skipping lazy loading relationship test - IndexedDB operations returning null'
+					)
 					return
 				}
 
@@ -268,10 +306,16 @@ describe('Lazy Loading Browser Tests', () => {
 				}
 
 				// Load more children and verify relationships are maintained
-				const moreNode = await controller.loadMoreChildren('/test-relationships', 25, 25)
-				
+				const moreNode = await controller.loadMoreChildren(
+					'/test-relationships',
+					25,
+					25
+				)
+
 				if (moreNode === null) {
-					console.warn('Skipping load more relationship test - operation returning null')
+					console.warn(
+						'Skipping load more relationship test - operation returning null'
+					)
 					return
 				}
 

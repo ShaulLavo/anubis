@@ -326,7 +326,7 @@ const sanitizeForCold = (value: unknown): unknown => {
 	if (value === null || typeof value !== 'object') {
 		return value
 	}
-	
+
 	try {
 		return unwrap(value as Record<string, unknown>)
 	} catch {

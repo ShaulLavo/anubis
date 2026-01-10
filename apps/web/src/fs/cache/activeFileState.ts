@@ -3,7 +3,7 @@ import type { FileCacheEntry } from './fileCacheController'
 /**
  * Manages state for the currently active file.
  * This state is never evicted and bypasses DISABLE_CACHE.
- * 
+ *
  * The active file is the file currently being edited in the editor.
  * Its state is kept separate from the regular cache to ensure it's
  * always available regardless of cache settings or eviction policies.
@@ -11,28 +11,28 @@ import type { FileCacheEntry } from './fileCacheController'
 export interface ActiveFileState {
 	/** Current active file path, or null if none */
 	activePath: string | null
-	
+
 	/** Current open tab paths */
 	openTabs: string[]
-	
+
 	/** Set the active file path */
 	setActive(path: string | null): void
-	
+
 	/** Set open tabs */
 	setOpenTabs(paths: string[]): void
-	
+
 	/** Get active file's cache entry (always available) */
 	getActiveEntry(): FileCacheEntry | null
-	
+
 	/** Update active file's cache entry */
 	setActiveEntry(entry: Partial<FileCacheEntry>): void
-	
+
 	/** Replace active file's cache entry entirely */
 	replaceActiveEntry(entry: FileCacheEntry): void
-	
+
 	/** Check if a path is the active file */
 	isActive(path: string): boolean
-	
+
 	/** Check if a path is in open tabs (protected from eviction) */
 	isOpenTab(path: string): boolean
 }
@@ -49,20 +49,22 @@ export interface ActiveFileStateOptions {
 
 /**
  * Creates an ActiveFileState instance that manages the currently active file's state.
- * 
+ *
  * The active file state is kept separate from the cache to ensure:
  * - It's never evicted from memory
  * - It bypasses DISABLE_CACHE setting
  * - It's always instantly available for editor operations
  */
-export function createActiveFileState(options: ActiveFileStateOptions = {}): ActiveFileState {
+export function createActiveFileState(
+	options: ActiveFileStateOptions = {}
+): ActiveFileState {
 	let activePath: string | null = null
 	let activeEntry: FileCacheEntry = {}
 	let openTabs: string[] = []
 
 	const setActive = (path: string | null): void => {
 		const oldPath = activePath
-		
+
 		if (oldPath && oldPath !== path && options.onDeactivate) {
 			options.onDeactivate(oldPath, { ...activeEntry })
 		}
@@ -72,7 +74,7 @@ export function createActiveFileState(options: ActiveFileStateOptions = {}): Act
 		}
 
 		activePath = path
-		
+
 		if (options.onActiveChange) {
 			options.onActiveChange(oldPath, path)
 		}
@@ -96,7 +98,7 @@ export function createActiveFileState(options: ActiveFileStateOptions = {}): Act
 
 		activeEntry = {
 			...activeEntry,
-			...entry
+			...entry,
 		}
 	}
 
@@ -129,7 +131,7 @@ export function createActiveFileState(options: ActiveFileStateOptions = {}): Act
 		setActiveEntry,
 		replaceActiveEntry,
 		isActive,
-		isOpenTab
+		isOpenTab,
 	}
 }
 

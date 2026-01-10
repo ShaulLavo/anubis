@@ -6,15 +6,19 @@ import { FsContext, type FsContextValue } from '../context/FsContext'
 
 // Mock the icons
 vi.mock('@repo/icons/vs/VsChevronDown', () => ({
-	VsChevronDown: (props: any) => <div data-testid="chevron-down" {...props} />
+	VsChevronDown: (props: any) => <div data-testid="chevron-down" {...props} />,
 }))
 
 vi.mock('@repo/icons/vs/VsChevronRight', () => ({
-	VsChevronRight: (props: any) => <div data-testid="chevron-right" {...props} />
+	VsChevronRight: (props: any) => (
+		<div data-testid="chevron-right" {...props} />
+	),
 }))
 
 vi.mock('./FileIcon', () => ({
-	FileIcon: (props: any) => <div data-testid="file-icon" data-name={props.name} {...props} />
+	FileIcon: (props: any) => (
+		<div data-testid="file-icon" data-name={props.name} {...props} />
+	),
 }))
 
 describe('TreeNode Layout and Alignment Preservation', () => {
@@ -29,7 +33,7 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 				creationState: null,
 				loadingPaths: new Set(),
 				pieceTableSnapshots: {},
-				visibleContentSnapshots: {}
+				visibleContentSnapshots: {},
 			},
 			actions: {
 				isSelectedPath: vi.fn(() => false),
@@ -41,27 +45,34 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 				ensureDirPathLoaded: vi.fn(),
 				updateSelectedFilePieceTable: vi.fn(),
 				updateSelectedFileVisibleContent: vi.fn(),
-				setCreationState: vi.fn()
-			}
+				setCreationState: vi.fn(),
+			},
 		}
 	})
 
-	const createTestFileNode = (name: string, depth: number = 0): FsFileTreeNode => ({
+	const createTestFileNode = (
+		name: string,
+		depth: number = 0
+	): FsFileTreeNode => ({
 		kind: 'file',
 		name,
 		path: `/${name}`,
 		depth,
 		size: 1024,
-		mtime: Date.now()
+		mtime: Date.now(),
 	})
 
-	const createTestDirNode = (name: string, depth: number = 0, children: any[] = []): FsDirTreeNode => ({
+	const createTestDirNode = (
+		name: string,
+		depth: number = 0,
+		children: any[] = []
+	): FsDirTreeNode => ({
 		kind: 'dir',
 		name,
 		path: `/${name}`,
 		depth,
 		children,
-		mtime: Date.now()
+		mtime: Date.now(),
 	})
 
 	it('should maintain consistent indentation calculations for different depths', () => {
@@ -119,7 +130,7 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 			// Test hierarchy structure (Requirements 2.2, 2.4)
 			expect(parentNode.children).toContain(childNode)
 			expect(childNode.depth).toBeGreaterThan(parentNode.depth)
-			
+
 			// Verify depth difference is exactly 1 for direct children
 			expect(childNode.depth - parentNode.depth).toBe(1)
 		})
@@ -129,14 +140,14 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 		createRoot(() => {
 			const parentNode = createTestDirNode('parent', 1)
 			const childNode = createTestDirNode('child', 2)
-			
+
 			// Test that branch line positioning logic is preserved (Requirements 2.2, 2.3)
 			// Branch lines should align with the new chevron structure
-			
+
 			// The CSS class should position branch lines at left-2 (0.5rem)
 			// This should align with the center of the 16px chevron icon
 			const expectedBranchLinePosition = 'left-2' // 0.5rem = 8px, center of 16px icon
-			
+
 			// Verify the positioning calculation remains consistent
 			expect(parentNode.depth).toBe(1)
 			expect(childNode.depth).toBe(2)
@@ -152,7 +163,7 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 			// Both folders and files should use the same base structure
 			expect(folderNode.kind).toBe('dir')
 			expect(fileNode.kind).toBe('file')
-			
+
 			// Verify that both node types have the same depth-based indentation
 			expect(folderNode.depth).toBe(fileNode.depth)
 		})

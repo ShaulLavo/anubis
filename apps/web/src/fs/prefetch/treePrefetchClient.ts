@@ -65,7 +65,7 @@ export const createTreePrefetchClient = (
 
 	// Determine whether to use caching
 	const enableCaching = options.enableCaching ?? true // Default to enabled
-	
+
 	let queue: PrefetchQueue | CachedPrefetchQueue
 
 	if (enableCaching) {

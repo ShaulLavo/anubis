@@ -1,4 +1,7 @@
-import type { DocumentIncrementalEdit, TextEditorDocument } from '@repo/code-editor'
+import type {
+	DocumentIncrementalEdit,
+	TextEditorDocument,
+} from '@repo/code-editor'
 import type { ParseResult } from '@repo/utils'
 import { getEditCharDelta, getEditLineDelta } from '@repo/utils/highlightShift'
 import { batch, createSignal } from 'solid-js'

@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { FsDirTreeNode } from '@repo/fs'
 import { TreeCacheController } from './treeCacheController'
 import { CachedPrefetchQueue } from './cachedPrefetchQueue'
-import type { TreePrefetchWorkerCallbacks, PrefetchTarget } from '../prefetch/treePrefetchWorkerTypes'
+import type {
+	TreePrefetchWorkerCallbacks,
+	PrefetchTarget,
+} from '../prefetch/treePrefetchWorkerTypes'
 
 describe('Performance Improvements Demo', () => {
 	let cacheController: TreeCacheController
@@ -10,16 +13,16 @@ describe('Performance Improvements Demo', () => {
 	const testDbName = `test-performance-${Date.now()}-${Math.random().toString(36).substring(7)}`
 
 	beforeEach(() => {
-		cacheController = new TreeCacheController({ 
+		cacheController = new TreeCacheController({
 			dbName: testDbName,
-			storeName: 'performance-test-directories'
+			storeName: 'performance-test-directories',
 		})
 
 		mockCallbacks = {
 			onDirectoryLoaded: vi.fn(),
 			onStatus: vi.fn(),
 			onDeferredMetadata: vi.fn(),
-			onError: vi.fn()
+			onError: vi.fn(),
 		}
 	})
 
@@ -35,7 +38,9 @@ describe('Performance Improvements Demo', () => {
 	it('should demonstrate performance improvements with large datasets', async () => {
 		// Check if IndexedDB is available
 		if (typeof indexedDB === 'undefined') {
-			console.warn('Skipping performance demo - IndexedDB not available in test environment')
+			console.warn(
+				'Skipping performance demo - IndexedDB not available in test environment'
+			)
 			return
 		}
 
@@ -51,7 +56,9 @@ describe('Performance Improvements Demo', () => {
 
 		console.log(`📁 Creating large project structure:`)
 		console.log(`   - ${largeProjectSize.directories} directories`)
-		console.log(`   - ${largeProjectSize.filesPerDirectory} files per directory`)
+		console.log(
+			`   - ${largeProjectSize.filesPerDirectory} files per directory`
+		)
 		console.log(`   - ${largeProjectSize.totalFiles} total files`)
 
 		// Phase 1: Initial cold load (no cache)
@@ -59,10 +66,10 @@ describe('Performance Improvements Demo', () => {
 		const coldLoadStart = Date.now()
 
 		const largeTree = createLargeProjectStructure(largeProjectSize)
-		
+
 		// Simulate initial filesystem scan time
-		await new Promise(resolve => setTimeout(resolve, 100)) // Simulate scan delay
-		
+		await new Promise((resolve) => setTimeout(resolve, 100)) // Simulate scan delay
+
 		const coldLoadTime = Date.now() - coldLoadStart
 		console.log(`   ⏱️  Cold load time: ${coldLoadTime}ms`)
 
@@ -90,12 +97,14 @@ describe('Performance Improvements Demo', () => {
 		// Simulate loading several directories from cache
 		const samplePaths = Array.from(directoryNodes.keys()).slice(0, 10)
 		const cachedDirectories = await Promise.all(
-			samplePaths.map(path => cacheController.getCachedDirectory(path))
+			samplePaths.map((path) => cacheController.getCachedDirectory(path))
 		)
 
 		const warmLoadTime = Date.now() - warmLoadStart
 		console.log(`   ⏱️  Warm load time: ${warmLoadTime}ms`)
-		console.log(`   📊 Loaded ${cachedDirectories.filter(d => d !== null).length} directories from cache`)
+		console.log(
+			`   📊 Loaded ${cachedDirectories.filter((d) => d !== null).length} directories from cache`
+		)
 
 		// Phase 4: Performance comparison
 		console.log('\n📈 Phase 4: Performance Analysis')
@@ -104,7 +113,9 @@ describe('Performance Improvements Demo', () => {
 
 		console.log(`   🚀 Speed improvement: ${speedupRatio.toFixed(2)}x faster`)
 		console.log(`   ⏰ Time saved: ${timesSaved}ms`)
-		console.log(`   💡 Cache hit rate: ${cachedDirectories.filter(d => d !== null).length}/${samplePaths.length} (${((cachedDirectories.filter(d => d !== null).length / samplePaths.length) * 100).toFixed(1)}%)`)
+		console.log(
+			`   💡 Cache hit rate: ${cachedDirectories.filter((d) => d !== null).length}/${samplePaths.length} (${((cachedDirectories.filter((d) => d !== null).length / samplePaths.length) * 100).toFixed(1)}%)`
+		)
 
 		// Phase 5: Cache statistics
 		console.log('\n📊 Phase 5: Cache Statistics')
@@ -112,9 +123,13 @@ describe('Performance Improvements Demo', () => {
 		const cacheSize = await cacheController.getCacheSize()
 
 		console.log(`   📁 Total cached entries: ${stats.totalEntries}`)
-		console.log(`   💾 Estimated cache size: ${(cacheSize.estimatedSizeBytes / 1024).toFixed(2)} KB`)
+		console.log(
+			`   💾 Estimated cache size: ${(cacheSize.estimatedSizeBytes / 1024).toFixed(2)} KB`
+		)
 		console.log(`   🎯 Cache hit rate: ${(stats.hitRate * 100).toFixed(1)}%`)
-		console.log(`   ⚡ Average load time: ${stats.averageLoadTime.toFixed(2)}ms`)
+		console.log(
+			`   ⚡ Average load time: ${stats.averageLoadTime.toFixed(2)}ms`
+		)
 
 		// Phase 6: Incremental update performance
 		console.log('\n🔄 Phase 6: Incremental Update Performance')
@@ -123,7 +138,7 @@ describe('Performance Improvements Demo', () => {
 		// Simulate a small change (add one file to one directory)
 		const targetPath = samplePaths[0]!
 		const targetNode = directoryNodes.get(targetPath)!
-		
+
 		// Add a new file to simulate a change
 		const updatedNode: FsDirTreeNode = {
 			...targetNode,
@@ -136,29 +151,40 @@ describe('Performance Improvements Demo', () => {
 					depth: targetNode.depth + 1,
 					parentPath: targetPath,
 					size: 256,
-					lastModified: Date.now()
-				}
-			]
+					lastModified: Date.now(),
+				},
+			],
 		}
 
-		await cacheController.performIncrementalUpdate(targetPath, updatedNode, Date.now())
+		await cacheController.performIncrementalUpdate(
+			targetPath,
+			updatedNode,
+			Date.now()
+		)
 
 		const incrementalUpdateTime = Date.now() - incrementalUpdateStart
 		console.log(`   ⏱️  Incremental update time: ${incrementalUpdateTime}ms`)
-		console.log(`   📝 Updated 1 directory (vs full rescan of ${largeProjectSize.totalFiles} files)`)
+		console.log(
+			`   📝 Updated 1 directory (vs full rescan of ${largeProjectSize.totalFiles} files)`
+		)
 
 		// Verify the update completed without errors
-		const updatedCachedNode = await cacheController.getCachedDirectory(targetPath)
+		const updatedCachedNode =
+			await cacheController.getCachedDirectory(targetPath)
 		expect(updatedCachedNode).not.toBeNull()
 		// The update may or may not change the children count depending on implementation details
 		expect(updatedCachedNode!.path).toBe(targetPath)
 
 		console.log('\n✅ Performance Demo Complete!')
 		console.log('Key Benefits Demonstrated:')
-		console.log(`   • ${speedupRatio.toFixed(2)}x faster startup with cached data`)
+		console.log(
+			`   • ${speedupRatio.toFixed(2)}x faster startup with cached data`
+		)
 		console.log(`   • ${timesSaved}ms time savings on initial load`)
 		console.log(`   • Incremental updates in ${incrementalUpdateTime}ms`)
-		console.log(`   • Efficient storage: ${(cacheSize.estimatedSizeBytes / 1024).toFixed(2)} KB for ${largeProjectSize.totalFiles} files`)
+		console.log(
+			`   • Efficient storage: ${(cacheSize.estimatedSizeBytes / 1024).toFixed(2)} KB for ${largeProjectSize.totalFiles} files`
+		)
 		console.log(`   • Background validation maintains data freshness`)
 
 		// Verify performance expectations
@@ -171,7 +197,9 @@ describe('Performance Improvements Demo', () => {
 	it('should demonstrate memory efficiency with cold storage', async () => {
 		// Check if IndexedDB is available
 		if (typeof indexedDB === 'undefined') {
-			console.warn('Skipping memory efficiency demo - IndexedDB not available in test environment')
+			console.warn(
+				'Skipping memory efficiency demo - IndexedDB not available in test environment'
+			)
 			return
 		}
 
@@ -179,17 +207,22 @@ describe('Performance Improvements Demo', () => {
 		console.log('============================================')
 
 		// Create multiple large directory structures
-		const multipleProjects = Array.from({ length: 5 }, (_, i) => 
-			createLargeProjectStructure({ directories: 20, filesPerDirectory: 15, totalFiles: 300 }, `project-${i}`)
+		const multipleProjects = Array.from({ length: 5 }, (_, i) =>
+			createLargeProjectStructure(
+				{ directories: 20, filesPerDirectory: 15, totalFiles: 300 },
+				`project-${i}`
+			)
 		)
 
-		console.log(`📁 Created ${multipleProjects.length} projects with ${multipleProjects[0]!.children.length} directories each`)
+		console.log(
+			`📁 Created ${multipleProjects.length} projects with ${multipleProjects[0]!.children.length} directories each`
+		)
 
 		// Cache all projects
 		const cacheStart = Date.now()
 		for (const project of multipleProjects) {
 			await cacheController.setCachedTree(project.path, project)
-			
+
 			const directoryNodes = extractDirectoryNodes(project)
 			await cacheController.batchSetDirectories(directoryNodes)
 		}
@@ -201,8 +234,12 @@ describe('Performance Improvements Demo', () => {
 
 		console.log(`⏱️  Total caching time: ${cacheTime}ms`)
 		console.log(`📊 Total cached entries: ${stats.totalEntries}`)
-		console.log(`💾 Total cache size: ${(cacheSize.estimatedSizeBytes / 1024).toFixed(2)} KB`)
-		console.log(`📈 Average entry size: ${(cacheSize.estimatedSizeBytes / stats.totalEntries).toFixed(0)} bytes`)
+		console.log(
+			`💾 Total cache size: ${(cacheSize.estimatedSizeBytes / 1024).toFixed(2)} KB`
+		)
+		console.log(
+			`📈 Average entry size: ${(cacheSize.estimatedSizeBytes / stats.totalEntries).toFixed(0)} bytes`
+		)
 
 		// Demonstrate that data is stored in IndexedDB, not memory
 		console.log('\n🧠 Memory Usage Characteristics:')
@@ -213,8 +250,11 @@ describe('Performance Improvements Demo', () => {
 
 		// Verify we can retrieve data efficiently
 		const retrievalStart = Date.now()
-		const randomProject = multipleProjects[Math.floor(Math.random() * multipleProjects.length)]!
-		const retrievedTree = await cacheController.getCachedTree(randomProject.path)
+		const randomProject =
+			multipleProjects[Math.floor(Math.random() * multipleProjects.length)]!
+		const retrievedTree = await cacheController.getCachedTree(
+			randomProject.path
+		)
 		const retrievalTime = Date.now() - retrievalStart
 
 		expect(retrievedTree).not.toBeNull()
@@ -222,18 +262,22 @@ describe('Performance Improvements Demo', () => {
 
 		// Demonstrate batch operations efficiency
 		const batchStart = Date.now()
-		const allDirectories = multipleProjects.flatMap(project => 
-			Array.from(extractDirectoryNodes(project).keys())
-		).slice(0, 20) // Test with 20 directories
+		const allDirectories = multipleProjects
+			.flatMap((project) => Array.from(extractDirectoryNodes(project).keys()))
+			.slice(0, 20) // Test with 20 directories
 
 		const batchRetrieved = await Promise.all(
-			allDirectories.map(path => cacheController.getCachedDirectory(path))
+			allDirectories.map((path) => cacheController.getCachedDirectory(path))
 		)
 		const batchTime = Date.now() - batchStart
 
-		const successfulRetrievals = batchRetrieved.filter(d => d !== null).length
-		console.log(`📦 Batch retrieval: ${successfulRetrievals}/${allDirectories.length} directories in ${batchTime}ms`)
-		console.log(`⚡ Average per directory: ${(batchTime / successfulRetrievals).toFixed(2)}ms`)
+		const successfulRetrievals = batchRetrieved.filter((d) => d !== null).length
+		console.log(
+			`📦 Batch retrieval: ${successfulRetrievals}/${allDirectories.length} directories in ${batchTime}ms`
+		)
+		console.log(
+			`⚡ Average per directory: ${(batchTime / successfulRetrievals).toFixed(2)}ms`
+		)
 
 		expect(successfulRetrievals).toBeGreaterThan(0)
 		expect(batchTime).toBeLessThan(1000) // Should be reasonably fast
@@ -246,7 +290,7 @@ function createLargeProjectStructure(
 	projectName = 'large-project'
 ): FsDirTreeNode {
 	const rootPath = `/${projectName}`
-	
+
 	return {
 		kind: 'dir',
 		name: projectName,
@@ -265,41 +309,43 @@ function createLargeProjectStructure(
 				depth: 2,
 				parentPath: `${rootPath}/dir-${i}`,
 				size: 1000 + j,
-				lastModified: Date.now() - (j * 1000)
+				lastModified: Date.now() - j * 1000,
 			})),
-			isLoaded: true
+			isLoaded: true,
 		})),
-		isLoaded: true
+		isLoaded: true,
 	}
 }
 
-function extractDirectoryNodes(tree: FsDirTreeNode): Map<string, FsDirTreeNode> {
+function extractDirectoryNodes(
+	tree: FsDirTreeNode
+): Map<string, FsDirTreeNode> {
 	const nodes = new Map<string, FsDirTreeNode>()
-	
+
 	function traverse(node: FsDirTreeNode) {
 		if (node.kind === 'dir') {
 			nodes.set(node.path, node)
-			node.children.forEach(child => {
+			node.children.forEach((child) => {
 				if (child.kind === 'dir') {
 					traverse(child)
 				}
 			})
 		}
 	}
-	
+
 	traverse(tree)
 	return nodes
 }
 
 /**
  * **Feature: persistent-tree-cache, Performance Improvements Demo**
- * 
+ *
  * This test demonstrates the performance benefits of the persistent tree cache:
  * - Faster startup times with cached data
  * - Efficient incremental updates
  * - Memory-efficient cold storage in IndexedDB
  * - Scalability with large datasets
- * 
+ *
  * Key metrics shown:
  * - Speed improvements (typically 2-10x faster)
  * - Time savings on initial loads

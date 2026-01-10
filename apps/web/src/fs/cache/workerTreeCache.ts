@@ -113,7 +113,6 @@ export class WorkerTreeCache {
 			throw error
 		}
 	}
-
 }
 
 /**

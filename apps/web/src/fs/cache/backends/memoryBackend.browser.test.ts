@@ -6,8 +6,8 @@ describe('MemoryBackend Browser Tests', () => {
 	/**
 	 * **Feature: persistent-file-cache, Property 3: LRU Eviction Order**
 	 * **Validates: Requirements 2.2, 2.5**
-	 * 
-	 * For any sequence of cache accesses in the Hot_Cache, when eviction occurs, 
+	 *
+	 * For any sequence of cache accesses in the Hot_Cache, when eviction occurs,
 	 * the entry with the oldest last-access timestamp SHALL be evicted first.
 	 */
 	it('property: LRU eviction order is maintained', () => {
@@ -16,26 +16,28 @@ describe('MemoryBackend Browser Tests', () => {
 				// Generate a sequence of cache operations
 				fc.record({
 					maxEntries: fc.integer({ min: 2, max: 5 }), // Small cache for easier eviction testing
-					keys: fc.array(
-						fc.string({ minLength: 1, maxLength: 5 }),
-						{ minLength: 3, maxLength: 10 }
-					).filter(keys => {
-						// Ensure all keys are unique
-						return new Set(keys).size === keys.length
-					})
+					keys: fc
+						.array(fc.string({ minLength: 1, maxLength: 5 }), {
+							minLength: 3,
+							maxLength: 10,
+						})
+						.filter((keys) => {
+							// Ensure all keys are unique
+							return new Set(keys).size === keys.length
+						}),
 				}),
 				({ maxEntries, keys }) => {
 					// Pre-condition: we need more keys than cache capacity to force eviction
 					fc.pre(keys.length > maxEntries)
 
 					const evictedEntries: Array<{ key: string; value: unknown }> = []
-					
+
 					// Create memory backend with eviction callback
 					const backend = createMemoryBackend({
 						maxEntries,
 						onEvict: (key, value) => {
 							evictedEntries.push({ key, value })
-						}
+						},
 					})
 
 					// Add entries sequentially - this establishes the initial LRU order
@@ -53,8 +55,8 @@ describe('MemoryBackend Browser Tests', () => {
 					// Verify that the first entries added were evicted (LRU behavior)
 					// The first `expectedEvictions` keys should have been evicted
 					const expectedEvictedKeys = keys.slice(0, expectedEvictions)
-					const actualEvictedKeys = evictedEntries.map(e => e.key)
-					
+					const actualEvictedKeys = evictedEntries.map((e) => e.key)
+
 					expect(actualEvictedKeys).toEqual(expectedEvictedKeys)
 
 					// Verify that the last `maxEntries` keys are still in cache
@@ -75,32 +77,34 @@ describe('MemoryBackend Browser Tests', () => {
 
 	/**
 	 * **Feature: persistent-file-cache, Property: Access updates LRU order**
-	 * 
-	 * For any key that exists in the cache, accessing it should move it to 
+	 *
+	 * For any key that exists in the cache, accessing it should move it to
 	 * the most recently used position, making it the last to be evicted.
 	 */
 	it('property: accessing entries updates LRU order', () => {
 		fc.assert(
 			fc.property(
 				fc.record({
-					keys: fc.array(
-						fc.string({ minLength: 1, maxLength: 5 }),
-						{ minLength: 4, maxLength: 4 } // Exactly 4 keys
-					).filter(keys => {
-						// Ensure all keys are unique
-						return new Set(keys).size === keys.length
-					}),
-					accessIndex: fc.integer({ min: 0, max: 1 }) // Access one of the first 2 keys
+					keys: fc
+						.array(
+							fc.string({ minLength: 1, maxLength: 5 }),
+							{ minLength: 4, maxLength: 4 } // Exactly 4 keys
+						)
+						.filter((keys) => {
+							// Ensure all keys are unique
+							return new Set(keys).size === keys.length
+						}),
+					accessIndex: fc.integer({ min: 0, max: 1 }), // Access one of the first 2 keys
 				}),
 				({ keys, accessIndex }) => {
 					const maxEntries = 3 // Cache holds 3, we'll add 4 to force eviction
 					const evictedEntries: Array<{ key: string; value: unknown }> = []
-					
+
 					const backend = createMemoryBackend({
 						maxEntries,
 						onEvict: (key, value) => {
 							evictedEntries.push({ key, value })
-						}
+						},
 					})
 
 					// Add first 3 entries (fill cache)
@@ -131,7 +135,7 @@ describe('MemoryBackend Browser Tests', () => {
 					if (evictedEntry && accessedKey !== undefined) {
 						const evictedKey = evictedEntry.key
 						expect(evictedKey).not.toBe(accessedKey)
-						
+
 						// The accessed key should still be in the cache
 						expect(backend.has(accessedKey)).toBe(true)
 
@@ -152,13 +156,13 @@ describe('MemoryBackend Browser Tests', () => {
 			maxEntries: 2,
 			onEvict: (key, value) => {
 				evictedEntries.push({ key, value })
-			}
+			},
 		})
 
 		// Fill cache
 		backend.set('key1', 'value1')
 		backend.set('key2', 'value2')
-		
+
 		// This should evict key1 (oldest)
 		backend.set('key3', 'value3')
 
@@ -166,7 +170,7 @@ describe('MemoryBackend Browser Tests', () => {
 		const firstEvicted = evictedEntries[0]
 		expect(firstEvicted?.key).toBe('key1')
 		expect(firstEvicted?.value).toBe('value1')
-		
+
 		expect(backend.has('key1')).toBe(false)
 		expect(backend.has('key2')).toBe(true)
 		expect(backend.has('key3')).toBe(true)
@@ -178,12 +182,12 @@ describe('MemoryBackend Browser Tests', () => {
 			maxEntries: 2,
 			onEvict: (key, value) => {
 				evictedEntries.push({ key, value })
-			}
+			},
 		})
 
 		backend.set('key1', 'value1')
 		backend.set('key2', 'value2')
-		
+
 		// Update existing entry - should not cause eviction
 		backend.set('key1', 'updated-value1')
 
@@ -198,22 +202,22 @@ describe('MemoryBackend Browser Tests', () => {
 			maxEntries: 2,
 			onEvict: (key, value) => {
 				evictedEntries.push({ key, value })
-			}
+			},
 		})
 
 		backend.set('key1', 'value1')
 		backend.set('key2', 'value2')
-		
+
 		// Access key1 to move it to front
 		backend.get('key1')
-		
+
 		// Add key3 - should evict key2 (now LRU), not key1
 		backend.set('key3', 'value3')
 
 		expect(evictedEntries).toHaveLength(1)
 		const firstEvicted = evictedEntries[0]
 		expect(firstEvicted?.key).toBe('key2')
-		
+
 		expect(backend.has('key1')).toBe(true)
 		expect(backend.has('key2')).toBe(false)
 		expect(backend.has('key3')).toBe(true)
@@ -228,7 +232,7 @@ describe('MemoryBackend Browser Tests', () => {
 		if (backend.estimateSize) {
 			expect(backend.estimateSize()).toBe(0)
 		}
-		
+
 		backend.remove('nonexistent') // Should not throw
 		backend.clear() // Should not throw
 	})

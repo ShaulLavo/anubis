@@ -11,7 +11,7 @@ vi.mock('../../workers/comlinkPool', () => ({
 		}
 		broadcast = vi.fn().mockResolvedValue(undefined)
 		destroy = vi.fn().mockResolvedValue(undefined)
-	}
+	},
 }))
 
 vi.mock('../prefetch/treePrefetch.worker.ts', () => ({}))
@@ -65,7 +65,9 @@ describe('Full System Integration Demo', () => {
 	it('should demonstrate complete system integration with caching', async () => {
 		// Check if IndexedDB is available
 		if (typeof indexedDB === 'undefined') {
-			console.warn('Skipping full system demo - IndexedDB not available in test environment')
+			console.warn(
+				'Skipping full system demo - IndexedDB not available in test environment'
+			)
 			return
 		}
 
@@ -90,7 +92,7 @@ describe('Full System Integration Demo', () => {
 							depth: 2,
 							parentPath: '/demo-project/src',
 							size: 1024,
-							lastModified: Date.now() - 10000
+							lastModified: Date.now() - 10000,
 						},
 						{
 							kind: 'file',
@@ -99,10 +101,10 @@ describe('Full System Integration Demo', () => {
 							depth: 2,
 							parentPath: '/demo-project/src',
 							size: 512,
-							lastModified: Date.now() - 5000
-						}
+							lastModified: Date.now() - 5000,
+						},
 					],
-					isLoaded: true
+					isLoaded: true,
 				},
 				{
 					kind: 'file',
@@ -111,10 +113,10 @@ describe('Full System Integration Demo', () => {
 					depth: 1,
 					parentPath: '/demo-project',
 					size: 256,
-					lastModified: Date.now() - 3000
-				}
+					lastModified: Date.now() - 3000,
+				},
 			],
-			isLoaded: true
+			isLoaded: true,
 		}
 
 		// Initialize the tree prefetch client
@@ -146,10 +148,10 @@ describe('Full System Integration Demo', () => {
 					depth: 3,
 					parentPath: '/demo-project/src/components',
 					size: 2048,
-					lastModified: Date.now() - 1000
-				}
+					lastModified: Date.now() - 1000,
+				},
 			],
-			isLoaded: true
+			isLoaded: true,
 		}
 
 		await treePrefetch.treePrefetchClient.ingestSubtree(newSubtree)
@@ -158,7 +160,9 @@ describe('Full System Integration Demo', () => {
 		await treePrefetch.treePrefetchClient.markDirLoaded('/demo-project/src')
 
 		// Verify the system handled all operations without errors
-		expect(mockSetters.setPrefetchError).not.toHaveBeenCalledWith(expect.any(String))
+		expect(mockSetters.setPrefetchError).not.toHaveBeenCalledWith(
+			expect.any(String)
+		)
 
 		// The system should have processed the tree operations
 		// (Exact behavior depends on worker implementation, but no errors should occur)
@@ -196,10 +200,10 @@ describe('Full System Integration Demo', () => {
 						depth: 1,
 						parentPath: '/no-cache-project',
 						size: 128,
-						lastModified: Date.now()
-					}
+						lastModified: Date.now(),
+					},
 				],
-				isLoaded: true
+				isLoaded: true,
 			}
 
 			// Initialize and seed tree
@@ -226,7 +230,7 @@ describe('Full System Integration Demo', () => {
 
 	it('should demonstrate error handling and graceful degradation', async () => {
 		// This test shows that the system continues to work even when cache operations fail
-		
+
 		// Create a tree that might cause issues
 		const problematicTree: FsDirTreeNode = {
 			kind: 'dir',
@@ -234,7 +238,7 @@ describe('Full System Integration Demo', () => {
 			path: '/problematic-project',
 			depth: 0,
 			children: [],
-			isLoaded: true
+			isLoaded: true,
 		}
 
 		try {
@@ -261,13 +265,13 @@ describe('Full System Integration Demo', () => {
 
 /**
  * **Feature: persistent-tree-cache, Full System Integration Demo**
- * 
+ *
  * This test demonstrates the complete integration of the persistent tree cache system:
  * - TreePrefetchClient with caching enabled/disabled
  * - Cache-first loading with background validation
  * - Graceful error handling and fallback behavior
  * - Integration with the existing filesystem hooks
- * 
+ *
  * The system provides:
  * - Instant tree loading from cache
  * - Background validation and incremental updates

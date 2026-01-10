@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fc from 'fast-check'
 import type { FsDirTreeNode } from '@repo/fs'
 import { createTreePrefetchClient } from '../prefetch/treePrefetchClient'
-import type { TreePrefetchWorkerCallbacks, TreePrefetchWorkerInitPayload } from '../prefetch/treePrefetchWorkerTypes'
+import type {
+	TreePrefetchWorkerCallbacks,
+	TreePrefetchWorkerInitPayload,
+} from '../prefetch/treePrefetchWorkerTypes'
 import { CachedPrefetchQueue } from './cachedPrefetchQueue'
 import { TreeCacheController } from './treeCacheController'
 
@@ -52,7 +55,9 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 		it('should maintain the same API interface with caching enabled', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping API compatibility test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping API compatibility test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -68,7 +73,9 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 			// Test that methods can be called without throwing
 			await expect(client.init(mockInitPayload)).resolves.not.toThrow()
 			await expect(client.seedTree({} as FsDirTreeNode)).resolves.not.toThrow()
-			await expect(client.ingestSubtree({} as FsDirTreeNode)).resolves.not.toThrow()
+			await expect(
+				client.ingestSubtree({} as FsDirTreeNode)
+			).resolves.not.toThrow()
 			await expect(client.markDirLoaded('/test-path')).resolves.not.toThrow()
 			await expect(client.dispose()).resolves.not.toThrow()
 		})
@@ -76,7 +83,9 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 		it('should handle property-based testing for API compatibility preservation', () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping API compatibility property test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping API compatibility property test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -86,7 +95,9 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 
 			const validNameArb = fc
 				.string({ minLength: 1, maxLength: 20 })
-				.filter((s) => !s.includes('/') && !s.includes('\0') && s.trim().length > 0)
+				.filter(
+					(s) => !s.includes('/') && !s.includes('\0') && s.trim().length > 0
+				)
 
 			const treeNodeArb = fc.record({
 				kind: fc.constant('dir' as const),
@@ -101,8 +112,12 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 						path: validPathArb,
 						depth: fc.integer({ min: 1, max: 4 }),
 						parentPath: fc.option(validPathArb, { nil: undefined }),
-						size: fc.option(fc.integer({ min: 0, max: 10000 }), { nil: undefined }),
-						lastModified: fc.option(fc.integer({ min: 0, max: Date.now() }), { nil: undefined }),
+						size: fc.option(fc.integer({ min: 0, max: 10000 }), {
+							nil: undefined,
+						}),
+						lastModified: fc.option(fc.integer({ min: 0, max: Date.now() }), {
+							nil: undefined,
+						}),
 					}),
 					{ maxLength: 3 }
 				),
@@ -145,7 +160,9 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 		it('should preserve callback behavior with cached and non-cached operations', async () => {
 			// Check if IndexedDB is available
 			if (typeof indexedDB === 'undefined') {
-				console.warn('Skipping callback compatibility test - IndexedDB not available in test environment')
+				console.warn(
+					'Skipping callback compatibility test - IndexedDB not available in test environment'
+				)
 				return
 			}
 
@@ -201,10 +218,15 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 			const client = createTreePrefetchClient(mockCallbacks)
 
 			// Type-level compatibility check - these should compile without errors
-			const initMethod: (payload: TreePrefetchWorkerInitPayload) => Promise<void> = client.init
-			const seedTreeMethod: (tree: FsDirTreeNode) => Promise<void> = client.seedTree
-			const ingestSubtreeMethod: (node: FsDirTreeNode) => Promise<void> = client.ingestSubtree
-			const markDirLoadedMethod: (path: string) => Promise<void> = client.markDirLoaded
+			const initMethod: (
+				payload: TreePrefetchWorkerInitPayload
+			) => Promise<void> = client.init
+			const seedTreeMethod: (tree: FsDirTreeNode) => Promise<void> =
+				client.seedTree
+			const ingestSubtreeMethod: (node: FsDirTreeNode) => Promise<void> =
+				client.ingestSubtree
+			const markDirLoadedMethod: (path: string) => Promise<void> =
+				client.markDirLoaded
 			const disposeMethod: () => Promise<void> = client.dispose
 
 			// Verify methods exist and have correct signatures
@@ -219,7 +241,7 @@ describe('TreePrefetchClient API Compatibility Tests', () => {
 
 /**
  * **Feature: persistent-tree-cache, Property 24: API compatibility preservation**
- * 
+ *
  * This test validates that the TreePrefetchClient maintains complete API compatibility
  * when caching is enabled. All existing methods should work the same way, callbacks
  * should still be invoked, and the type interface should remain unchanged.

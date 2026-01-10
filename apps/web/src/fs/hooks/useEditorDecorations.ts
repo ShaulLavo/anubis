@@ -1,6 +1,6 @@
 import type { EditorSyntaxHighlight, HighlightOffsets } from '@repo/code-editor'
 import { getHighlightClassForScope } from '@repo/code-editor'
-import { createEffect, createMemo } from 'solid-js'
+import { createMemo } from 'solid-js'
 import type { Accessor } from 'solid-js'
 import { unwrap } from 'solid-js/store'
 import type {
@@ -65,22 +65,6 @@ export const useEditorDecorations = (params: UseEditorDecorationsParams) => {
 	})
 
 	const editorErrors = createMemo(() => params.errors())
-
-	createEffect(() => {
-		console.log(
-			'[SelectedFilePanel] highlight update',
-			JSON.stringify(
-				{
-					path: params.filePath(),
-					highlightCount: editorHighlights()?.length ?? 0,
-					offsetCount: editorHighlightOffset()?.length ?? 0,
-					isSelected: params.isFileSelected(),
-				},
-				null,
-				2
-			)
-		)
-	})
 
 	return { editorHighlights, editorHighlightOffset, editorErrors }
 }

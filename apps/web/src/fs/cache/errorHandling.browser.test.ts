@@ -3,7 +3,10 @@ import fc from 'fast-check'
 import type { FsDirTreeNode } from '@repo/fs'
 import { CachedPrefetchQueue } from './cachedPrefetchQueue'
 import { TreeCacheController } from './treeCacheController'
-import type { PrefetchTarget, TreePrefetchWorkerCallbacks } from '../prefetch/treePrefetchWorkerTypes'
+import type {
+	PrefetchTarget,
+	TreePrefetchWorkerCallbacks,
+} from '../prefetch/treePrefetchWorkerTypes'
 import { logger } from '../../logger'
 
 const cacheLogger = logger.withTag('tree-cache')
@@ -12,23 +15,25 @@ describe('ErrorHandling', () => {
 	let cacheController: TreeCacheController
 	let cachedQueue: CachedPrefetchQueue
 	let mockCallbacks: TreePrefetchWorkerCallbacks
-	let mockLoadDirectory: ReturnType<typeof vi.fn<(target: PrefetchTarget) => Promise<FsDirTreeNode | undefined>>>
+	let mockLoadDirectory: ReturnType<
+		typeof vi.fn<(target: PrefetchTarget) => Promise<FsDirTreeNode | undefined>>
+	>
 	const testDbName = `test-error-handling-${Date.now()}-${Math.random().toString(36).substring(7)}`
 
 	beforeEach(async () => {
-		cacheController = new TreeCacheController({ 
+		cacheController = new TreeCacheController({
 			dbName: testDbName,
-			storeName: 'test-error-handling'
+			storeName: 'test-error-handling',
 		})
 
 		// Ensure LocalForage is ready
-		await new Promise(resolve => setTimeout(resolve, 10))
+		await new Promise((resolve) => setTimeout(resolve, 10))
 
 		mockCallbacks = {
 			onDirectoryLoaded: vi.fn(),
 			onStatus: vi.fn(),
 			onDeferredMetadata: vi.fn(),
-			onError: vi.fn()
+			onError: vi.fn(),
 		}
 
 		mockLoadDirectory = vi.fn()
@@ -37,7 +42,7 @@ describe('ErrorHandling', () => {
 			workerCount: 2,
 			loadDirectory: mockLoadDirectory,
 			callbacks: mockCallbacks,
-			cacheController
+			cacheController,
 		})
 	})
 
@@ -54,16 +59,27 @@ describe('ErrorHandling', () => {
 		it('should fall back to filesystem scanning when LocalForage operations fail', async () => {
 			await fc.assert(
 				fc.asyncProperty(
-					fc.record({
-						path: fc.string({ minLength: 2, maxLength: 15 }).map(s => `/${s.replace(/[\0\/\s]/g, '_')}`),
-						name: fc.string({ minLength: 1, maxLength: 10 }).map(s => s.replace(/[\0\/\s]/g, '_')),
-						childCount: fc.integer({ min: 1, max: 4 }),
-						errorType: fc.oneof(
-							fc.constant('cache_read_failure'),
-							fc.constant('cache_write_failure'),
-							fc.constant('cache_clear_failure')
-						)
-					}).filter(data => data.path.length > 1 && data.name.length > 0 && data.path !== '/_'),
+					fc
+						.record({
+							path: fc
+								.string({ minLength: 2, maxLength: 15 })
+								.map((s) => `/${s.replace(/[\0\/\s]/g, '_')}`),
+							name: fc
+								.string({ minLength: 1, maxLength: 10 })
+								.map((s) => s.replace(/[\0\/\s]/g, '_')),
+							childCount: fc.integer({ min: 1, max: 4 }),
+							errorType: fc.oneof(
+								fc.constant('cache_read_failure'),
+								fc.constant('cache_write_failure'),
+								fc.constant('cache_clear_failure')
+							),
+						})
+						.filter(
+							(data) =>
+								data.path.length > 1 &&
+								data.name.length > 0 &&
+								data.path !== '/_'
+						),
 					async (testData) => {
 						const { path, name, childCount, errorType } = testData
 
@@ -80,9 +96,9 @@ describe('ErrorHandling', () => {
 								depth: 2,
 								parentPath: path,
 								size: 100 + i,
-								lastModified: Date.now() - 1000
+								lastModified: Date.now() - 1000,
 							})),
-							isLoaded: true
+							isLoaded: true,
 						}
 
 						// Mock the filesystem loader to return fallback data
@@ -95,15 +111,18 @@ describe('ErrorHandling', () => {
 
 						switch (errorType) {
 							case 'cache_read_failure':
-								cacheReadSpy = vi.spyOn(cacheController, 'getCachedDirectory')
+								cacheReadSpy = vi
+									.spyOn(cacheController, 'getCachedDirectory')
 									.mockRejectedValue(new Error('LocalForage read failure'))
 								break
 							case 'cache_write_failure':
-								cacheWriteSpy = vi.spyOn(cacheController, 'setCachedDirectory')
+								cacheWriteSpy = vi
+									.spyOn(cacheController, 'setCachedDirectory')
 									.mockRejectedValue(new Error('LocalForage write failure'))
 								break
 							case 'cache_clear_failure':
-								cacheClearSpy = vi.spyOn(cacheController, 'clearCache')
+								cacheClearSpy = vi
+									.spyOn(cacheController, 'clearCache')
 									.mockRejectedValue(new Error('LocalForage clear failure'))
 								break
 						}
@@ -111,7 +130,7 @@ describe('ErrorHandling', () => {
 						const target: PrefetchTarget = {
 							path,
 							name,
-							depth: 1
+							depth: 1,
 						}
 
 						// Test that the system gracefully handles the cache failure
@@ -122,13 +141,17 @@ describe('ErrorHandling', () => {
 							if (errorType === 'cache_clear_failure') {
 								// Test cache clear failure - this should not affect normal operations
 								await expect(cacheController.clearCache()).rejects.toThrow()
-								
+
 								// System should still be able to load directories via fallback
-								result = await (cachedQueue as any).loadDirectoryWithCache(target)
+								result = await (cachedQueue as any).loadDirectoryWithCache(
+									target
+								)
 								operationSucceeded = true
 							} else {
 								// Test read/write failures during normal operation
-								result = await (cachedQueue as any).loadDirectoryWithCache(target)
+								result = await (cachedQueue as any).loadDirectoryWithCache(
+									target
+								)
 								operationSucceeded = true
 							}
 						} catch (error) {
@@ -140,7 +163,7 @@ describe('ErrorHandling', () => {
 
 						// Verify normal operation continued despite cache errors
 						expect(operationSucceeded).toBe(true)
-						
+
 						if (errorType !== 'cache_clear_failure') {
 							expect(result).not.toBeUndefined()
 							expect(result!.path).toBe(path)
@@ -168,16 +191,27 @@ describe('ErrorHandling', () => {
 		it('should handle corrupted cache data gracefully by clearing affected entries', async () => {
 			await fc.assert(
 				fc.asyncProperty(
-					fc.record({
-						path: fc.string({ minLength: 3, maxLength: 12 }).map(s => `/${s.replace(/[\0\/\s!@#$%^&*()]/g, 'x')}`),
-						name: fc.string({ minLength: 1, maxLength: 8 }).map(s => s.replace(/[\0\/\s!@#$%^&*()]/g, 'x')),
-						validChildCount: fc.integer({ min: 1, max: 3 }),
-						corruptionType: fc.oneof(
-							fc.constant('invalid_json'),
-							fc.constant('missing_required_fields'),
-							fc.constant('invalid_data_types')
-						)
-					}).filter(data => data.path.length > 2 && data.name.length > 0 && !data.path.includes('__')),
+					fc
+						.record({
+							path: fc
+								.string({ minLength: 3, maxLength: 12 })
+								.map((s) => `/${s.replace(/[\0\/\s!@#$%^&*()]/g, 'x')}`),
+							name: fc
+								.string({ minLength: 1, maxLength: 8 })
+								.map((s) => s.replace(/[\0\/\s!@#$%^&*()]/g, 'x')),
+							validChildCount: fc.integer({ min: 1, max: 3 }),
+							corruptionType: fc.oneof(
+								fc.constant('invalid_json'),
+								fc.constant('missing_required_fields'),
+								fc.constant('invalid_data_types')
+							),
+						})
+						.filter(
+							(data) =>
+								data.path.length > 2 &&
+								data.name.length > 0 &&
+								!data.path.includes('__')
+						),
 					async (testData) => {
 						const { path, name, validChildCount, corruptionType } = testData
 
@@ -194,9 +228,9 @@ describe('ErrorHandling', () => {
 								depth: 2,
 								parentPath: path,
 								size: 100 + i,
-								lastModified: Date.now() - 1000
+								lastModified: Date.now() - 1000,
 							})),
-							isLoaded: true
+							isLoaded: true,
 						}
 
 						// Mock filesystem fallback
@@ -207,17 +241,22 @@ describe('ErrorHandling', () => {
 
 						switch (corruptionType) {
 							case 'invalid_json':
-								getCachedSpy = vi.spyOn(cacheController, 'getCachedDirectory')
-									.mockRejectedValue(new SyntaxError('Unexpected token in JSON'))
+								getCachedSpy = vi
+									.spyOn(cacheController, 'getCachedDirectory')
+									.mockRejectedValue(
+										new SyntaxError('Unexpected token in JSON')
+									)
 								break
 							case 'missing_required_fields':
 								// Mock getCachedDirectory to return null (simulating corrupted data cleanup)
-								getCachedSpy = vi.spyOn(cacheController, 'getCachedDirectory')
+								getCachedSpy = vi
+									.spyOn(cacheController, 'getCachedDirectory')
 									.mockResolvedValue(null)
 								break
 							case 'invalid_data_types':
 								// Mock getCachedDirectory to return null (simulating corrupted data cleanup)
-								getCachedSpy = vi.spyOn(cacheController, 'getCachedDirectory')
+								getCachedSpy = vi
+									.spyOn(cacheController, 'getCachedDirectory')
 									.mockResolvedValue(null)
 								break
 						}
@@ -225,7 +264,7 @@ describe('ErrorHandling', () => {
 						const target: PrefetchTarget = {
 							path,
 							name,
-							depth: 1
+							depth: 1,
 						}
 
 						// Test that corrupted cache data is handled gracefully
@@ -242,7 +281,7 @@ describe('ErrorHandling', () => {
 
 						// System should fall back to filesystem scanning
 						expect(mockLoadDirectory).toHaveBeenCalled()
-						
+
 						// Verify it was called with a target that has the expected path
 						const calls = mockLoadDirectory.mock.calls
 						expect(calls.length).toBeGreaterThan(0)
@@ -251,7 +290,7 @@ describe('ErrorHandling', () => {
 						expect(lastCall![0]).toMatchObject({
 							path: expect.any(String),
 							name: expect.any(String),
-							depth: expect.any(Number)
+							depth: expect.any(Number),
 						})
 
 						// Operation should succeed despite corruption
@@ -277,21 +316,34 @@ describe('ErrorHandling', () => {
 		it('should continue with cache-disabled mode when cache initialization fails', async () => {
 			await fc.assert(
 				fc.asyncProperty(
-					fc.record({
-						directories: fc.array(
-							fc.record({
-								path: fc.string({ minLength: 2, maxLength: 10 }).map(s => `/${s.replace(/[\0\/\s]/g, '_')}`),
-								name: fc.string({ minLength: 1, maxLength: 8 }).map(s => s.replace(/[\0\/\s]/g, '_')),
-								childCount: fc.integer({ min: 1, max: 3 })
-							}).filter(data => data.path.length > 1 && data.name.length > 0 && data.path !== '/_'),
-							{ minLength: 2, maxLength: 4 }
-						)
-					}).filter(data => {
-						// Ensure all paths are unique
-						const paths = data.directories.map(d => d.path)
-						const uniquePaths = new Set(paths)
-						return uniquePaths.size === paths.length
-					}),
+					fc
+						.record({
+							directories: fc.array(
+								fc
+									.record({
+										path: fc
+											.string({ minLength: 2, maxLength: 10 })
+											.map((s) => `/${s.replace(/[\0\/\s]/g, '_')}`),
+										name: fc
+											.string({ minLength: 1, maxLength: 8 })
+											.map((s) => s.replace(/[\0\/\s]/g, '_')),
+										childCount: fc.integer({ min: 1, max: 3 }),
+									})
+									.filter(
+										(data) =>
+											data.path.length > 1 &&
+											data.name.length > 0 &&
+											data.path !== '/_'
+									),
+								{ minLength: 2, maxLength: 4 }
+							),
+						})
+						.filter((data) => {
+							// Ensure all paths are unique
+							const paths = data.directories.map((d) => d.path)
+							const uniquePaths = new Set(paths)
+							return uniquePaths.size === paths.length
+						}),
 					async (testData) => {
 						const { directories } = testData
 
@@ -310,17 +362,19 @@ describe('ErrorHandling', () => {
 									depth: 2,
 									parentPath: dir.path,
 									size: 100 + i,
-									lastModified: Date.now() - 1000
+									lastModified: Date.now() - 1000,
 								})),
-								isLoaded: true
+								isLoaded: true,
 							}
 							filesystemData.set(dir.path, dirNode)
 						}
 
 						// Mock filesystem loader
-						mockLoadDirectory.mockImplementation(async (target: PrefetchTarget) => {
-							return filesystemData.get(target.path)
-						})
+						mockLoadDirectory.mockImplementation(
+							async (target: PrefetchTarget) => {
+								return filesystemData.get(target.path)
+							}
+						)
 
 						// Test that system continues to work even with cache initialization failure
 						// We'll test this by ensuring filesystem operations still work
@@ -330,7 +384,7 @@ describe('ErrorHandling', () => {
 							const target: PrefetchTarget = {
 								path: dir.path,
 								name: dir.name,
-								depth: 1
+								depth: 1,
 							}
 
 							try {
@@ -345,11 +399,11 @@ describe('ErrorHandling', () => {
 
 						// Verify all filesystem operations succeeded
 						expect(results).toHaveLength(directories.length)
-						
+
 						for (let i = 0; i < results.length; i++) {
 							const result = results[i]
 							const expectedDir = directories[i]!
-							
+
 							expect(result).not.toBeUndefined()
 							expect(result!.path).toBe(expectedDir.path)
 							expect(result!.children).toHaveLength(expectedDir.childCount)
@@ -367,16 +421,27 @@ describe('ErrorHandling', () => {
 		it('should log cache errors for debugging while maintaining normal operation', async () => {
 			await fc.assert(
 				fc.asyncProperty(
-					fc.record({
-						path: fc.string({ minLength: 2, maxLength: 12 }).map(s => `/${s.replace(/[\0\/\s]/g, '_')}`),
-						name: fc.string({ minLength: 1, maxLength: 8 }).map(s => s.replace(/[\0\/\s]/g, '_')),
-						childCount: fc.integer({ min: 1, max: 3 }),
-						errorScenario: fc.oneof(
-							fc.constant('read_timeout'),
-							fc.constant('write_quota_exceeded'),
-							fc.constant('database_locked')
-						)
-					}).filter(data => data.path.length > 1 && data.name.length > 0 && data.path !== '/_'),
+					fc
+						.record({
+							path: fc
+								.string({ minLength: 2, maxLength: 12 })
+								.map((s) => `/${s.replace(/[\0\/\s]/g, '_')}`),
+							name: fc
+								.string({ minLength: 1, maxLength: 8 })
+								.map((s) => s.replace(/[\0\/\s]/g, '_')),
+							childCount: fc.integer({ min: 1, max: 3 }),
+							errorScenario: fc.oneof(
+								fc.constant('read_timeout'),
+								fc.constant('write_quota_exceeded'),
+								fc.constant('database_locked')
+							),
+						})
+						.filter(
+							(data) =>
+								data.path.length > 1 &&
+								data.name.length > 0 &&
+								data.path !== '/_'
+						),
 					async (testData) => {
 						const { path, name, childCount, errorScenario } = testData
 
@@ -393,30 +458,37 @@ describe('ErrorHandling', () => {
 								depth: 2,
 								parentPath: path,
 								size: 100 + i,
-								lastModified: Date.now() - 1000
+								lastModified: Date.now() - 1000,
 							})),
-							isLoaded: true
+							isLoaded: true,
 						}
 
 						mockLoadDirectory.mockResolvedValue(fallbackNode)
 
 						// Mock console methods to capture logging
-						const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-						const consoleDebugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+						const consoleSpy = vi
+							.spyOn(console, 'warn')
+							.mockImplementation(() => {})
+						const consoleDebugSpy = vi
+							.spyOn(console, 'debug')
+							.mockImplementation(() => {})
 
 						// Simulate different error scenarios
 						let methodSpy: any
 						switch (errorScenario) {
 							case 'read_timeout':
-								methodSpy = vi.spyOn(cacheController, 'getCachedDirectory')
+								methodSpy = vi
+									.spyOn(cacheController, 'getCachedDirectory')
 									.mockRejectedValue(new Error('Operation timed out'))
 								break
 							case 'write_quota_exceeded':
-								methodSpy = vi.spyOn(cacheController, 'setCachedDirectory')
+								methodSpy = vi
+									.spyOn(cacheController, 'setCachedDirectory')
 									.mockRejectedValue(new Error('Quota exceeded'))
 								break
 							case 'database_locked':
-								methodSpy = vi.spyOn(cacheController, 'getCachedDirectory')
+								methodSpy = vi
+									.spyOn(cacheController, 'getCachedDirectory')
 									.mockRejectedValue(new Error('Database is locked'))
 								break
 						}
@@ -424,7 +496,7 @@ describe('ErrorHandling', () => {
 						const target: PrefetchTarget = {
 							path,
 							name,
-							depth: 1
+							depth: 1,
 						}
 
 						// Execute operation that will encounter cache error
@@ -436,7 +508,9 @@ describe('ErrorHandling', () => {
 							operationSucceeded = true
 						} catch (error) {
 							// Operation should not fail due to cache errors
-							expect(String(error)).not.toMatch(/timed out|Quota exceeded|locked/)
+							expect(String(error)).not.toMatch(
+								/timed out|Quota exceeded|locked/
+							)
 						}
 
 						// Verify normal operation continued despite cache errors
@@ -469,7 +543,7 @@ describe('ErrorHandling', () => {
 				fc.asyncProperty(
 					fc.record({
 						entryCount: fc.integer({ min: 5, max: 8 }),
-						quotaLimit: fc.integer({ min: 3, max: 5 })
+						quotaLimit: fc.integer({ min: 3, max: 5 }),
 					}),
 					async (testData) => {
 						const { entryCount, quotaLimit } = testData
@@ -479,11 +553,12 @@ describe('ErrorHandling', () => {
 							path: `/test-dir-${i}`,
 							name: `test-dir-${i}`,
 							childCount: 1,
-							cacheTime: 1000000000000 + i * 1000 // Different timestamps
+							cacheTime: 1000000000000 + i * 1000, // Different timestamps
 						}))
 
 						// Mock the evictLRUEntries method to test the LRU logic
-						const evictLRUSpy = vi.spyOn(cacheController, 'evictLRUEntries')
+						const evictLRUSpy = vi
+							.spyOn(cacheController, 'evictLRUEntries')
 							.mockImplementation(async (maxEntries: number) => {
 								// Simulate LRU eviction behavior
 								expect(maxEntries).toBeLessThanOrEqual(quotaLimit)
@@ -492,7 +567,8 @@ describe('ErrorHandling', () => {
 							})
 
 						// Mock cleanupOldEntries to trigger LRU eviction
-						const cleanupSpy = vi.spyOn(cacheController, 'cleanupOldEntries')
+						const cleanupSpy = vi
+							.spyOn(cacheController, 'cleanupOldEntries')
 							.mockImplementation(async () => {
 								// Simulate quota exceeded scenario
 								await cacheController.evictLRUEntries(quotaLimit)
@@ -527,7 +603,7 @@ describe('ErrorHandling', () => {
 					fc.record({
 						dirCount: fc.integer({ min: 4, max: 6 }),
 						accessCount: fc.integer({ min: 2, max: 4 }),
-						quotaLimit: fc.integer({ min: 2, max: 4 })
+						quotaLimit: fc.integer({ min: 2, max: 4 }),
 					}),
 					async (testData) => {
 						const { dirCount, accessCount, quotaLimit } = testData
@@ -536,25 +612,28 @@ describe('ErrorHandling', () => {
 						const directories = Array.from({ length: dirCount }, (_, i) => ({
 							path: `/lru-test-${i}`,
 							name: `lru-test-${i}`,
-							cacheTime: 1000000000000 + i * 1000
+							cacheTime: 1000000000000 + i * 1000,
 						}))
 
 						// Mock updateAccessTime to track access patterns
 						const accessTimes = new Map<string, number>()
-						const updateAccessSpy = vi.spyOn(cacheController, 'updateAccessTime')
+						const updateAccessSpy = vi
+							.spyOn(cacheController, 'updateAccessTime')
 							.mockImplementation(async (path: string, _cachedAt: number) => {
 								accessTimes.set(path, Date.now())
 							})
 
 						// Mock evictLRUEntries to verify LRU behavior
-						const evictLRUSpy = vi.spyOn(cacheController, 'evictLRUEntries')
+						const evictLRUSpy = vi
+							.spyOn(cacheController, 'evictLRUEntries')
 							.mockImplementation(async (maxEntries: number) => {
 								// Simulate LRU eviction based on access times
-								const sortedByAccess = Array.from(accessTimes.entries())
-									.sort((a, b) => a[1] - b[1]) // Sort by access time (oldest first)
-								
+								const sortedByAccess = Array.from(accessTimes.entries()).sort(
+									(a, b) => a[1] - b[1]
+								) // Sort by access time (oldest first)
+
 								const toEvict = Math.max(0, sortedByAccess.length - maxEntries)
-								
+
 								// Verify that we're evicting the right number of entries
 								expect(toEvict).toBeGreaterThanOrEqual(0)
 								expect(maxEntries).toBe(quotaLimit)
@@ -591,7 +670,7 @@ describe('ErrorHandling', () => {
 							fc.constant('single_entry'),
 							fc.constant('all_entries_same_age')
 						),
-						entryCount: fc.integer({ min: 0, max: 3 })
+						entryCount: fc.integer({ min: 0, max: 3 }),
 					}),
 					async (testData) => {
 						const { scenario, entryCount } = testData
@@ -604,18 +683,23 @@ describe('ErrorHandling', () => {
 								directories = []
 								break
 							case 'single_entry':
-								directories = [{
-									path: '/single',
-									name: 'single',
-									cacheTime: Date.now() - 5000
-								}]
+								directories = [
+									{
+										path: '/single',
+										name: 'single',
+										cacheTime: Date.now() - 5000,
+									},
+								]
 								break
 							case 'all_entries_same_age':
-								directories = Array.from({ length: Math.min(entryCount, 3) }, (_, i) => ({
-									path: `/same-age-${i}`,
-									name: `same-age-${i}`,
-									cacheTime: Date.now() - 5000 // Same timestamp
-								}))
+								directories = Array.from(
+									{ length: Math.min(entryCount, 3) },
+									(_, i) => ({
+										path: `/same-age-${i}`,
+										name: `same-age-${i}`,
+										cacheTime: Date.now() - 5000, // Same timestamp
+									})
+								)
 								break
 						}
 
@@ -627,14 +711,18 @@ describe('ErrorHandling', () => {
 								path: dir.path,
 								depth: 1,
 								children: [],
-								isLoaded: true
+								isLoaded: true,
 							}
 
-							await cacheController.setCachedDirectory(dir.path, dirNode, dir.cacheTime)
+							await cacheController.setCachedDirectory(
+								dir.path,
+								dirNode,
+								dir.cacheTime
+							)
 						}
-						
+
 						// Small delay to ensure LocalForage operations complete
-						await new Promise(resolve => setTimeout(resolve, 10))
+						await new Promise((resolve) => setTimeout(resolve, 10))
 
 						// Test LRU eviction with edge cases
 						let evictionSucceeded = true

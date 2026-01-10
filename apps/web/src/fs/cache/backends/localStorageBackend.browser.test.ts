@@ -15,72 +15,116 @@ describe('LocalStorageBackend Browser Tests', () => {
 	/**
 	 * **Feature: persistent-file-cache, Property 6: JSON Serialization Round-Trip**
 	 * **Validates: Requirements 3.4**
-	 * 
-	 * For any valid FileCacheEntry stored in Warm_Cache, serializing then deserializing 
+	 *
+	 * For any valid FileCacheEntry stored in Warm_Cache, serializing then deserializing
 	 * SHALL produce an equivalent object.
 	 */
 	it('property: JSON serialization round-trip preserves data', () => {
 		fc.assert(
 			fc.property(
 				// Generate arbitrary FileCacheEntry-like objects
-				fc.record({
-					// ScrollPosition - exclude NaN values since they don't round-trip through JSON
-					scrollPosition: fc.option(fc.record({
-						scrollTop: fc.float({ min: 0, max: 10000, noNaN: true }),
-						scrollLeft: fc.float({ min: 0, max: 10000, noNaN: true })
-					}), { nil: undefined }),
-					// Simple arrays and objects that JSON can handle
-					highlights: fc.option(fc.array(fc.record({
-						startIndex: fc.integer({ min: 0, max: 1000 }),
-						endIndex: fc.integer({ min: 0, max: 1000 }),
-						scope: fc.string({ minLength: 1, maxLength: 20 }),
-						className: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined })
-					})), { nil: undefined }),
-					folds: fc.option(fc.array(fc.record({
-						startLine: fc.integer({ min: 0, max: 100 }),
-						endLine: fc.integer({ min: 0, max: 100 }),
-						type: fc.string({ minLength: 1, maxLength: 10 })
-					})), { nil: undefined }),
-					brackets: fc.option(fc.array(fc.record({
-						index: fc.integer({ min: 0, max: 1000 }),
-						char: fc.string({ minLength: 1, maxLength: 1 }),
-						depth: fc.integer({ min: 0, max: 10 })
-					})), { nil: undefined }),
-					errors: fc.option(fc.array(fc.record({
-						startIndex: fc.integer({ min: 0, max: 1000 }),
-						endIndex: fc.integer({ min: 0, max: 1000 }),
-						message: fc.string({ minLength: 1, maxLength: 50 }),
-						isMissing: fc.boolean()
-					})), { nil: undefined }),
-					// Visible content snapshot
-					visibleContent: fc.option(fc.record({
-						scrollTop: fc.float({ min: 0, max: 10000, noNaN: true }),
-						scrollLeft: fc.float({ min: 0, max: 10000, noNaN: true }),
-						viewportHeight: fc.integer({ min: 100, max: 2000 }),
-						viewportWidth: fc.integer({ min: 100, max: 2000 }),
-						lines: fc.array(fc.record({
-							lineIndex: fc.integer({ min: 0, max: 100 }),
-							columnStart: fc.integer({ min: 0, max: 100 }),
-							columnEnd: fc.integer({ min: 0, max: 100 }),
-							runs: fc.array(fc.record({
-								text: fc.string({ maxLength: 50 }),
-								depth: fc.option(fc.integer({ min: 0, max: 10 }), { nil: undefined }),
-								highlightClass: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined }),
-								highlightScope: fc.option(fc.string({ minLength: 1, maxLength: 20 }), { nil: undefined })
-							}))
-						}))
-					}), { nil: undefined })
-				}, { requiredKeys: [] }), // All fields are optional
+				fc.record(
+					{
+						// ScrollPosition - exclude NaN values since they don't round-trip through JSON
+						scrollPosition: fc.option(
+							fc.record({
+								scrollTop: fc.float({ min: 0, max: 10000, noNaN: true }),
+								scrollLeft: fc.float({ min: 0, max: 10000, noNaN: true }),
+							}),
+							{ nil: undefined }
+						),
+						// Simple arrays and objects that JSON can handle
+						highlights: fc.option(
+							fc.array(
+								fc.record({
+									startIndex: fc.integer({ min: 0, max: 1000 }),
+									endIndex: fc.integer({ min: 0, max: 1000 }),
+									scope: fc.string({ minLength: 1, maxLength: 20 }),
+									className: fc.option(
+										fc.string({ minLength: 1, maxLength: 20 }),
+										{ nil: undefined }
+									),
+								})
+							),
+							{ nil: undefined }
+						),
+						folds: fc.option(
+							fc.array(
+								fc.record({
+									startLine: fc.integer({ min: 0, max: 100 }),
+									endLine: fc.integer({ min: 0, max: 100 }),
+									type: fc.string({ minLength: 1, maxLength: 10 }),
+								})
+							),
+							{ nil: undefined }
+						),
+						brackets: fc.option(
+							fc.array(
+								fc.record({
+									index: fc.integer({ min: 0, max: 1000 }),
+									char: fc.string({ minLength: 1, maxLength: 1 }),
+									depth: fc.integer({ min: 0, max: 10 }),
+								})
+							),
+							{ nil: undefined }
+						),
+						errors: fc.option(
+							fc.array(
+								fc.record({
+									startIndex: fc.integer({ min: 0, max: 1000 }),
+									endIndex: fc.integer({ min: 0, max: 1000 }),
+									message: fc.string({ minLength: 1, maxLength: 50 }),
+									isMissing: fc.boolean(),
+								})
+							),
+							{ nil: undefined }
+						),
+						// Visible content snapshot
+						visibleContent: fc.option(
+							fc.record({
+								scrollTop: fc.float({ min: 0, max: 10000, noNaN: true }),
+								scrollLeft: fc.float({ min: 0, max: 10000, noNaN: true }),
+								viewportHeight: fc.integer({ min: 100, max: 2000 }),
+								viewportWidth: fc.integer({ min: 100, max: 2000 }),
+								lines: fc.array(
+									fc.record({
+										lineIndex: fc.integer({ min: 0, max: 100 }),
+										columnStart: fc.integer({ min: 0, max: 100 }),
+										columnEnd: fc.integer({ min: 0, max: 100 }),
+										runs: fc.array(
+											fc.record({
+												text: fc.string({ maxLength: 50 }),
+												depth: fc.option(fc.integer({ min: 0, max: 10 }), {
+													nil: undefined,
+												}),
+												highlightClass: fc.option(
+													fc.string({ minLength: 1, maxLength: 20 }),
+													{ nil: undefined }
+												),
+												highlightScope: fc.option(
+													fc.string({ minLength: 1, maxLength: 20 }),
+													{ nil: undefined }
+												),
+											})
+										),
+									})
+								),
+							}),
+							{ nil: undefined }
+						),
+					},
+					{ requiredKeys: [] }
+				), // All fields are optional
 				fc.string({ minLength: 1, maxLength: 20 }), // key
 				(entry, key) => {
 					const backend = createLocalStorageBackend<Partial<FileCacheEntry>>({
 						prefix: 'test:',
-						maxSize: 1024 * 1024 // 1MB for testing
+						maxSize: 1024 * 1024, // 1MB for testing
 					})
 
 					// Store the entry
 					const storedEntry = backend.set(key, entry)
-					
+
 					// Retrieve the entry
 					const retrievedEntry = backend.get(key)
 
@@ -96,8 +140,8 @@ describe('LocalStorageBackend Browser Tests', () => {
 	/**
 	 * **Feature: persistent-file-cache, Property 7: localStorage Quota Recovery**
 	 * **Validates: Requirements 3.5**
-	 * 
-	 * For any Warm_Cache write that exceeds localStorage quota, the cache SHALL evict 
+	 *
+	 * For any Warm_Cache write that exceeds localStorage quota, the cache SHALL evict
 	 * oldest entries until the write succeeds or the cache is empty.
 	 */
 	it('property: quota recovery evicts oldest entries until write succeeds', () => {
@@ -105,23 +149,25 @@ describe('LocalStorageBackend Browser Tests', () => {
 			fc.property(
 				// Generate a sequence of entries to fill cache, then a large entry to trigger quota
 				fc.record({
-					initialEntries: fc.array(
-						fc.record({
-							key: fc.string({ minLength: 1, maxLength: 10 }),
-							value: fc.string({ minLength: 10, maxLength: 30 }) // Smaller values
+					initialEntries: fc
+						.array(
+							fc.record({
+								key: fc.string({ minLength: 1, maxLength: 10 }),
+								value: fc.string({ minLength: 10, maxLength: 30 }), // Smaller values
+							}),
+							{ minLength: 3, maxLength: 6 }
+						)
+						.filter((entries) => {
+							// Ensure all keys are unique
+							const keys = entries.map((e) => e.key)
+							return new Set(keys).size === keys.length
 						}),
-						{ minLength: 3, maxLength: 6 }
-					).filter(entries => {
-						// Ensure all keys are unique
-						const keys = entries.map(e => e.key)
-						return new Set(keys).size === keys.length
-					}),
-					largeValue: fc.string({ minLength: 50, maxLength: 100 }) // Reasonable large value
+					largeValue: fc.string({ minLength: 50, maxLength: 100 }), // Reasonable large value
 				}),
 				({ initialEntries, largeValue }) => {
 					const backend = createLocalStorageBackend({
 						prefix: 'quota-test:',
-						maxSize: 500 // Small limit to trigger eviction
+						maxSize: 500, // Small limit to trigger eviction
 					})
 
 					// Add initial entries
@@ -146,12 +192,11 @@ describe('LocalStorageBackend Browser Tests', () => {
 
 						// Verify the large key is present
 						expect(keysAfterLarge).toContain('large-key')
-
 					} catch (error) {
 						// If it failed, it should be because the item is too large
 						expect(error).toBeInstanceOf(Error)
 						expect((error as Error).message).toMatch(/too large|storage/)
-						
+
 						// Original entries should still be intact if large item couldn't fit
 						const keysAfterFailure = backend.keys() as string[]
 						expect(keysAfterFailure.length).toBeGreaterThan(0)
@@ -171,7 +216,9 @@ describe('LocalStorageBackend Browser Tests', () => {
 				fc.oneof(
 					fc.string(),
 					fc.integer(),
-					fc.float({ noNaN: true, noDefaultInfinity: true }).filter(x => !Object.is(x, -0)), // Exclude -0 since JSON doesn't preserve it
+					fc
+						.float({ noNaN: true, noDefaultInfinity: true })
+						.filter((x) => !Object.is(x, -0)), // Exclude -0 since JSON doesn't preserve it
 					fc.boolean(),
 					fc.constant(null),
 					fc.array(fc.string()),
@@ -180,14 +227,14 @@ describe('LocalStorageBackend Browser Tests', () => {
 						str: fc.string(),
 						num: fc.integer(),
 						bool: fc.boolean(),
-						arr: fc.array(fc.string())
+						arr: fc.array(fc.string()),
 					})
 				),
 				fc.string({ minLength: 1, maxLength: 10 }),
 				(value, key) => {
 					const backend = createLocalStorageBackend({
 						prefix: 'prim:',
-						maxSize: 1024 * 1024
+						maxSize: 1024 * 1024,
 					})
 
 					backend.set(key, value)
@@ -221,10 +268,10 @@ describe('LocalStorageBackend Browser Tests', () => {
 				level2: {
 					level3: {
 						value: 'deep',
-						array: [1, 2, { nested: true }]
-					}
-				}
-			}
+						array: [1, 2, { nested: true }],
+					},
+				},
+			},
 		}
 
 		backend.set('nested', nestedData)
@@ -289,7 +336,7 @@ describe('LocalStorageBackend Browser Tests', () => {
 	it('enforces size limits with eviction', () => {
 		const backend = createLocalStorageBackend({
 			prefix: 'limit:',
-			maxSize: 100 // Very small limit to force eviction
+			maxSize: 100, // Very small limit to force eviction
 		})
 
 		// Add entries that exceed the limit
@@ -304,17 +351,17 @@ describe('LocalStorageBackend Browser Tests', () => {
 	it('handles localStorage quota exceeded errors in real browser environment', () => {
 		const backend = createLocalStorageBackend({
 			prefix: 'quota-test:',
-			maxSize: 100 // Very small limit
+			maxSize: 100, // Very small limit
 		})
 
 		// Add entries that should work within the limit
 		backend.set('small1', 'a')
 		backend.set('small2', 'b')
-		
+
 		// Verify the entries were stored
 		expect(backend.get('small1')).toBe('a')
 		expect(backend.get('small2')).toBe('b')
-		
+
 		// The backend should handle large entries gracefully
 		// Either by evicting old entries or by handling the error
 		expect(() => {

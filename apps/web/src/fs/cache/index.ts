@@ -1,4 +1,4 @@
-export { 
+export {
 	TreeCacheController,
 	CACHE_KEY_SCHEMA,
 	type CachedDirectoryEntry,
@@ -6,12 +6,9 @@ export {
 	type TreeCacheStats,
 } from './treeCacheController'
 
-export { 
-	WorkerTreeCache,
-	createWorkerTreeCache,
-} from './workerTreeCache'
+export { WorkerTreeCache, createWorkerTreeCache } from './workerTreeCache'
 
-export { 
+export {
 	CachedPrefetchQueue,
 	type CachedPrefetchQueueOptions,
 } from './cachedPrefetchQueue'

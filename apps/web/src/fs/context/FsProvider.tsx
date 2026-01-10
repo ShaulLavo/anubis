@@ -137,7 +137,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 			await fileCache.flush()
 			fileCache.setActiveFile(null)
 		}
-		
+
 		// If the file isn't in the tree yet, load all parent directories first
 		// This ensures the file appears in the sidebar after opening from command palette or restore
 		const tree = state.tree
@@ -147,12 +147,14 @@ export function FsProvider(props: { children: JSX.Element }) {
 				// File not in tree - load parent directories
 				const parentPath = path.split('/').slice(0, -1).join('/')
 				if (parentPath) {
-					console.log(`[FsProvider] selectPath: loading parent directories for ${path}`)
+					console.log(
+						`[FsProvider] selectPath: loading parent directories for ${path}`
+					)
 					await ensureDirPathLoaded(parentPath)
 				}
 			}
 		}
-		
+
 		await selectPathInternal(path, options)
 		const latestTree = state.tree
 		if (latestTree) {

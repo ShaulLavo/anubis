@@ -13,8 +13,8 @@ const SYSTEM_FILES: SystemFile[] = [
 	{
 		name: 'settings.json',
 		path: '/.system/settings.json',
-		icon: 'settings'
-	}
+		icon: 'settings',
+	},
 ]
 
 export const SystemFilesSection = () => {
@@ -63,18 +63,18 @@ export const SystemFilesSection = () => {
 					>
 						<span
 							class="tree-node-icon"
-							classList={{ 
+							classList={{
 								'text-cyan-700': isSelected(file.path),
-								'text-amber-600': !isSelected(file.path)
+								'text-amber-600': !isSelected(file.path),
 							}}
 						>
 							{renderFileIcon(file)}
 						</span>
 						<span
 							class="truncate text-sm"
-							classList={{ 
+							classList={{
 								'text-cyan-700': isSelected(file.path),
-								'text-foreground/90': !isSelected(file.path)
+								'text-foreground/90': !isSelected(file.path),
 							}}
 						>
 							{file.name}
