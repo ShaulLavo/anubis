@@ -22,13 +22,26 @@ type ThemeContextValue = {
 	setMode: (mode: ThemeMode) => void
 }
 
+export type ThemeProviderProps = {
+	children: JSX.Element
+	/** Initial theme mode - if provided, overrides localStorage */
+	initialMode?: ThemeMode
+	/** Callback when mode changes (e.g., from ModeToggle clicks) */
+	onModeChange?: (mode: ThemeMode) => void
+}
+
 const ThemeContext = createContext<ThemeContextValue>()
 
-export const ThemeProvider = (props: { children: JSX.Element }) => {
+export const ThemeProvider = (props: ThemeProviderProps) => {
 	const { colorMode, setColorMode } = useColorMode()
-	const [mode, setMode] = createSignal<ThemeMode>(
-		(localStorage.getItem('ui-theme') as ThemeMode | null) ?? 'system'
-	)
+
+	// Use initialMode prop if provided, otherwise fall back to localStorage
+	const getInitialMode = (): ThemeMode => {
+		if (props.initialMode) return props.initialMode
+		return (localStorage.getItem('ui-theme') as ThemeMode | null) ?? 'system'
+	}
+
+	const [mode, setMode] = createSignal<ThemeMode>(getInitialMode())
 
 	const isDark = createMemo(() => colorMode() === 'dark')
 	const [theme, setTheme] = createStore<ThemePalette>(
@@ -42,6 +55,10 @@ export const ThemeProvider = (props: { children: JSX.Element }) => {
 	const handleSetMode = (newMode: ThemeMode) => {
 		setMode(newMode)
 		setColorMode(newMode)
+		// Persist to localStorage for fast initial render on next page load
+		localStorage.setItem('ui-theme', newMode)
+		// Notify external listeners (settings system)
+		props.onModeChange?.(newMode)
 	}
 
 	const trackedTheme = () => {

@@ -1,4 +1,4 @@
-import type { Component } from 'solid-js'
+import type { Component, JSX } from 'solid-js'
 import { For, Show } from 'solid-js'
 import { SettingItem } from './SettingItem'
 import type { SettingDefinition } from './SettingItem'
@@ -14,6 +14,8 @@ export type SettingsPanelProps = {
 	class?: string
 	/** Parent category ID when a subcategory is selected */
 	parentCategoryId?: string
+	/** Custom UI components for specific subcategories */
+	customSubcategoryComponents?: Record<string, () => JSX.Element>
 }
 
 export const SettingsPanel: Component<SettingsPanelProps> = (props) => {
@@ -51,6 +53,16 @@ export const SettingsPanel: Component<SettingsPanelProps> = (props) => {
 	const shouldShowSubcategory = (subcategory: string) =>
 		subcategory !== 'general' || groupedEntries().length > 1
 
+	// Check if we should show custom UI for fonts subcategory
+	const shouldShowCustomFontsUI = () => {
+		return props.parentCategoryId === 'appearance' && props.categoryId === 'fonts'
+	}
+
+	// Get custom component for subcategory
+	const getCustomComponent = (subcategory: string) => {
+		return props.customSubcategoryComponents?.[subcategory]
+	}
+
 	return (
 		<SettingsScrollArea
 			class={cn('h-full min-h-0 bg-background', props.class)}
@@ -68,31 +80,62 @@ export const SettingsPanel: Component<SettingsPanelProps> = (props) => {
 			{/* Settings grouped by subcategory */}
 			<div class="space-y-5">
 				<For each={groupedEntries()}>
-					{([subcategory, settings]) => (
-						<div class="space-y-3">
-							{/* Subcategory header (only show if not 'general' or if there are multiple subcategories) */}
-							<Show when={shouldShowSubcategory(subcategory)}>
-								<h2 class="text-sm font-semibold text-foreground/80 capitalize border-b border-border/60 pb-1.5">
-									{subcategory === 'general' ? 'General' : subcategory}
-								</h2>
-							</Show>
+					{([subcategory, settings]) => {
+						const CustomComponent = getCustomComponent(subcategory)
+						
+						return (
+							<div class="space-y-3">
+								{/* Subcategory header (only show if not 'general' or if there are multiple subcategories) */}
+								<Show when={shouldShowSubcategory(subcategory)}>
+									<h2 class="text-sm font-semibold text-foreground/80 capitalize border-b border-border/60 pb-1.5">
+										{subcategory === 'general' ? 'General' : subcategory}
+									</h2>
+								</Show>
 
-							{/* Settings list */}
-							<div class="divide-y divide-border/60">
-								<For each={settings}>
-									{(setting) => (
-										<SettingItem
-											setting={setting}
-											value={props.values[setting.key]}
-											onChange={(value) =>
-												props.onSettingChange(setting.key, value)
-											}
-										/>
-									)}
-								</For>
+								{/* Custom component or regular settings */}
+								<Show
+									when={CustomComponent}
+									fallback={
+										<div class="divide-y divide-border/60">
+											<For each={settings}>
+												{(setting) => (
+													<SettingItem
+														setting={setting}
+														value={props.values[setting.key]}
+														onChange={(value) =>
+															props.onSettingChange(setting.key, value)
+														}
+													/>
+												)}
+											</For>
+										</div>
+									}
+								>
+									<div class="space-y-4">
+										{/* Regular settings first */}
+										<Show when={settings.length > 0}>
+											<div class="divide-y divide-border/60">
+												<For each={settings}>
+													{(setting) => (
+														<SettingItem
+															setting={setting}
+															value={props.values[setting.key]}
+															onChange={(value) =>
+																props.onSettingChange(setting.key, value)
+															}
+														/>
+													)}
+												</For>
+											</div>
+										</Show>
+										
+										{/* Custom component */}
+										{CustomComponent && CustomComponent()}
+									</div>
+								</Show>
 							</div>
-						</div>
-					)}
+						)
+					}}
 				</For>
 			</div>
 

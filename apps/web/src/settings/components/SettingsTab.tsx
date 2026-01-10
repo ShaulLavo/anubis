@@ -7,6 +7,7 @@ import {
 } from '@repo/ui/settings'
 import { Resizable } from '../../components/Resizable'
 import { useSettings } from '../SettingsProvider'
+import { FontsSubcategoryUI } from '../fonts/components/FontsSubcategoryUI'
 
 export type SettingsTabProps = {
 	initialCategory?: string
@@ -99,6 +100,11 @@ export const SettingsTab: Component<SettingsTabProps> = (props) => {
 		settingsActions.setSetting(key, value)
 	}
 
+	// Custom subcategory components
+	const customSubcategoryComponents = {
+		fonts: () => <FontsSubcategoryUI />
+	}
+
 	// Update parent category when selected category changes or from props
 	createEffect(() => {
 		const category = selectedCategory()
@@ -144,6 +150,7 @@ export const SettingsTab: Component<SettingsTabProps> = (props) => {
 					settings={settingsState.schema.settings}
 					values={settingsState.values}
 					onSettingChange={handleSettingChange}
+					customSubcategoryComponents={customSubcategoryComponents}
 				/>
 			</Resizable>
 		</div>

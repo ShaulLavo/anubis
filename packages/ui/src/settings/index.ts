@@ -19,3 +19,6 @@ export type { SettingItemProps, SettingDefinition } from './SettingItem'
 
 export { SettingsPanel } from './SettingsPanel'
 export type { SettingsPanelProps } from './SettingsPanel'
+
+export { SettingsScrollArea } from './SettingsScrollArea'
+export type { SettingsScrollAreaProps } from './SettingsScrollArea'

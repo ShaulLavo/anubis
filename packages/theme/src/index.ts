@@ -14,4 +14,4 @@ export { DARK_THEME, LIGHT_THEME } from './palettes'
 export { syncToCssVars } from './cssVars'
 
 // Context
-export { ThemeProvider, useTheme } from './context'
+export { ThemeProvider, useTheme, type ThemeProviderProps } from './context'
