@@ -14,7 +14,7 @@ import type {
 } from '../cache/fileCacheController'
 import type { FsState, FsSource } from '../types'
 import type { HighlightTransform } from '../hooks/createHighlightState'
-import type { ViewMode } from '../types/TabIdentity'
+import type { ViewMode } from '../types/ViewMode'
 
 export type SelectPathOptions = {
 	forceReload?: boolean

@@ -1,5 +1,5 @@
 import { Accessor, createEffect, createSignal } from 'solid-js'
-import { migrateTabState } from '../types/TabIdentity'
+import { migrateTabState } from '../types/ViewMode'
 
 export type UseTabsOptions = {
 	maxTabs?: number

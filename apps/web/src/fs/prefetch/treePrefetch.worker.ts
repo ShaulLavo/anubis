@@ -39,7 +39,6 @@ const loadDirectoryTarget = async (
 ): Promise<FsDirTreeNode | undefined> => {
 	const context = ensureContext()
 
-	// Check cache first if available
 	if (workerCache) {
 		try {
 			const cached = await workerCache.getDirectory(target.path)
@@ -89,8 +88,6 @@ const loadDirectoryTarget = async (
 	} else {
 		// No worker cache
 	}
-
-	// Perform filesystem scan
 
 	const result = await walkDirectory(
 		context,

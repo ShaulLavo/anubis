@@ -56,7 +56,6 @@ export const createFsMutations = ({
 
 		const newPath = buildPath(parentPath, trimmed)
 
-		// Check if node already exists
 		if (findNode(tree, newPath)) {
 			toast.error(`A folder named "${trimmed}" already exists`)
 			return
@@ -66,11 +65,9 @@ export const createFsMutations = ({
 			const ctx = await ensureFs(getActiveSource())
 			await ctx.ensureDir(newPath)
 
-			// Calculate depth based on parent
 			const parentNode = findNode(tree, parentPath)
 			const parentDepth = parentNode?.depth ?? 0
 
-			// Create the new directory node
 			const newNode: FsDirTreeNode = {
 				kind: 'dir',
 				name: trimmed,
@@ -108,7 +105,6 @@ export const createFsMutations = ({
 
 		const newPath = buildPath(parentPath, trimmed)
 
-		// Check if node already exists
 		if (findNode(tree, newPath)) {
 			toast.error(`A file named "${trimmed}" already exists`)
 			return
@@ -119,11 +115,9 @@ export const createFsMutations = ({
 			const fileContent = content ?? '// empty file'
 			await ctx.write(newPath, fileContent)
 
-			// Calculate depth based on parent
 			const parentNode = findNode(tree, parentPath)
 			const parentDepth = parentNode?.depth ?? 0
 
-			// Create the new file node
 			const newNode: FsFileTreeNode = {
 				kind: 'file',
 				name: trimmed,
@@ -188,7 +182,9 @@ export const createFsMutations = ({
 		}
 
 		// Normalize path for cache lookups
-		const normalizedPath = filePath.startsWith('/') ? filePath.slice(1) : filePath
+		const normalizedPath = filePath.startsWith('/')
+			? filePath.slice(1)
+			: filePath
 
 		const stats = state.fileStats[normalizedPath]
 		if (stats && stats.contentKind === 'binary') {
@@ -232,7 +228,6 @@ export const createFsMutations = ({
 					window.dispatchEvent(
 						new CustomEvent('settings-file-saved', { detail: parsed })
 					)
-					console.log('[fsMutations] Dispatched settings-file-saved event', parsed)
 				} catch (e) {
 					logger
 						.withTag('fsMutations')

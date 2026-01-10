@@ -213,7 +213,6 @@ export class TierRouter {
 		const key = this.generateCacheKey(path, dataType)
 
 		try {
-			// Check in order: hot → warm → cold
 			if (this.hot.has(key)) return true
 			if (this.warm.has(key)) return true
 			if (await this.cold.has(key)) return true
@@ -276,7 +275,6 @@ export class TierRouter {
 				this.cold.keys().catch(() => []),
 			])
 
-			// Deduplicate keys
 			const allKeys = new Set([...hotKeys, ...warmKeys, ...coldKeys])
 			return Array.from(allKeys)
 		} catch (error) {

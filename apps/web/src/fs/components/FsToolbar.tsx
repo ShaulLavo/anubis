@@ -38,7 +38,7 @@ export const FsToolbar = (props: FsToolbarProps) => {
 	}
 
 	return (
-		<Flex class="fs-toolbar gap-0.5">
+		<Flex class="fs-toolbar gap-0.5 w-auto" justifyContent="end">
 			<Button
 				variant="ghost"
 				size="icon"

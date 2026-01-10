@@ -62,6 +62,7 @@ export const useFileSystemObserver = ({
 				path: fullPath,
 			})
 
+			// PARKED: logic for handling file system events
 			// switch (record.type) {
 			// 	case 'appeared': {
 			// 		// New file or folder appeared - reload parent directory
@@ -221,7 +222,6 @@ export const useFileSystemObserver = ({
 		}
 	}
 
-	// Cleanup on component unmount
 	onCleanup(() => {
 		stopObserving()
 	})

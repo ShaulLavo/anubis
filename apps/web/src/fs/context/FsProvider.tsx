@@ -11,7 +11,8 @@ import { createFsMutations } from '../fsMutations'
 import { restoreHandleCache } from '../runtime/handleCache'
 import { createFsState } from '../hooks/createFsState'
 import type { FsSource } from '../types'
-import type { ViewMode } from '../types/TabIdentity'
+import type { ViewMode } from '../types/ViewMode'
+import { getValidViewMode } from '../utils/viewModeDetection'
 import { FsContext, type FsContextValue } from './FsContext'
 import { replaceDirNodeInTree } from '../utils/treeNodes'
 import { makeTreePrefetch } from '../hooks/useTreePrefetch'
@@ -63,10 +64,12 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setCreationState,
 	} = createFsState()
 
-	// Wrapper for setViewMode that includes stats
+	// Wrapper for setViewMode that includes stats and error handling
 	const setViewModeWithStats = (path: string, viewMode: ViewMode) => {
 		const stats = state.fileStats[path]
-		setViewMode(path, viewMode, stats)
+		// Validate the requested view mode and fallback if unavailable
+		const validViewMode = getValidViewMode(viewMode, path, stats)
+		setViewMode(path, validViewMode, stats)
 	}
 
 	const fileCache = createFileCacheController({

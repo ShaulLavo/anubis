@@ -98,7 +98,6 @@ export class TreeCacheController {
 
 			this.stats.hits++
 
-			// Recursively load all cached directories to build the full tree
 			const fullTree = await this.loadFullTreeFromCache(cached)
 
 			const loadTime = performance.now() - startTime
@@ -115,7 +114,7 @@ export class TreeCacheController {
 				'Failed to get cached tree, falling back to filesystem',
 				{ rootPath, error }
 			)
-			return null // Graceful degradation - return null to trigger filesystem fallback
+			return null
 		}
 	}
 
@@ -150,17 +149,14 @@ export class TreeCacheController {
 					lastModified: child.lastModified,
 				})
 			} else {
-				// For directories, try to load their cached children recursively
 				const childKey = CACHE_KEY_SCHEMA.dir(child.path)
 				const childCached =
 					await this.store.getItem<CachedDirectoryEntry>(childKey)
 
 				if (childCached) {
-					// Recursively load this directory's full tree
 					const childTree = await this.loadFullTreeFromCache(childCached)
 					children.push(childTree)
 				} else {
-					// No cached data for this directory, create empty placeholder
 					children.push({
 						kind: 'dir' as const,
 						name: child.name,
@@ -204,7 +200,6 @@ export class TreeCacheController {
 				rootPath,
 				error,
 			})
-			// Graceful degradation - don't throw, just log and continue
 		}
 	}
 
@@ -224,7 +219,6 @@ export class TreeCacheController {
 			const loadTime = performance.now() - startTime
 			this.stats.totalLoadTime += loadTime
 
-			// Update access time for LRU tracking (don't await to avoid blocking)
 			this.updateAccessTime(path, cached.cachedAt).catch((error) => {
 				cacheLogger.warn('Failed to update access time', { path, error })
 			})
@@ -237,7 +231,7 @@ export class TreeCacheController {
 				'Failed to get cached directory, falling back to filesystem',
 				{ path, error }
 			)
-			return null // Graceful degradation - return null to trigger filesystem fallback
+			return null
 		}
 	}
 
@@ -260,7 +254,6 @@ export class TreeCacheController {
 				'Failed to cache directory, continuing without caching',
 				{ path, error }
 			)
-			// Graceful degradation - don't throw, just log and continue
 		}
 	}
 
@@ -332,14 +325,10 @@ export class TreeCacheController {
 				return false
 			}
 
-			// If no current modification time provided, consider it fresh
-			// This allows for cache-first loading scenarios
 			if (currentMtime === undefined) {
 				return true
 			}
 
-			// Compare cached modification time with current modification time
-			// Directory is fresh if cached time is greater than or equal to current time
 			const isFresh =
 				cached.lastModified !== undefined && cached.lastModified >= currentMtime
 
@@ -354,7 +343,6 @@ export class TreeCacheController {
 				validationTime,
 			})
 
-			// If directory is stale, mark it for cleanup
 			if (!isFresh) {
 				cacheLogger.debug('Directory is stale, marking for cleanup', {
 					path,
@@ -372,10 +360,7 @@ export class TreeCacheController {
 
 	async markDirectoryStale(path: string): Promise<void> {
 		try {
-			// Remove the stale directory from cache
 			await this.invalidateDirectory(path)
-
-			// Also invalidate ancestors to maintain hierarchy consistency
 			await this.invalidateAncestors(path)
 
 			cacheLogger.debug('Marked directory and ancestors as stale', { path })
@@ -447,7 +432,6 @@ export class TreeCacheController {
 
 			const staleEntries: string[] = []
 
-			// Check each cached directory against current modification times
 			for (const key of directoryKeys) {
 				if (typeof key !== 'string') continue
 
@@ -462,7 +446,6 @@ export class TreeCacheController {
 				}
 			}
 
-			// Remove all stale entries
 			if (staleEntries.length > 0) {
 				const cleanupPromises = staleEntries.map((path) =>
 					this.invalidateDirectory(path)
@@ -500,10 +483,7 @@ export class TreeCacheController {
 		directoryMtime?: number
 	): Promise<void> {
 		try {
-			// Update the specific directory with fresh data
 			await this.setCachedDirectory(path, freshNode, directoryMtime)
-
-			// Ensure parent-child relationships are maintained
 			await this.updateParentChildRelationships(path, freshNode)
 
 			cacheLogger.debug('Performed incremental update', {
@@ -524,19 +504,16 @@ export class TreeCacheController {
 		updatedNode: FsDirTreeNode
 	): Promise<void> {
 		try {
-			// If this node has a parent, ensure the parent's child reference is updated
 			if (updatedNode.parentPath) {
 				const parentCached = await this.getCachedDirectory(
 					updatedNode.parentPath
 				)
 				if (parentCached) {
-					// Update the parent's children array to reflect the updated child
 					const childIndex = parentCached.children.findIndex(
 						(child) => child.path === path
 					)
 
 					if (childIndex >= 0) {
-						// Replace the child with updated metadata (but keep it as a directory reference)
 						parentCached.children[childIndex] = {
 							kind: 'dir',
 							name: updatedNode.name,
@@ -547,13 +524,11 @@ export class TreeCacheController {
 							isLoaded: updatedNode.isLoaded,
 						}
 
-						// Update the parent in cache
 						await this.setCachedDirectory(parentCached.path, parentCached)
 					}
 				}
 			}
 
-			// Ensure all children have correct parent references
 			for (const child of updatedNode.children) {
 				if (child.parentPath !== path) {
 					cacheLogger.warn('Correcting child parent reference', {
@@ -585,16 +560,12 @@ export class TreeCacheController {
 			const existingCached = await this.getCachedDirectory(path)
 
 			if (!existingCached) {
-				// No existing data, just cache the fresh node
 				await this.setCachedDirectory(path, freshNode, directoryMtime)
 				return
 			}
 
-			// Merge the data - in this case, we replace with fresh data
-			// but maintain the same cache structure and metadata format
 			const mergedNode: FsDirTreeNode = {
 				...freshNode,
-				// Preserve any cache-specific metadata if needed
 			}
 
 			await this.setCachedDirectory(path, mergedNode, directoryMtime)
@@ -689,7 +660,6 @@ export class TreeCacheController {
 				return // No eviction needed
 			}
 
-			// Get all cached entries with their timestamps
 			const entriesWithTimestamps: Array<{
 				key: string
 				path: string
@@ -720,10 +690,8 @@ export class TreeCacheController {
 				}
 			}
 
-			// Sort by cachedAt timestamp (oldest first)
 			entriesWithTimestamps.sort((a, b) => a.cachedAt - b.cachedAt)
 
-			// Evict oldest entries
 			const entriesToEvict = entriesWithTimestamps.length - maxEntries
 			const evictionPromises: Promise<void>[] = []
 
@@ -776,10 +744,7 @@ export class TreeCacheController {
 		try {
 			cacheLogger.warn('Detected corrupted cache data, cleaning up', { path })
 
-			// Remove the corrupted entry
 			await this.invalidateDirectory(path)
-
-			// Also invalidate related entries that might be affected
 			await this.invalidateAncestors(path)
 
 			cacheLogger.debug('Cleaned up corrupted cache data', { path })
@@ -840,8 +805,7 @@ export class TreeCacheController {
 				const lazyTreeNode: FsDirTreeNode = {
 					...treeNode,
 					children: lazyChildren,
-					// Add metadata to track lazy loading state
-					isLoaded: false, // Mark as not fully loaded
+					isLoaded: false,
 				}
 
 				// Store metadata about remaining children for future loading
@@ -903,14 +867,20 @@ export class TreeCacheController {
 				return null
 			}
 
-			// Get the current cached directory
 			const currentNode = await this.getCachedDirectory(path)
 			if (!currentNode) {
 				return null
 			}
 
 			// Merge the next batch with current children
-			const updatedChildren = [...currentNode.children, ...nextBatch]
+			const mappedNextBatch = nextBatch.map((child) => {
+				if (child.kind === 'dir' && !child.children) {
+					return { ...child, children: [] }
+				}
+				return child
+			}) as unknown as FsDirTreeNode['children']
+
+			const updatedChildren = [...currentNode.children, ...mappedNextBatch]
 			const isFullyLoaded = endIndex >= metadata.totalChildren
 
 			const updatedNode: FsDirTreeNode = {
@@ -919,10 +889,8 @@ export class TreeCacheController {
 				isLoaded: isFullyLoaded,
 			}
 
-			// Update the cached entry
 			await this.setCachedDirectory(path, updatedNode)
 
-			// Update lazy loading metadata
 			if (!isFullyLoaded) {
 				const remainingChildren = metadata.remainingChildren.slice(batchSize)
 				await this.storeLazyLoadingMetadata(path, remainingChildren, endIndex)
@@ -1079,7 +1047,6 @@ export class TreeCacheController {
 				})
 			}
 
-			// Reset stats
 			this.stats = {
 				hits: 0,
 				misses: 0,
@@ -1142,7 +1109,6 @@ export class TreeCacheController {
 				currentOperation: `Invalidating ${totalOperations} entries...`,
 			})
 
-			// Remove entries with progress tracking
 			for (let i = 0; i < keysToRemove.length; i++) {
 				await this.store.removeItem(keysToRemove[i]!)
 				onProgress?.({
@@ -1703,7 +1669,6 @@ export class TreeCacheController {
 				error,
 			})
 
-			// Handle corrupted data
 			if (cached?.path) {
 				this.handleCorruptedData(cached.path).catch(() => {
 					// Ignore cleanup errors

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { cleanLegacyTabId, migrateTabState } from '../types/TabIdentity'
+import { cleanLegacyTabId, migrateTabState } from '../types/ViewMode'
 
 describe('Tab Identity System', () => {
 	describe('cleanLegacyTabId', () => {

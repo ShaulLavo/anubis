@@ -1,9 +1,20 @@
 /**
  * View mode types for files
- * View mode is stored separately from tab identity - tabs are just file paths
+ * View modes are stored separately - tabs are just file paths
+ * 
+ * Built-in view modes with extensibility support
  */
+export type BuiltInViewMode = 'editor' | 'ui' | 'binary'
 
-export type ViewMode = 'editor' | 'ui' | 'binary'
+/**
+ * Extensible view mode type that allows custom modes
+ * Built-in modes are strongly typed, custom modes are strings
+ */
+export type ViewMode = BuiltInViewMode | (string & {})
+
+/**
+ * Legacy migration utilities - still needed for existing users
+ */
 
 /**
  * Cleans up legacy tab IDs that had :viewMode suffix
@@ -29,4 +40,11 @@ export const migrateTabState = (oldTabs: string[]): string[] => {
 	const cleaned = oldTabs.map(cleanLegacyTabId)
 	// Remove duplicates that might result from migration
 	return [...new Set(cleaned)]
+}
+
+/**
+ * Type guard to check if a view mode is a built-in mode
+ */
+export const isBuiltInViewMode = (mode: ViewMode): mode is BuiltInViewMode => {
+	return mode === 'editor' || mode === 'ui' || mode === 'binary'
 }

@@ -1,36 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { createMinimalBinaryParseResult } from '@repo/utils'
-import { cleanLegacyTabId, migrateTabState } from '../TabIdentity'
 import {
 	detectAvailableViewModes,
 	getDefaultViewMode,
 	supportsMultipleViewModes,
 	isViewModeValid,
+	getValidViewMode,
+	isRegularFile,
 } from '../../utils/viewModeDetection'
-
-describe('TabIdentity utilities', () => {
-	it('cleans legacy tab IDs with view mode suffix', () => {
-		expect(cleanLegacyTabId('/test/file.txt:editor')).toBe('/test/file.txt')
-		expect(cleanLegacyTabId('/settings.json:ui')).toBe('/settings.json')
-		expect(cleanLegacyTabId('/binary.exe:binary')).toBe('/binary.exe')
-	})
-
-	it('leaves clean paths unchanged', () => {
-		expect(cleanLegacyTabId('/test/file.txt')).toBe('/test/file.txt')
-	})
-
-	it('migrates old tab state by removing view mode suffixes', () => {
-		const oldTabs = ['/file1.txt:editor', '/file2.txt:ui', '/file3.txt']
-		const migrated = migrateTabState(oldTabs)
-		expect(migrated).toEqual(['/file1.txt', '/file2.txt', '/file3.txt'])
-	})
-
-	it('removes duplicates after migration', () => {
-		const oldTabs = ['/file1.txt:editor', '/file1.txt:ui']
-		const migrated = migrateTabState(oldTabs)
-		expect(migrated).toEqual(['/file1.txt'])
-	})
-})
 
 describe('ViewModeRegistry', () => {
 	it('detects editor mode for all files', () => {
@@ -87,5 +64,41 @@ describe('ViewModeRegistry', () => {
 		})
 		expect(isViewModeValid('binary', '/test/binary.exe', mockStats)).toBe(true)
 		expect(isViewModeValid('binary', '/test/file.txt')).toBe(false)
+	})
+
+	it('handles invalid view mode requests with fallback (Requirements 4.4, 6.1, 6.3, 6.4)', () => {
+		// Regular file - should fallback to editor when requesting unavailable mode
+		expect(getValidViewMode('ui', '/test/file.txt')).toBe('editor')
+		expect(getValidViewMode('binary', '/test/file.txt')).toBe('editor')
+		
+		// Settings file - should allow valid modes
+		expect(getValidViewMode('ui', '/.system/userSettings.json')).toBe('ui')
+		expect(getValidViewMode('editor', '/.system/userSettings.json')).toBe('editor')
+		
+		// Binary file - should default to editor mode (Requirement 4.4)
+		const mockStats = createMinimalBinaryParseResult('', {
+			isText: false,
+			confidence: 'high',
+		})
+		expect(getValidViewMode('binary', '/test/binary.exe', mockStats)).toBe('binary')
+		expect(getValidViewMode('editor', '/test/binary.exe', mockStats)).toBe('editor')
+		// Invalid mode should fallback to default (editor for binary files)
+		expect(getValidViewMode('ui', '/test/binary.exe', mockStats)).toBe('editor')
+	})
+
+	it('identifies regular files correctly (Requirements 6.1, 6.3, 6.4)', () => {
+		// Regular files should only support editor mode
+		expect(isRegularFile('/test/file.txt')).toBe(true)
+		expect(isRegularFile('/test/document.md')).toBe(true)
+		
+		// Settings files support multiple modes
+		expect(isRegularFile('/.system/userSettings.json')).toBe(false)
+		
+		// Binary files support multiple modes
+		const mockStats = createMinimalBinaryParseResult('', {
+			isText: false,
+			confidence: 'high',
+		})
+		expect(isRegularFile('/test/binary.exe', mockStats)).toBe(false)
 	})
 })

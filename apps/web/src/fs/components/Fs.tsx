@@ -5,6 +5,8 @@ import { useFs } from '../../fs/context/FsContext'
 import { SelectedFilePanel } from './SelectedFilePanel'
 import { TreeView } from './TreeView'
 
+import { ExplorerAccordion } from './ExplorerAccordion'
+
 export const Fs = () => {
 	const [state, actions] = useFs()
 
@@ -29,7 +31,9 @@ export const Fs = () => {
 				defaultSizes={[0.3, 0.7]}
 				handleAriaLabel="Resize file tree"
 			>
-				<TreeView tree={() => state.tree} loading={() => state.loading} />
+				<ExplorerAccordion>
+					<TreeView tree={() => state.tree} loading={() => state.loading} />
+				</ExplorerAccordion>
 				<SelectedFilePanel
 					isFileSelected={isFileSelected}
 					currentPath={state.lastKnownFilePath}

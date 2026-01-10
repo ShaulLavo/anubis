@@ -21,9 +21,12 @@ import { BinaryFileViewer } from '~/components/BinaryFileViewer'
 import { useEditorDecorations } from '../hooks/useEditorDecorations'
 import { useEditorDocument } from '../hooks/useEditorDocument'
 import { useSelectedFileTabs } from '../hooks/useSelectedFileTabs'
-import { detectAvailableViewModes } from '../utils/viewModeDetection'
+import {
+	detectAvailableViewModes,
+	getValidViewMode,
+} from '../utils/viewModeDetection'
 import { viewModeRegistry } from '../registry/ViewModeRegistry'
-import { type ViewMode } from '../types/TabIdentity'
+import { type ViewMode } from '../types/ViewMode'
 
 const DEFAULT_FONT_SIZE = 14
 const DEFAULT_FONT_FAMILY = "'JetBrains Mono Variable', monospace"
@@ -136,44 +139,48 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		return dirtyStatus
 	}
 
-	// Get view mode for a specific tab (file path)
 	const getTabViewMode = (tabPath: string): ViewMode => {
 		if (tabPath === state.lastKnownFilePath) {
-			// For the currently selected file, use the current view mode
 			return getCurrentViewMode()
 		}
-		// For other tabs, we need to get their stored view mode
-		// Since view modes are stored per path, we can get it from the state
+		// For other tabs, we need to get their stored view mode with error handling
 		const stats =
 			state.fileStats[tabPath.startsWith('/') ? tabPath.slice(1) : tabPath]
-		return (
-			state.fileViewModes[
-				tabPath.startsWith('/') ? tabPath.slice(1) : tabPath
-			] || viewModeRegistry.getDefaultMode(tabPath, stats)
-		)
+		const storedMode =
+			state.fileViewModes[tabPath.startsWith('/') ? tabPath.slice(1) : tabPath]
+		const requestedMode =
+			storedMode || viewModeRegistry.getDefaultMode(tabPath, stats)
+
+		// Ensure the view mode is valid for this file
+		return getValidViewMode(requestedMode, tabPath, stats)
 	}
 
-	// Get available view modes for a specific tab (file path)
 	const getTabAvailableViewModes = (tabPath: string): ViewMode[] => {
 		const stats =
 			state.fileStats[tabPath.startsWith('/') ? tabPath.slice(1) : tabPath]
 		return detectAvailableViewModes(tabPath, stats)
 	}
 
-	// Handle view mode switching - switches mode on same tab
 	const handleViewModeSelect = (newViewMode: ViewMode) => {
 		const currentPath = state.lastKnownFilePath
 		if (!currentPath) return
 
-		// Set the view mode using the new system
-		setViewMode(currentPath, newViewMode)
+		// Validate the requested view mode and fallback if unavailable (error handling)
+		const validViewMode = getValidViewMode(
+			newViewMode,
+			currentPath,
+			state.selectedFileStats
+		)
+
+		setViewMode(currentPath, validViewMode)
 	}
 
-	// Get current view mode and available modes for the toggle
 	const getCurrentViewMode = (): ViewMode => {
-		// Use the new view mode system
-		const currentMode = state.selectedFileViewMode || 'editor'
-		return currentMode
+		const currentPath = state.lastKnownFilePath
+		if (!currentPath) return 'editor'
+
+		const requestedMode = state.selectedFileViewMode || 'editor'
+		return getValidViewMode(requestedMode, currentPath, state.selectedFileStats)
 	}
 
 	const getAvailableViewModesForCurrentFile = () => {

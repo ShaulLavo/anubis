@@ -2,7 +2,7 @@ import { VsClose } from '@repo/icons/vs/VsClose'
 import { VsCircleFilled } from '@repo/icons/vs/VsCircleFilled'
 import { createSignal, Show } from 'solid-js'
 import { FileIcon } from './FileIcon'
-import type { ViewMode } from '../types/TabIdentity'
+import type { ViewMode } from '../types/ViewMode'
 import { Button } from '@repo/ui/button'
 
 type TabProps = {

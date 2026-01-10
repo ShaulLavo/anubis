@@ -176,11 +176,24 @@ export const useFileSelection = ({
 								)
 							pieceTableSnapshot = existingSnapshot
 						} else if (isBinary) {
+							// Binary files: load both binary preview AND text content
+							// Text content is needed for editor mode (broken UTF-8 display like VS Code)
 							binaryPreviewBytes = previewBytes
+							
+							// Also load full content as UTF-8 text for editor mode
+							const buffer = await timeAsync('read-file-buffer', () =>
+								readFileBuffer(source, path)
+							)
+							if (requestId !== selectRequestId) return
+
+							const textBytes = new Uint8Array(buffer)
+							const text = textDecoder.decode(textBytes)
+							selectedFileContentValue = text
+							
 							fileStatsResult =
 								existingFileStats ??
 								timeSync('binary-file-metadata', () =>
-									createMinimalBinaryParseResult('', detection)
+									createMinimalBinaryParseResult(text, detection)
 								)
 						} else {
 							const buffer = await timeAsync('read-file-buffer', () =>

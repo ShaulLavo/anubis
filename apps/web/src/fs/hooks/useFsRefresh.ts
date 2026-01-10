@@ -164,13 +164,13 @@ export const useFsRefresh = ({
 
 			try {
 				const fsCtx = await ensureFs(source)
-				
+
 				// Always ensure .system is expanded (it contains settings files)
 				const expandedPaths = {
 					...state.expanded,
 					'.system': true,
 				}
-				
+
 				let built = await buildTree(source, {
 					expandedPaths,
 					ensurePaths: [...ensurePaths, '.system'],
@@ -184,9 +184,8 @@ export const useFsRefresh = ({
 							ensurePaths: ['.system'],
 						})
 						built = mergeSystemFolder(built, opfsTree)
-					} catch (error) {
+					} catch {
 						// OPFS .system merge is best-effort, don't fail the whole refresh
-						console.log('[useFsRefresh] Could not merge OPFS .system folder:', error)
 					}
 				}
 
@@ -220,11 +219,7 @@ export const useFsRefresh = ({
 				}
 
 				if (restorablePath) {
-					// console.log(`[useFsRefresh] refresh: calling selectPath with forceReload`, { restorablePath })
 					await selectPath(restorablePath, { forceReload: true })
-					// console.log(`[useFsRefresh] refresh: selectPath complete`, { restorablePath })
-				} else {
-					// console.log(`[useFsRefresh] refresh: no restorablePath, skipping selectPath`)
 				}
 				return
 			} catch (error) {

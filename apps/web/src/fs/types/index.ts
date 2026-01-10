@@ -1,6 +1,6 @@
-// Re-export tab identity types and utilities
-export type { ViewMode } from './TabIdentity'
-export { cleanLegacyTabId, migrateTabState } from './TabIdentity'
+// Re-export view mode types and legacy migration utilities
+export type { ViewMode } from './ViewMode'
+export { cleanLegacyTabId, migrateTabState } from './ViewMode'
 
 // Re-export view mode registry
 export type { ViewModeDefinition } from '../registry/ViewModeRegistry'
@@ -16,4 +16,6 @@ export {
 	supportsMultipleViewModes,
 	isViewModeValid,
 	getViewModeLabel,
+	getValidViewMode,
+	isRegularFile,
 } from '../utils/viewModeDetection'

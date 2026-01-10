@@ -1,7 +1,7 @@
 import { render } from '@solidjs/testing-library'
 import { describe, expect, it } from 'vitest'
 import { Tabs } from './Tabs'
-import type { ViewMode } from '../types/TabIdentity'
+import type { ViewMode } from '../types/ViewMode'
 
 describe('Tabs Component - Enhanced Tooltips', () => {
 	it('should enhance tooltip with view mode information when multiple modes available', () => {

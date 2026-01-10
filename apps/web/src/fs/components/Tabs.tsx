@@ -1,7 +1,7 @@
 import { Component, createSelector, For, Show, type JSX } from 'solid-js'
 import { Tab } from './Tab'
 import { Flex } from '@repo/ui/flex'
-import type { ViewMode } from '../types/TabIdentity'
+import type { ViewMode } from '../types/ViewMode'
 
 export type TabsProps = {
 	values: string[]
@@ -76,7 +76,6 @@ export const Tabs: Component<TabsProps> = (props) => {
 	)
 }
 
-// Helper function to get display labels for view modes
 const getViewModeDisplayLabel = (viewMode: ViewMode): string => {
 	switch (viewMode) {
 		case 'editor':

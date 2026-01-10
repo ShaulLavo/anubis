@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store'
 import { ReactiveSet } from '@solid-primitives/set'
 import type { ParseResult } from '@repo/utils'
-import type { ViewMode } from '../types/TabIdentity'
+import type { ViewMode } from '../types/ViewMode'
 import { getDefaultViewMode } from '../utils/viewModeDetection'
 
 /**
@@ -28,11 +28,9 @@ export const createViewModeState = () => {
 		const defaultMode = getDefaultViewMode(p, stats)
 
 		if (viewMode === defaultMode) {
-			// Remove from store if setting to default
 			setFileViewModes(p, undefined!)
 			pathsWithCustomModes.delete(p)
 		} else {
-			// Store non-default view mode
 			setFileViewModes(p, viewMode)
 			pathsWithCustomModes.add(p)
 		}
@@ -45,7 +43,6 @@ export const createViewModeState = () => {
 			return stored
 		}
 
-		// Return default view mode for the file
 		const defaultMode = getDefaultViewMode(p, stats)
 		return defaultMode
 	}
