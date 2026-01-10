@@ -118,3 +118,266 @@ Effects are primarily intended for handling side effects that do not write to th
 > You can install individual packages using `bun add @solid-primitives/{name}` from the list below:
 >
 > active-element, audio, autofocus, bounds, clipboard, connectivity, context, cursor, date, deep, destructure, devices, event-bus, event-dispatcher, event-listener, event-props, filesystem, fullscreen, geolocation, graphql, history, i18n, immutable, input, intersection-observer, keyboard, keyed, lifecycle, map, media, memo, mouse, mutation-observer, network, pagination, platform, pointer, props, raf, range, refs, resize-observer, resource, rootless, scheduled, script-loader, scroll, selection, share, signal-builders, start, static-store, storage, stream, styles, template, timer, title, transition, trigger, tween, upload, utils, websocket, workers
+
+SOLID ASYNC + SUSPENSE CHEAT SHEET
+
+1. Suspense
+
+- Tracks resources read under it
+- Blocks DOM attach, not execution
+- Shows fallback until all resources inside are ready
+- Children are built before resolve → fast swap
+
+Use:
+<Suspense fallback={...}>{children}</Suspense>
+
+2. What triggers Suspense
+
+- ONLY calling a resource: data()
+- Signals, memos, props do nothing
+
+3. Never wrap resources in <Show> inside Suspense
+   Bad: <Suspense><Show when={res()} /></Suspense>
+   Good: <Suspense>{res()}</Suspense>
+
+4. Nested Suspense = isolate loading
+   Each Suspense waits only for resources read inside it
+
+5. createResource
+
+- Keyed async data
+- Cache + refetch + loading + error
+  const [res] = createResource(key, fetcher)
+
+6. createAsync
+
+- Fire-and-forget async
+- No keys, no refetch
+  const data = createAsync(fetcher)
+
+7. startTransition
+
+- Wrap key changes
+- Old UI stays until new resource resolves
+  startTransition(() => setKey(x))
+
+8. useTransition
+
+- Gives pending() while transitions run
+
+9. Resource-driven UI pattern
+   const [font] = createResource(activeFont, loadFont)
+
+<Suspense fallback={...}>
+  <Editor font={font()} />
+</Suspense>
+
+startTransition(() => setActiveFont("Inter"))
+
+10. Rules
+
+- Want no flicker → Suspense
+- Want keyed async → createResource
+- Want smooth swaps → startTransition
+- Want loading UI → useTransition
+- Want partial loading → nested Suspense
+
+SOLID PRIMITIVES — POWER LAYER OVER createResource
+
+CORE IDEA
+All these wrap either:
+
+- the Resource
+- the fetcher
+- or the storage
+  to add TanStack-Query-like behavior without replacing Solid.
+
+---
+
+## FETCHER MODIFIERS
+
+makeAbortable / createAbortable
+
+- Adds AbortController
+- Auto-aborts previous request or on timeout
+- createAbortable auto-cleans on dispose
+
+Use when:
+
+- You have refetching
+- You have slow / cancelable requests
+
+Pattern:
+signal() → pass to fetch()
+filterErrors() → ignore AbortError
+
+---
+
+makeRetrying
+
+- Retries failed fetcher N times with delay
+
+Use when:
+
+- Network flakey
+- API unstable
+
+---
+
+makeCache
+
+- Caches fetcher by source key
+- Optional persistence (localStorage)
+- TTL / expiry
+- Invalidate by key or all
+
+Use when:
+
+- Query keys
+- Avoid duplicate fetches
+- Offline / reload support
+
+---
+
+## RESOURCE MODIFIERS
+
+createAggregated
+
+- Prevents overwrite
+- Merges new data into old
+
+Rules:
+Array → append  
+Object → shallow merge  
+String → append  
+null doesn’t overwrite  
+Else → array wrap
+
+Use when:
+
+- Pagination
+- Streaming
+- Infinite scroll
+- Chunked APIs
+
+---
+
+createDeepSignal (storage)
+
+- Makes resource deeply reactive
+- Only changed nested fields trigger updates
+
+Use when:
+
+- Big JSON
+- Tables
+- Avoid rerender storms
+
+Warning:
+Base signal no longer changes → must deepTrack() if combining with aggregation
+
+---
+
+## createFetch
+
+createResource but with fetch + modifiers
+
+Built-in:
+withAbort
+withTimeout
+withRetry
+withCache
+withAggregation
+withRefetchEvent
+withCatchAll
+withCacheStorage
+
+Use when:
+
+- You want a TanStack-Query-like fetch layer
+- But still native Solid Suspense + Resource
+
+---
+
+## STREAMS
+
+createStream
+
+- MediaStream as a resource
+- loading / error / refetch / stop
+
+createAmplitudeStream
+
+- Audio amplitude signal
+
+Use when:
+
+- Camera
+- Mic
+- Screen capture
+
+---
+
+## WEBSOCKETS
+
+createWS / makeWS
+
+- WebSocket with message signal
+
+makeReconnectingWS
+
+- Auto reconnect
+
+makeHeartbeatWS
+
+- Ping/pong keepalive
+
+createWSState
+
+- readyState signal
+
+Use when:
+
+- Live data
+- Presence
+- Multiplayer
+- Chat
+
+---
+
+## STATIC STORES
+
+createStaticStore
+
+- Shallow reactive object
+- Fixed shape
+- Each property = signal
+
+createDerivedStaticStore
+
+- Static store derived from a signal
+
+Use when:
+
+- Window size
+- Mouse
+- Layout state
+- Event state
+
+---
+
+## HOW IT ALL COMPOSES
+
+You stack:
+source → makeCache → makeRetrying → makeAbortable → createResource → createAggregated → Suspense
+
+That gives you:
+Keys  
+Cache  
+Retry  
+Abort  
+Streaming  
+Pagination  
+Fine-grained reactivity  
+Suspense + transitions  
+All without a query client

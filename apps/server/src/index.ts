@@ -38,16 +38,13 @@ const app = new Elysia()
 	.use(
 		cors({
 			origin: env.webOrigin,
+			methods: ['GET', 'POST', 'HEAD', 'OPTIONS'],
+			allowedHeaders: ['authorization', 'content-type', 'git-protocol'],
+			exposeHeaders: ['content-type', 'content-encoding', 'cache-control'],
+			credentials: false,
+			preflight: true,
 		})
 	)
-	.get('/', () => 'Hi Elysia')
-	.get('/id/:id', ({ params: { id } }) => id)
-	.post('/mirror', ({ body }) => body, {
-		body: t.Object({
-			id: t.Number(),
-			name: t.String(),
-		}),
-	})
 	.listen(env.serverPort)
 	.get('/fonts', async () => {
 		const links = await getNerdFontLinks()
@@ -111,7 +108,7 @@ const app = new Elysia()
 			body:
 				method === 'GET' || method === 'HEAD'
 					? undefined
-					: request.body ?? undefined,
+					: (request.body ?? undefined),
 		})
 		console.log(
 			'[git-proxy] response',

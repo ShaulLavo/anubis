@@ -44,6 +44,7 @@
     "@elysiajs/eden": "^1.4.5",
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource/geist-mono": "^5.2.7",
     "@fontsource/google-sans-flex": "^5.2.1",
     "@kobalte/core": "^0.13.11",
     "@repo/code-editor": "*",
