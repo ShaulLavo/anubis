@@ -34,7 +34,7 @@ export function TabBar(props: TabBarProps) {
 	// Get active tab
 	const activeTab = createMemo(() => {
 		const id = activeTabId()
-		return tabs().find(t => t.id === id)
+		return tabs().find((t) => t.id === id)
 	})
 
 	// Get current file path
@@ -75,7 +75,7 @@ export function TabBar(props: TabBarProps) {
 	}
 
 	return (
-		<div class="tab-bar flex h-9 shrink-0 border-b border-border bg-surface-1">
+		<div class="tab-bar flex h-9 shrink-0 bg-surface-1">
 			<div class="flex flex-1 overflow-x-auto scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border hover:scrollbar-thumb-surface-3">
 				<For each={tabs()}>
 					{(tab) => (

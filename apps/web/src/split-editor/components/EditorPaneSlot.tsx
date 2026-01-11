@@ -37,8 +37,8 @@ export function EditorPaneSlot(props: EditorPaneSlotProps) {
 		<div
 			class="editor-pane-slot relative flex h-full w-full flex-col transition-all duration-200 ease-in-out"
 			classList={{
-				'ring-2 ring-primary/60 ring-inset shadow-sm bg-background': isFocused(),
-				'ring-1 ring-border/30 ring-inset bg-background/50': !isFocused(),
+				'shadow-sm bg-background': isFocused(),
+				'bg-background/50': !isFocused(),
 			}}
 			onClick={handleClick}
 			data-pane-id={props.pane.id}

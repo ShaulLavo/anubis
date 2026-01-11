@@ -49,15 +49,14 @@ export function FileTab(props: FileTabProps) {
 		return getTreeSitterWorker()
 	})
 
-	onMount(() => {
-		resourceManager.registerTabForFile(props.tab.id, props.filePath)
-	})
+	// Register for file IMMEDIATELY (not in onMount) so buffer exists when memo runs
+	resourceManager.registerTabForFile(props.tab.id, props.filePath)
 
 	onCleanup(() => {
 		resourceManager.unregisterTabFromFile(props.tab.id, props.filePath)
 	})
 
-	// Get shared buffer
+	// Get shared buffer - resource was just registered above, so it exists
 	const buffer = createMemo(() => resourceManager.getBuffer(props.filePath))
 
 	// Get highlight state - track the accessor functions

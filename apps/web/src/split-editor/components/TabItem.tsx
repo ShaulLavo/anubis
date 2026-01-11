@@ -70,7 +70,8 @@ export function TabItem(props: TabItemProps) {
 			class="tab-item group flex h-full min-w-0 cursor-pointer items-center gap-1.5 border-r border-border px-3 transition-colors"
 			classList={{
 				'bg-surface-2 text-foreground': props.isActive,
-				'bg-surface-1 text-muted-foreground hover:bg-surface-1-hover hover:text-foreground': !props.isActive,
+				'bg-surface-1 text-muted-foreground hover:bg-surface-1-hover hover:text-foreground':
+					!props.isActive,
 			}}
 			onClick={handleClick}
 			role="tab"
@@ -78,15 +79,14 @@ export function TabItem(props: TabItemProps) {
 			tabindex={props.isActive ? 0 : -1}
 		>
 			{/* File icon */}
-			<Show when={props.tab.content.type === 'file' && props.tab.content.filePath}>
+			<Show
+				when={props.tab.content.type === 'file' && props.tab.content.filePath}
+			>
 				<FileIcon name={fileName()} size={14} class="shrink-0" />
 			</Show>
 
 			{/* File name */}
-			<span
-				class="max-w-32 truncate text-sm font-medium"
-				title={fileName()}
-			>
+			<span class="max-w-32 truncate text-sm font-medium" title={fileName()}>
 				{fileName()}
 			</span>
 
@@ -108,11 +108,22 @@ export function TabItem(props: TabItemProps) {
 						'text-muted-foreground': props.tab.viewMode !== 'ui',
 					}}
 					onClick={handleViewModeToggle}
-					title={props.tab.viewMode === 'editor' ? 'Switch to UI view' : 'Switch to editor view'}
-					aria-label={props.tab.viewMode === 'editor' ? 'Switch to UI view' : 'Switch to editor view'}
+					title={
+						props.tab.viewMode === 'editor'
+							? 'Switch to UI view'
+							: 'Switch to editor view'
+					}
+					aria-label={
+						props.tab.viewMode === 'editor'
+							? 'Switch to UI view'
+							: 'Switch to editor view'
+					}
 					tabindex={-1}
 				>
-					<Show when={props.tab.viewMode === 'editor'} fallback={<VsEdit class="h-3.5 w-3.5" />}>
+					<Show
+						when={props.tab.viewMode === 'editor'}
+						fallback={<VsEdit class="h-3.5 w-3.5" />}
+					>
 						<VsSettingsGear class="h-3.5 w-3.5" />
 					</Show>
 				</button>
