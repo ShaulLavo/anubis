@@ -99,12 +99,13 @@ function PanePortal(props: PanePortalProps) {
 				const currentPane = pane()!
 				return (
 					<Portal mount={target()!}>
-						<div class="pane-content absolute inset-0" data-pane-id={props.paneId}>
+						<div
+							class="pane-content absolute inset-0"
+							data-pane-id={props.paneId}
+						>
 							{/* Use keyed Show to force re-render when active tab changes */}
 							<Show when={activeTab()} keyed>
 								{(tab) => {
-									const filePath = tab.content.type === 'file' ? tab.content.filePath : 'N/A'
-									console.log('[PanePortal] rendering activeTab:', tab.id, 'filePath:', filePath)
 									return (
 										<div class="absolute inset-0" data-tab-id={tab.id}>
 											<Show

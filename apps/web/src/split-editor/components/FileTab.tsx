@@ -87,12 +87,6 @@ export function FileTab(props: FileTabProps) {
 		const state = highlightState()
 		if (!state) return undefined
 
-		// Access signals to create dependencies
-		state.captures()
-		state.brackets()
-		state.folds()
-		state.errors()
-
 		return {
 			captures: state.captures,
 			folds: state.folds,

@@ -72,8 +72,6 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 		const source = state.activeSource ?? DEFAULT_SOURCE
 		const failedPaths: string[] = []
 
-		console.log('[SplitEditorPanel] Preloading content for persisted layout')
-
 		for (const node of saved.nodes) {
 			if (node.type !== 'pane' || !node.tabs) continue
 
@@ -87,14 +85,8 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 				}
 
 				try {
-					console.log('[SplitEditorPanel] Preloading:', filePath)
 					const content = await readFileText(source, filePath)
-					console.log(
-						'[SplitEditorPanel] Preloaded:',
-						filePath,
-						'length:',
-						content.length
-					)
+
 					resourceManager.preloadFileContent(filePath, content)
 				} catch (error) {
 					console.warn(
@@ -129,22 +121,11 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 
 	// Initialize with persistence support
 	onMount(async () => {
-		console.log('[SplitEditorPanel] onMount starting')
-
 		// IMPORTANT: Preload file content BEFORE initializing layout
 		// This ensures buffers exist when FileTab components render
 		const failedPaths = await preloadPersistedFileContent()
 
 		layoutManager.initialize()
-
-		console.log('[SplitEditorPanel] After initialize, state:', {
-			rootId: layoutManager.state.rootId,
-			nodes: Object.entries(layoutManager.state.nodes).map(([id, node]) => ({
-				id,
-				type: isPane(node) ? 'pane' : 'container',
-				tabs: isPane(node) ? (node as EditorPane).tabs.length : undefined,
-			})),
-		})
 
 		removeFailedTabs(failedPaths)
 
@@ -155,10 +136,7 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 
 		if (!hasTabs) {
 			const focusedPaneId = layoutManager.state.focusedPaneId
-			console.log(
-				'[SplitEditorPanel] Creating untitled file in pane:',
-				focusedPaneId
-			)
+
 			if (focusedPaneId) {
 				const untitledPath = 'Untitled'
 				resourceManager.preloadFileContent(untitledPath, '')
@@ -169,7 +147,6 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 
 		// Notify parent that layout manager is ready
 		props.onLayoutManagerReady?.(layoutManager)
-		console.log('[SplitEditorPanel] onMount complete')
 	})
 
 	const openFileAsTab = async (filePath: string) => {

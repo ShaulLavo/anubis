@@ -149,7 +149,7 @@ export const SettingsEffects: Component = () => {
 		const uiFontFamily =
 			settingsState.values['ui.font.family'] ??
 			settingsState.defaults['ui.font.family']
-		
+
 		if (uiFontSize != null) {
 			root.style.setProperty('--ui-font-size', `${uiFontSize}px`)
 		}
@@ -158,16 +158,12 @@ export const SettingsEffects: Component = () => {
 		}
 
 		// Editor font settings
-		const editorFontSize = editorFontSetting ?? settingsState.defaults['editor.font.size']
+		const editorFontSize =
+			editorFontSetting ?? settingsState.defaults['editor.font.size']
 		const editorFontFamily =
 			settingsState.values['editor.font.family'] ??
 			settingsState.defaults['editor.font.family']
-		
-		console.log('SettingsEffects: Editor font size update', {
-			baseSetting: editorFontSetting,
-			finalSize: editorFontSize
-		})
-		
+
 		if (editorFontSize != null) {
 			root.style.setProperty('--editor-font-size', `${editorFontSize}px`)
 		}
