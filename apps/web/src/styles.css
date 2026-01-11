@@ -20,6 +20,15 @@
 	--font-mono: var(--editor-font-family, 'JetBrains Mono Variable', monospace);
 	--font-serif: 'Geist Variable', sans-serif;
 	--font-sans: var(--ui-font-family, 'Google Sans Flex', sans-serif);
+	
+	/* Custom font sizes */
+	--font-size-ui: var(--ui-font-size, var(--base-font-size));
+	--font-size-ui-xs: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-xs));
+	--font-size-ui-sm: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-sm));
+	--font-size-ui-lg: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-lg));
+	--font-size-ui-xl: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-xl));
+	--font-size-editor: var(--editor-font-size, var(--base-font-size));
+	--font-size-editor-xs: calc(var(--editor-font-size, var(--base-font-size)) * var(--font-scale-xs));
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -124,6 +133,29 @@ body {
 	.animate-accordion-up {
 		@apply ease-out;
 		animation: accordion-up 0.2s;
+	}
+
+	/* Font size utilities based on CSS variables set by JS */
+	.text-ui {
+		font-size: var(--ui-font-size, var(--base-font-size));
+	}
+	.text-ui-xs {
+		font-size: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-xs));
+	}
+	.text-ui-sm {
+		font-size: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-sm));
+	}
+	.text-ui-lg {
+		font-size: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-lg));
+	}
+	.text-ui-xl {
+		font-size: calc(var(--ui-font-size, var(--base-font-size)) * var(--font-scale-xl));
+	}
+	.text-editor {
+		font-size: var(--editor-font-size, var(--base-font-size));
+	}
+	.text-editor-xs {
+		font-size: calc(var(--editor-font-size, var(--base-font-size)) * var(--font-scale-xs));
 	}
 
 	/* Editor Viewport */
