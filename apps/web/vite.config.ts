@@ -124,6 +124,9 @@ export default defineConfig(() => {
 				'@tree-sitter-grammars/tree-sitter-markdown',
 				'minimatch',
 			],
+			// Exclude packages used in workers - Vite's pre-bundling breaks worker imports
+			// See: https://github.com/vitejs/vite/issues/20859
+			exclude: ['up-fetch'],
 		},
 		test: {
 			projects: [
