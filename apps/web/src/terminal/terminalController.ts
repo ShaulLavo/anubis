@@ -9,7 +9,7 @@ import {
 import { WebglAddon } from '@xterm/addon-webgl'
 import { CanvasAddon } from '@xterm/addon-canvas'
 import { LocalEchoController } from './localEcho'
-import { typeEffect } from './effects'
+import { typeEffect, batchTypeEffect } from './effects'
 import { createJustBashAdapter } from './justBashAdapter'
 import { getSharedBuffer } from './sharedBuffer'
 import type { BufferEntry } from './sharedBuffer'
@@ -302,10 +302,12 @@ export const createTerminalController = async (
 			combinedLines.push('')
 			combinedLines.push('Type `help` to see available commands.')
 
-			// Type out the lines
-			for (const line of combinedLines) {
-				await typeEffect(term, line, 0) // Faster typing for the big block
-			}
+			// Type out all lines simultaneously with variable speeds
+			await batchTypeEffect(term, combinedLines, {
+				baseDelay: 12,
+				delayVariance: 8,
+				speedVariance: 0.6,
+			})
 			return
 		}
 

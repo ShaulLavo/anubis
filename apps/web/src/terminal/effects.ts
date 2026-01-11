@@ -17,6 +17,83 @@ export async function typeEffect(
 }
 
 /**
+ * Types out multiple lines simultaneously with variable speeds per line.
+ * Creates a "batch typing" effect where all lines progress in parallel.
+ */
+export async function batchTypeEffect(
+	terminal: TerminalLike,
+	lines: string[],
+	options: {
+		baseDelay?: number
+		delayVariance?: number
+		speedVariance?: number
+	} = {}
+) {
+	const { baseDelay = 15, delayVariance = 10, speedVariance = 0.5 } = options
+
+	if (lines.length === 0) return
+
+	// Track progress for each line
+	const lineStates = lines.map((line) => ({
+		text: line,
+		position: 0,
+		speed: 1 + (Math.random() - 0.5) * speedVariance, // Random speed multiplier per line
+		done: false,
+	}))
+
+	// Pre-allocate lines in terminal (create empty lines)
+	for (let i = 0; i < lines.length; i++) {
+		terminal.write('\r\n')
+	}
+	// Move cursor back up to first line using relative movement
+	terminal.write(`\x1b[${lines.length}A`)
+
+	// Track current cursor position (which line we're on, 0-indexed)
+	let cursorLine = 0
+
+	while (lineStates.some((s) => !s.done)) {
+		// Update each line
+		for (let i = 0; i < lineStates.length; i++) {
+			const state = lineStates[i]
+			if (state.done) continue
+
+			// Advance position based on speed
+			const charsToType = Math.ceil(state.speed)
+			state.position = Math.min(state.position + charsToType, state.text.length)
+
+			// Check if line is complete
+			if (state.position >= state.text.length) {
+				state.done = true
+			}
+
+			// Move cursor to line i using relative movement
+			if (i > cursorLine) {
+				terminal.write(`\x1b[${i - cursorLine}B`) // Move down
+			} else if (i < cursorLine) {
+				terminal.write(`\x1b[${cursorLine - i}A`) // Move up
+			}
+			cursorLine = i
+
+			// Clear line and write current progress
+			terminal.write('\r\x1b[2K') // Move to start of line, clear entire line
+			terminal.write(state.text.slice(0, state.position))
+		}
+
+		// Add random delay variation
+		const randomDelay =
+			baseDelay + Math.floor(Math.random() * delayVariance * 2 - delayVariance)
+		await new Promise((resolve) => setTimeout(resolve, Math.max(5, randomDelay)))
+	}
+
+	// Move cursor to last line and add newline
+	const linesToMove = lines.length - 1 - cursorLine
+	if (linesToMove > 0) {
+		terminal.write(`\x1b[${linesToMove}B`)
+	}
+	terminal.write('\r\n')
+}
+
+/**
  * Creates a snake animation that moves around a square border
  */
 export function createSnakeSquareAnimation(size: number): string[] {
