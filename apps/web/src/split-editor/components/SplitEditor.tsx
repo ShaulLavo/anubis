@@ -9,6 +9,7 @@ import { createContext, useContext, onMount, onCleanup, type JSX } from 'solid-j
 import { SplitNode } from './SplitNode'
 import { PanePortals } from './PanePortals'
 import { createSplitEditorKeymap } from '../createSplitEditorKeymap'
+import { CONTAINMENT_MODE } from '../constants'
 import type { LayoutManager } from '../createLayoutManager'
 import type { ResourceManager } from '../createResourceManager'
 import type { EditorPane, Tab } from '../types'
@@ -57,7 +58,7 @@ export function SplitEditor(props: SplitEditorProps) {
 			<ResourceContext.Provider value={props.resourceManager}>
 				<div
 					class={`split-editor h-full w-full ${props.class ?? ''}`}
-					style={{ contain: 'strict' }}
+					style={{ contain: CONTAINMENT_MODE }}
 				>
 					<SplitNode nodeId={props.layoutManager.state.rootId} />
 					<PanePortals renderTabContent={props.renderTabContent} />
