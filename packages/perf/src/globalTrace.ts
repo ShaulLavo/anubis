@@ -3,7 +3,7 @@
  * Use startGlobalTrace('keystroke') at input, endGlobalTrace('keystroke') when render completes.
  */
 
-import { loggers } from '@repo/logger'
+import { perfEnv } from './env'
 
 type TraceData = {
 	start: number
@@ -13,7 +13,6 @@ type TraceData = {
 }
 
 const globalTraces = new Map<string, TraceData>()
-const traceLog = loggers.codeEditor.withTag('trace')
 const MAX_TRACE_MARKS = 40
 const MAX_TRACE_STAT_LINES = 8
 
@@ -35,42 +34,45 @@ export const endGlobalTrace = (name: string, label = 'total'): number => {
 		const end = performance.now()
 		const duration = end - trace.start
 		const metaStr = trace.meta ? ` [${trace.meta}]` : ''
-		traceLog.debug(`⏱ ${name}:${label}${metaStr} ${duration.toFixed(1)}ms`)
 
-		const stats = trace.stats
-		if (stats && stats.size > 0) {
-			const rows = Array.from(stats.entries())
-				.map(([statLabel, entry]) => ({
-					label: statLabel,
-					total: entry.total,
-					count: entry.count,
-				}))
-				.sort((a, b) => b.total - a.total)
-				.slice(0, MAX_TRACE_STAT_LINES)
+		if (perfEnv.traceEnabled) {
+			console.debug(`⏱ ${name}:${label}${metaStr} ${duration.toFixed(1)}ms`)
 
-			for (const row of rows) {
-				traceLog.debug(
-					`⏱ ${name}:stat${metaStr} ${row.label} ${row.total.toFixed(1)}ms (${row.count}x)`
-				)
+			const stats = trace.stats
+			if (stats && stats.size > 0) {
+				const rows = Array.from(stats.entries())
+					.map(([statLabel, entry]) => ({
+						label: statLabel,
+						total: entry.total,
+						count: entry.count,
+					}))
+					.sort((a, b) => b.total - a.total)
+					.slice(0, MAX_TRACE_STAT_LINES)
+
+				for (const row of rows) {
+					console.debug(
+						`⏱ ${name}:stat${metaStr} ${row.label} ${row.total.toFixed(1)}ms (${row.count}x)`
+					)
+				}
 			}
-		}
 
-		const marks = trace.marks
-		if (marks && marks.length > 0) {
-			const deltas: Array<{ label: string; dt: number }> = []
-			let prev = trace.start
-			for (const mark of marks) {
-				deltas.push({ label: mark.label, dt: mark.t - prev })
-				prev = mark.t
-			}
-			deltas.push({ label: 'end', dt: end - prev })
+			const marks = trace.marks
+			if (marks && marks.length > 0) {
+				const deltas: Array<{ label: string; dt: number }> = []
+				let prev = trace.start
+				for (const mark of marks) {
+					deltas.push({ label: mark.label, dt: mark.t - prev })
+					prev = mark.t
+				}
+				deltas.push({ label: 'end', dt: end - prev })
 
-			deltas.sort((a, b) => b.dt - a.dt)
-			const top = deltas.slice(0, MAX_TRACE_STAT_LINES)
-			for (const row of top) {
-				traceLog.debug(
-					`⏱ ${name}:mark${metaStr} ${row.label} ${row.dt.toFixed(1)}ms`
-				)
+				deltas.sort((a, b) => b.dt - a.dt)
+				const top = deltas.slice(0, MAX_TRACE_STAT_LINES)
+				for (const row of top) {
+					console.debug(
+						`⏱ ${name}:mark${metaStr} ${row.label} ${row.dt.toFixed(1)}ms`
+					)
+				}
 			}
 		}
 

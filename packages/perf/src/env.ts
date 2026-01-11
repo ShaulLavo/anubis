@@ -19,6 +19,8 @@ const getImportMetaEnv = (): EnvRecord => {
 const envSchema = z.object({
 	PERF_TRACKING_ENABLED: z.stringbool().optional(),
 	VITE_PERF_TRACKING: z.stringbool().optional(),
+	TRACE_ENABLED: z.stringbool().optional(),
+	VITE_TRACE_ENABLED: z.stringbool().optional(),
 })
 
 let envData: z.infer<typeof envSchema>
@@ -34,6 +36,7 @@ try {
 export const perfEnv = {
 	perfTrackingEnabled:
 		envData.PERF_TRACKING_ENABLED ?? envData.VITE_PERF_TRACKING ?? false,
+	traceEnabled: envData.TRACE_ENABLED ?? envData.VITE_TRACE_ENABLED ?? false,
 }
 
 export type PerfEnv = typeof perfEnv

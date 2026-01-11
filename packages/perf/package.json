@@ -6,7 +6,6 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@repo/logger": "*",
     "zod": "^4.1.13"
   },
   "scripts": {
