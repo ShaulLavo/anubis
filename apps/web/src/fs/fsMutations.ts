@@ -112,7 +112,7 @@ export const createFsMutations = ({
 
 		try {
 			const ctx = await ensureFs(getActiveSource())
-			const fileContent = content ?? '// empty file'
+			const fileContent = content ?? ''
 			await ctx.write(newPath, fileContent)
 
 			const parentNode = findNode(tree, parentPath)

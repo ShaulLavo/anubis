@@ -4,7 +4,7 @@ import { useFs } from '../../fs/context/FsContext'
 import { SyncStatusProvider } from '../context/SyncStatusContext'
 import { SplitEditorPanel } from './SplitEditorPanel'
 import { TreeView } from './TreeView'
-import { createSignal } from 'solid-js'
+import { createSignal, createEffect } from 'solid-js'
 import type { LayoutManager } from '../../split-editor'
 
 import { ExplorerAccordion } from './ExplorerAccordion'
@@ -27,6 +27,17 @@ export const Fs = () => {
 			;(manager as any).openFileAsTab(filePath)
 		}
 	}
+
+	// Auto-open files when they are selected (e.g., after creation)
+	createEffect(() => {
+		const selectedPath = state.selectedPath
+		const fileNode = state.lastKnownFileNode
+		
+		// Only auto-open if it's a file and we have a layout manager
+		if (selectedPath && fileNode?.kind === 'file' && layoutManager()) {
+			openFileAsTab(selectedPath)
+		}
+	})
 
 	return (
 		<SyncStatusProvider>

@@ -91,6 +91,7 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 		console.log('[renderTabContent] tab:', tab.id, 'content.type:', tab.content.type, 'filePath:', tab.content.filePath)
 		
 		if (tab.content.type === 'empty') {
+			// This is the "no tabs" state - show welcome message
 			return (
 				<div class="h-full w-full flex items-center justify-center text-muted-foreground">
 					<div class="text-center">
@@ -104,7 +105,7 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 		}
 		
 		if (tab.content.type === 'file' && tab.content.filePath) {
-			// Always render FileTab for file content - it will handle loading states
+			// Always render FileTab for file content - it will handle empty files and loading states
 			return (
 				<FileTab 
 					tab={tab} 
