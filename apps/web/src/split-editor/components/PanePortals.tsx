@@ -56,10 +56,24 @@ function PanePortal(props: PanePortalProps) {
 		return node && isPane(node) ? node : null
 	})
 
-	const activeTab = createMemo(() => {
+	// Track activeTabId separately to ensure reactivity
+	const activeTabId = createMemo(() => {
 		const p = pane()
-		if (!p || !p.activeTabId) return null
-		return p.tabs.find((t) => t.id === p.activeTabId) ?? null
+		return p?.activeTabId ?? null
+	})
+
+	// Track tabs array separately
+	const tabs = createMemo(() => {
+		const p = pane()
+		return p?.tabs ?? []
+	})
+
+	// Get the active tab object
+	const activeTab = createMemo(() => {
+		const tabId = activeTabId()
+		const tabList = tabs()
+		if (!tabId) return null
+		return tabList.find((t) => t.id === tabId) ?? null
 	})
 
 	// Track a signal that changes when we need to re-check for the target element
@@ -81,20 +95,34 @@ function PanePortal(props: PanePortalProps) {
 
 	return (
 		<Show when={target() && pane()}>
-			<Portal mount={target()!}>
-				<div class="pane-content h-full w-full" data-pane-id={props.paneId}>
-					<Show when={activeTab()} fallback={<EmptyPaneContent />}>
-						{(tab) => (
-							<Show
-								when={props.renderTabContent}
-								fallback={<TabContent tab={tab()} pane={pane()!} />}
-							>
-								{(render) => render()(tab(), pane()!)}
+			{(_) => {
+				const currentPane = pane()!
+				return (
+					<Portal mount={target()!}>
+						<div class="pane-content absolute inset-0" data-pane-id={props.paneId}>
+							{/* Use keyed Show to force re-render when active tab changes */}
+							<Show when={activeTab()} keyed>
+								{(tab) => {
+									console.log('[PanePortal] rendering activeTab:', tab.id, 'content.type:', tab.content.type)
+									return (
+										<div class="absolute inset-0" data-tab-id={tab.id}>
+											<Show
+												when={props.renderTabContent}
+												fallback={<TabContent tab={tab} pane={currentPane} />}
+											>
+												{(render) => render()(tab, currentPane)}
+											</Show>
+										</div>
+									)
+								}}
 							</Show>
-						)}
-					</Show>
-				</div>
-			</Portal>
+							<Show when={tabs().length === 0}>
+								<EmptyPaneContent />
+							</Show>
+						</div>
+					</Portal>
+				)
+			}}
 		</Show>
 	)
 }

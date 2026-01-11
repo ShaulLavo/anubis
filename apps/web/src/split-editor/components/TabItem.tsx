@@ -8,6 +8,7 @@
 
 import { createMemo, Show } from 'solid-js'
 import { useLayoutManager } from './SplitEditor'
+import { FileIcon } from '../../fs/components/FileIcon'
 import type { Tab } from '../types'
 
 export interface TabItemProps {
@@ -57,6 +58,11 @@ export function TabItem(props: TabItemProps) {
 			aria-selected={props.isActive}
 			tabindex={props.isActive ? 0 : -1}
 		>
+			{/* File icon */}
+			<Show when={props.tab.content.type === 'file' && props.tab.content.filePath}>
+				<FileIcon name={fileName()} size={14} class="shrink-0" />
+			</Show>
+			
 			{/* File name */}
 			<span 
 				class="max-w-32 truncate text-sm font-medium"

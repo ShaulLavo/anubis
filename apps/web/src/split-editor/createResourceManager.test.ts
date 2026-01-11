@@ -200,7 +200,7 @@ describe('Resource Manager Properties', () => {
 	 * tree-sitter worker and syntax highlighting state SHALL be cleaned up.
 	 * **Validates: Requirements 2.4**
 	 */
-	it('property: resources are cleaned up when last pane is unregistered', () => {
+	it('property: resources are cleaned up when explicitly requested', () => {
 		fc.assert(
 			fc.property(
 				fc.record({
@@ -222,7 +222,7 @@ describe('Resource Manager Properties', () => {
 					expect(resourceManager.hasResourcesForFile(filePath)).toBe(true)
 					expect(resourceManager.getPaneCountForFile(filePath)).toBe(paneIds.length)
 
-					// Unregister panes one by one
+					// Unregister panes one by one - resources should persist
 					for (let i = 0; i < paneIds.length; i++) {
 						const paneId = paneIds[i]
 						if (!paneId) continue
@@ -231,19 +231,21 @@ describe('Resource Manager Properties', () => {
 
 						const remainingPanes = paneIds.length - i - 1
 
-						if (remainingPanes > 0) {
-							// Resources should still exist
-							expect(resourceManager.hasResourcesForFile(filePath)).toBe(true)
-							expect(resourceManager.getPaneCountForFile(filePath)).toBe(remainingPanes)
-						} else {
-							// Last pane unregistered - resources should be cleaned up
-							expect(resourceManager.hasResourcesForFile(filePath)).toBe(false)
-							expect(resourceManager.getPaneCountForFile(filePath)).toBe(0)
-							expect(resourceManager.getBuffer(filePath)).toBeUndefined()
-							expect(resourceManager.getHighlightState(filePath)).toBeUndefined()
-							expect(resourceManager.getTrackedFiles()).not.toContain(filePath)
-						}
+						// Resources should still exist even after all panes unregister
+						// (to prevent race conditions during tab switching)
+						expect(resourceManager.hasResourcesForFile(filePath)).toBe(true)
+						expect(resourceManager.getPaneCountForFile(filePath)).toBe(remainingPanes)
 					}
+
+					// Explicitly cleanup resources
+					resourceManager.cleanupFileResources(filePath)
+
+					// Now resources should be cleaned up
+					expect(resourceManager.hasResourcesForFile(filePath)).toBe(false)
+					expect(resourceManager.getPaneCountForFile(filePath)).toBe(0)
+					expect(resourceManager.getBuffer(filePath)).toBeUndefined()
+					expect(resourceManager.getHighlightState(filePath)).toBeUndefined()
+					expect(resourceManager.getTrackedFiles()).not.toContain(filePath)
 				}
 			),
 			{ numRuns: 100 }

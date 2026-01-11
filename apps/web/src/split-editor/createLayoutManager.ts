@@ -77,19 +77,18 @@ export function createLayoutManager() {
 		return tabs
 	})
 
-	const findTabByFilePath = (filePath: string) =>
-		createMemo(() => {
-			for (const node of Object.values(state.nodes)) {
-				if (isPane(node)) {
-					for (const tab of node.tabs) {
-						if (tab.content.filePath === filePath) {
-							return { paneId: node.id, tab }
-						}
+	const findTabByFilePath = (filePath: string) => {
+		for (const node of Object.values(state.nodes)) {
+			if (isPane(node)) {
+				for (const tab of node.tabs) {
+					if (tab.content.filePath === filePath) {
+						return { paneId: node.id, tab }
 					}
 				}
 			}
-			return null
-		})
+		}
+		return null
+	}
 
 	// ========================================================================
 	// Initialization

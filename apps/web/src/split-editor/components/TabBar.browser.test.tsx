@@ -24,6 +24,9 @@ describe('TabBar Component', () => {
 		layoutManager = createLayoutManager()
 		resourceManager = createResourceManager()
 		
+		// Initialize layout manager and set up the pane in the store
+		layoutManager.initialize()
+		
 		// Create a mock pane with tabs
 		mockPane = {
 			id: 'test-pane',
@@ -60,10 +63,13 @@ describe('TabBar Component', () => {
 	})
 
 	const renderTabBar = (pane: EditorPane = mockPane) => {
+		// Inject the pane into the layout manager's store for testing
+		;(layoutManager as any).state.nodes[pane.id] = pane
+		
 		return render(() => (
 			<LayoutContext.Provider value={layoutManager}>
 				<ResourceContext.Provider value={resourceManager}>
-					<TabBar pane={pane} />
+					<TabBar paneId={pane.id} />
 				</ResourceContext.Provider>
 			</LayoutContext.Provider>
 		))
@@ -91,6 +97,7 @@ describe('TabBar Component', () => {
 		// Create a pane with many tabs to test overflow
 		const manyTabsPane: EditorPane = {
 			...mockPane,
+			id: 'many-tabs-pane',
 			tabs: Array.from({ length: 20 }, (_, i) => ({
 				id: `tab-${i}`,
 				content: { type: 'file', filePath: `/test/very-long-filename-${i}.txt` },
@@ -131,6 +138,7 @@ describe('TabBar Component', () => {
 	it('renders empty tab bar when no tabs', async () => {
 		const emptyPane: EditorPane = {
 			...mockPane,
+			id: 'empty-pane',
 			tabs: [],
 			activeTabId: null
 		}

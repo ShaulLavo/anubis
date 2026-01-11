@@ -8,10 +8,17 @@
  * Requirements: 2.1, 2.5, 8.1, 8.2, 8.4
  */
 
-import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
+import { createEffect, createMemo, createResource, onCleanup, onMount } from 'solid-js'
 import { Editor } from '@repo/code-editor'
-import type { EditorProps, ScrollPosition, DocumentIncrementalEdit } from '@repo/code-editor'
+import { CursorMode } from '@repo/code-editor'
+import type {
+	EditorProps,
+	ScrollPosition,
+	DocumentIncrementalEdit,
+} from '@repo/code-editor'
 import { useLayoutManager, useResourceManager } from './SplitEditor'
+import { useFocusManager } from '~/focus/focusManager'
+import { getTreeSitterWorker } from '~/treeSitter/workerClient'
 import type { Tab, EditorPane } from '../types'
 import { createScrollSyncCoordinator } from '../createScrollSyncCoordinator'
 import type { ScrollEvent } from '../createScrollSyncCoordinator'
@@ -24,57 +31,64 @@ export interface FileTabProps {
 
 /**
  * FileTab - Renders file content with shared resources and independent state
- *
- * This component:
- * - Registers with Resource Manager on mount for shared resources
- * - Uses shared buffer for file content (coordinated across tabs)
- * - Maintains independent scroll position, selections, cursor per tab
- * - Uses pane's view settings for display (shared across tabs in pane)
  */
 export function FileTab(props: FileTabProps) {
 	const layoutManager = useLayoutManager()
 	const resourceManager = useResourceManager()
+	const focus = useFocusManager()
 
-	console.log(`[FileTab] Rendering FileTab for ${props.filePath}, tabId: ${props.tab.id}`)
-
-	// Create scroll sync coordinator
 	const scrollSyncCoordinator = createScrollSyncCoordinator(layoutManager)
 
-	// Register this tab for the file on mount
+	// Get tree-sitter worker for minimap
+	const [treeSitterWorker] = createResource(async () => getTreeSitterWorker())
+
 	onMount(() => {
-		console.log(`[FileTab] Registering tab ${props.tab.id} for file ${props.filePath}`)
 		resourceManager.registerTabForFile(props.tab.id, props.filePath)
 	})
 
-	// Unregister on cleanup
 	onCleanup(() => {
-		console.log(`[FileTab] Unregistering tab ${props.tab.id} for file ${props.filePath}`)
 		resourceManager.unregisterTabFromFile(props.tab.id, props.filePath)
 	})
 
-	// Get shared resources
+	// Get shared buffer
 	const buffer = createMemo(() => resourceManager.getBuffer(props.filePath))
-	const highlights = createMemo(() => resourceManager.getHighlightState(props.filePath))
+	
+	// Get highlight state - track the accessor functions
+	const highlightState = createMemo(() => resourceManager.getHighlightState(props.filePath))
+	
+	// Create reactive accessors for highlights
+	const highlights = createMemo(() => {
+		const state = highlightState()
+		if (!state) return undefined
+		
+		// Access signals to create dependencies
+		state.captures()
+		state.brackets()
+		state.folds()
+		state.errors()
+		
+		return {
+			captures: state.captures,
+			folds: state.folds,
+			brackets: state.brackets,
+			errors: state.errors
+		}
+	})
 
-	// Subscribe to edits from other tabs showing the same file
+	// Subscribe to edits from other tabs
 	createEffect(() => {
 		const sharedBuffer = buffer()
 		if (!sharedBuffer) return
 
-		const unsubscribe = sharedBuffer.onEdit((edit) => {
-			// Edit is already applied to shared buffer content
-			// Tab state (scroll, selections) remains independent
-			console.log(`[FileTab] Received edit from another tab for ${props.filePath}`)
-		})
-
+		const unsubscribe = sharedBuffer.onEdit(() => {})
 		onCleanup(unsubscribe)
 	})
 
 	// Create document interface for the Editor
 	const document = createMemo(() => {
 		const sharedBuffer = buffer()
+		
 		if (!sharedBuffer) {
-			// Fallback if buffer not ready
 			return {
 				filePath: () => props.filePath,
 				content: () => '',
@@ -88,89 +102,97 @@ export function FileTab(props: FileTabProps) {
 		return {
 			filePath: () => props.filePath,
 			content: sharedBuffer.content,
-			pieceTable: () => undefined, // TODO: Integrate with piece table if needed
-			updatePieceTable: () => {}, // TODO: Implement if piece table is used
+			pieceTable: () => undefined,
+			updatePieceTable: () => {},
 			isEditable: () => true,
 			applyIncrementalEdit: (edit: DocumentIncrementalEdit) => {
-				// Convert DocumentIncrementalEdit to TextEdit format
 				const textEdit = {
 					startIndex: edit.startIndex,
 					oldEndIndex: edit.oldEndIndex,
 					newEndIndex: edit.newEndIndex,
-					startPosition: { row: edit.startPosition.row, column: edit.startPosition.column },
-					oldEndPosition: { row: edit.oldEndPosition.row, column: edit.oldEndPosition.column },
-					newEndPosition: { row: edit.newEndPosition.row, column: edit.newEndPosition.column },
+					startPosition: {
+						row: edit.startPosition.row,
+						column: edit.startPosition.column,
+					},
+					oldEndPosition: {
+						row: edit.oldEndPosition.row,
+						column: edit.oldEndPosition.column,
+					},
+					newEndPosition: {
+						row: edit.newEndPosition.row,
+						column: edit.newEndPosition.column,
+					},
 					insertedText: edit.insertedText,
 				}
 
-				// Apply edit to shared buffer (will notify other tabs)
 				void sharedBuffer.applyEdit(textEdit)
-
-				// Mark tab as dirty
 				layoutManager.setTabDirty(props.pane.id, props.tab.id, true)
 			},
 		}
 	})
 
-	// Handle scroll position changes (independent per tab)
 	const handleScrollPositionChange = (position: ScrollPosition) => {
 		layoutManager.updateTabState(props.pane.id, props.tab.id, {
 			scrollTop: position.lineIndex,
 			scrollLeft: position.scrollLeft,
 		})
 
-		// Create scroll event for sync coordination
 		const scrollEvent: ScrollEvent = {
 			tabId: props.tab.id,
 			scrollTop: position.lineIndex,
 			scrollLeft: position.scrollLeft,
-			scrollHeight: 1000, // TODO: Get actual scroll dimensions from editor
+			scrollHeight: 1000,
 			scrollWidth: 1000,
 			clientHeight: 500,
 			clientWidth: 500,
 		}
 
-		// Handle scroll sync
 		scrollSyncCoordinator.handleScroll(scrollEvent)
 	}
 
-	// Get initial scroll position from tab state
-	const initialScrollPosition = createMemo((): ScrollPosition => ({
-		lineIndex: props.tab.state.scrollTop,
-		scrollLeft: props.tab.state.scrollLeft,
-	}))
+	const initialScrollPosition = createMemo(
+		(): ScrollPosition => ({
+			lineIndex: props.tab.state.scrollTop,
+			scrollLeft: props.tab.state.scrollLeft,
+		})
+	)
 
-	// Handle save action
 	const handleSave = () => {
-		// TODO: Implement actual file saving
 		layoutManager.setTabDirty(props.pane.id, props.tab.id, false)
-		console.log(`[FileTab] Saved ${props.filePath}`)
 	}
 
-	// Create editor props
-	const editorProps = createMemo((): EditorProps => ({
-		document: document(),
-		isFileSelected: () => true, // Tab is active if this component is rendered
-		stats: () => undefined, // TODO: Integrate with file stats if needed
-		fontSize: () => props.pane.viewSettings.fontSize,
-		fontFamily: () => 'JetBrains Mono, monospace', // TODO: Make configurable
-		cursorMode: () => 'regular' as const,
-		tabSize: () => 4, // TODO: Make configurable
-		highlights: highlights()?.captures,
-		folds: highlights()?.folds,
-		brackets: highlights()?.brackets,
-		errors: highlights()?.errors,
-		onSave: handleSave,
-		initialScrollPosition: () => initialScrollPosition(),
-		onScrollPositionChange: handleScrollPositionChange,
-		// TODO: Add visible content caching for better performance
-		initialVisibleContent: () => undefined,
-		onCaptureVisibleContent: () => {},
-	}))
+	const editorProps = createMemo(
+		(): EditorProps => {
+			const doc = document()
+			const highlightData = highlights()
+			
+			return {
+				document: doc,
+				isFileSelected: () => true,
+				stats: () => undefined,
+				fontSize: () => props.pane.viewSettings.fontSize,
+				fontFamily: () => 'JetBrains Mono, monospace',
+				cursorMode: () => CursorMode.Regular,
+				tabSize: () => 4,
+				registerEditorArea: (resolver) => focus.registerArea('editor', resolver),
+				activeScopes: focus.activeScopes,
+				highlights: highlightData?.captures,
+				folds: highlightData?.folds,
+				brackets: highlightData?.brackets,
+				errors: highlightData?.errors,
+				treeSitterWorker: treeSitterWorker() ?? undefined,
+				onSave: handleSave,
+				initialScrollPosition: () => initialScrollPosition(),
+				onScrollPositionChange: handleScrollPositionChange,
+				initialVisibleContent: () => undefined,
+				onCaptureVisibleContent: () => {},
+			}
+		}
+	)
 
 	return (
-		<div 
-			class="file-tab h-full w-full"
+		<div
+			class="file-tab absolute inset-0"
 			data-testid="file-tab"
 			data-file-path={props.filePath}
 			data-tab-id={props.tab.id}

@@ -5,7 +5,7 @@
  * across tabs showing the same file. Uses reference counting for cleanup.
  */
 
-import { createMemo, createSignal, onCleanup, type Accessor } from 'solid-js'
+import { createSignal, type Accessor } from 'solid-js'
 import type { TabId } from './types'
 import type {
 	TreeSitterCapture,
@@ -103,6 +103,12 @@ export interface ResourceManager {
 
 	/** Cleanup all resources */
 	cleanup: () => void
+
+	/** Pre-populate content for a file before any tabs register */
+	preloadFileContent: (filePath: string, content: string) => void
+
+	/** Cleanup resources for a specific file (call when tab is actually closed) */
+	cleanupFileResources: (filePath: string) => void
 
 	// Legacy aliases for backward compatibility with tests
 	registerPaneForFile: (paneId: string, filePath: string) => void
@@ -254,11 +260,23 @@ export function createResourceManager(): ResourceManager {
 		try {
 			await ensureTreeSitterWorkerReady()
 			resource.workerReady = true
+			
+			// Trigger initial parsing since we have content
+			const content = resource.buffer.content()
+			if (content.length > 0) {
+				try {
+					const encoder = new TextEncoder()
+					const buffer = encoder.encode(content).buffer
+					const parseResult = await parseBufferWithTreeSitter(filePath, buffer)
+					if (parseResult) {
+						resource.highlights.updateFromParseResult(parseResult)
+					}
+				} catch (parseError) {
+					console.error(`[ResourceManager] Parse failed for ${filePath}:`, parseError)
+				}
+			}
 		} catch (error) {
-			console.error(
-				`[ResourceManager] Failed to initialize worker for ${filePath}:`,
-				error
-			)
+			console.error(`[ResourceManager] Failed to initialize worker for ${filePath}:`, error)
 		}
 	}
 
@@ -278,10 +296,11 @@ export function createResourceManager(): ResourceManager {
 
 		resource.tabIds.delete(tabId)
 
-		// Cleanup if no more tabs using this file
-		if (resource.tabIds.size === 0) {
-			resources.delete(filePath)
-		}
+		// DON'T cleanup resources here - they should persist as long as any tab
+		// in the layout references this file. Cleanup happens when the tab is
+		// actually closed (removed from layout), not when the component unmounts.
+		// This prevents the race condition where switching tabs causes the old
+		// FileTab to cleanup before the new one mounts.
 	}
 
 	/** Get shared buffer for a file */
@@ -314,6 +333,17 @@ export function createResourceManager(): ResourceManager {
 		resources.clear()
 	}
 
+	/** Pre-populate content for a file before any tabs register */
+	function preloadFileContent(filePath: string, content: string): void {
+		const resource = getOrCreateResource(filePath)
+		resource.buffer.setContent(content)
+	}
+
+	/** Cleanup resources for a specific file (call when tab is actually closed) */
+	function cleanupFileResources(filePath: string): void {
+		resources.delete(filePath)
+	}
+
 	return {
 		getBuffer,
 		getHighlightState,
@@ -323,6 +353,8 @@ export function createResourceManager(): ResourceManager {
 		getTabCountForFile,
 		getTrackedFiles,
 		cleanup,
+		preloadFileContent,
+		cleanupFileResources,
 		// Legacy aliases for backward compatibility with tests
 		registerPaneForFile: registerTabForFile,
 		unregisterPaneFromFile: unregisterTabFromFile,

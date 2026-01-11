@@ -37,7 +37,7 @@ export const SyncStatusDemo = () => {
 	onMount(() => {
 		// Set up some mock sync statuses
 		mockFiles.forEach((path, index) => {
-			const statusType = statusTypes[index % statusTypes.length]
+			const statusType = statusTypes[index % statusTypes.length]!
 			simulateStatusChange(path, statusType)
 		})
 	})
@@ -45,32 +45,34 @@ export const SyncStatusDemo = () => {
 	const cycleStatus = () => {
 		const currentIndex = statusTypes.indexOf(currentStatus().type)
 		const nextIndex = (currentIndex + 1) % statusTypes.length
-		const nextType = statusTypes[nextIndex]
-		
+		const nextType = statusTypes[nextIndex]!
+
 		const newStatus: SyncStatusInfo = {
 			type: nextType,
 			lastSyncTime: Date.now(),
 			hasLocalChanges: nextType === 'dirty' || nextType === 'conflict',
-			hasExternalChanges: nextType === 'external-changes' || nextType === 'conflict',
+			hasExternalChanges:
+				nextType === 'external-changes' || nextType === 'conflict',
 			errorMessage: nextType === 'error' ? 'Mock sync error' : undefined,
 		}
-		
+
 		setCurrentStatus(newStatus)
 	}
 
 	return (
 		<div class="p-4 space-y-4 border border-border rounded-lg bg-background">
 			<h3 class="text-lg font-semibold">Sync Status Indicators Demo</h3>
-			
+
 			<div class="space-y-2">
 				<h4 class="font-medium">All Status Types:</h4>
 				<div class="flex gap-4 items-center">
-					{statusTypes.map(type => {
+					{statusTypes.map((type) => {
 						const mockStatus: SyncStatusInfo = {
 							type,
 							lastSyncTime: Date.now(),
 							hasLocalChanges: type === 'dirty' || type === 'conflict',
-							hasExternalChanges: type === 'external-changes' || type === 'conflict',
+							hasExternalChanges:
+								type === 'external-changes' || type === 'conflict',
 							errorMessage: type === 'error' ? 'Mock error message' : undefined,
 						}
 						return (
@@ -87,7 +89,7 @@ export const SyncStatusDemo = () => {
 				<h4 class="font-medium">Interactive Status:</h4>
 				<div class="flex items-center gap-4">
 					<SyncStatusIndicator status={currentStatus()} size={20} />
-					<button 
+					<button
 						onClick={cycleStatus}
 						class="px-3 py-1 bg-primary text-primary-foreground rounded text-sm"
 					>

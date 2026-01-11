@@ -72,6 +72,7 @@ describe('Property Test: Independent Tab State', () => {
 					)
 
 					// Open same file in two different panes
+					const pane1Id = layoutManager.state.rootId
 					const tab1Id = layoutManager.openTab(
 						pane1Id,
 						createFileContent(config.filePath)
