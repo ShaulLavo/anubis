@@ -15,6 +15,7 @@ type TreeNodeProps = {
 	node: FsTreeNode
 	hasParent?: boolean
 	onHover?: (hovered: boolean) => void
+	onFileOpen?: (filePath: string) => void
 }
 
 export const TreeNode = (props: TreeNodeProps) => {
@@ -44,7 +45,13 @@ export const TreeNode = (props: TreeNodeProps) => {
 		if (isDir()) {
 			actions.toggleDir(props.node.path)
 		} else {
-			void actions.selectPath(props.node.path)
+			// Use the new tab-based file opening if available
+			if (props.onFileOpen) {
+				props.onFileOpen(props.node.path)
+			} else {
+				// Fallback to traditional selection
+				void actions.selectPath(props.node.path)
+			}
 		}
 	}
 
@@ -76,7 +83,7 @@ export const TreeNode = (props: TreeNodeProps) => {
 					/>
 					<For each={(props.node as FsDirTreeNode).children}>
 						{(child) => (
-							<TreeNode node={child} hasParent onHover={handleChildHover} />
+							<TreeNode node={child} hasParent onHover={handleChildHover} onFileOpen={props.onFileOpen} />
 						)}
 					</For>
 					<CreationRow

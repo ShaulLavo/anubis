@@ -6,6 +6,7 @@ import { CreationRow } from './CreationRow'
 type TreeViewProps = {
 	tree: Accessor<FsDirTreeNode | undefined>
 	loading: Accessor<boolean>
+	onFileOpen?: (filePath: string) => void
 }
 
 export const TreeView = (props: TreeViewProps) => {
@@ -22,7 +23,7 @@ export const TreeView = (props: TreeViewProps) => {
 				{(tree) => (
 					<>
 						<For each={tree().children}>
-							{(child) => <TreeNode node={child} />}
+							{(child) => <TreeNode node={child} onFileOpen={props.onFileOpen} />}
 						</For>
 						<CreationRow depth={1} parentPath="" />
 					</>
