@@ -97,10 +97,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		return null
 	}
 
-	// ========================================================================
-	// Initialization
-	// ========================================================================
-
 	function initialize(): void {
 		const paneId = generateId()
 		const pane: EditorPane = {
@@ -118,10 +114,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 			setState('focusedPaneId', paneId)
 		})
 	}
-
-	// ========================================================================
-	// Split Operations
-	// ========================================================================
 
 	function splitPane(paneId: NodeId, direction: SplitDirection): NodeId {
 		const newPaneId = generateId()
@@ -176,10 +168,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		return newPaneId
 	}
 
-	// ========================================================================
-	// Close Operations
-	// ========================================================================
-
 	function closePane(paneId: NodeId): void {
 		batch(() => {
 			setState(
@@ -190,7 +178,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 					const parentId = pane.parentId
 
 					if (!parentId) {
-						// Can't close the last pane
 						return
 					}
 
@@ -232,11 +219,11 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		})
 	}
 
-	// ========================================================================
-	// Tab Operations
-	// ========================================================================
-
-	function openTab(paneId: NodeId, content: TabContent, viewMode: ViewMode = 'editor'): TabId {
+	function openTab(
+		paneId: NodeId,
+		content: TabContent,
+		viewMode: ViewMode = 'editor'
+	): TabId {
 		const tabId = generateId()
 
 		setState(
@@ -264,7 +251,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		let shouldClosePane = false
 		let closedTab: Tab | undefined
 
-		// Find the tab before closing to pass to callback
 		const pane = state.nodes[paneId] as EditorPane | undefined
 		if (pane && isPane(pane)) {
 			closedTab = pane.tabs.find((t) => t.id === tabId)
@@ -295,7 +281,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 			})
 		)
 
-		// Call the onTabClose callback after state update
 		if (closedTab && options.onTabClose) {
 			options.onTabClose(paneId, closedTab)
 		}
@@ -387,7 +372,11 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		)
 	}
 
-	function setTabViewMode(paneId: NodeId, tabId: TabId, viewMode: ViewMode): void {
+	function setTabViewMode(
+		paneId: NodeId,
+		tabId: TabId,
+		viewMode: ViewMode
+	): void {
 		setState(
 			produce((s) => {
 				const pane = s.nodes[paneId] as EditorPane | undefined
@@ -411,7 +400,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		const activeTab = pane.tabs.find((t) => t.id === pane.activeTabId)
 		if (!activeTab || activeTab.content.type !== 'file') return
 
-		// Cycle through: editor -> ui -> binary -> editor
 		const viewModes: ViewMode[] = ['editor', 'ui', 'binary']
 		const currentIndex = viewModes.indexOf(activeTab.viewMode)
 		const nextIndex = (currentIndex + 1) % viewModes.length
@@ -421,10 +409,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 			setTabViewMode(focusedPaneId, activeTab.id, nextMode)
 		}
 	}
-
-	// ========================================================================
-	// Pane Operations
-	// ========================================================================
 
 	function updateViewSettings(
 		paneId: NodeId,
@@ -453,10 +437,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		)
 	}
 
-	// ========================================================================
-	// Focus Management
-	// ========================================================================
-
 	function setFocusedPane(paneId: NodeId): void {
 		setState('focusedPaneId', paneId)
 	}
@@ -478,7 +458,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		const pane = state.nodes[paneId]
 		if (!pane || !isPane(pane)) return null
 
-		// Walk up the tree to find a container that can provide the adjacent pane
 		let currentNode: SplitNode = pane
 		let parentId = currentNode.parentId
 
@@ -486,7 +465,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 			const parent = state.nodes[parentId]
 			if (!parent || !isContainer(parent)) break
 
-			// Check if this container's split direction matches our navigation direction
 			const isHorizontalNav = direction === 'left' || direction === 'right'
 			const isVerticalNav = direction === 'up' || direction === 'down'
 			const isHorizontalSplit = parent.direction === 'horizontal'
@@ -496,11 +474,9 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 				(isHorizontalNav && isHorizontalSplit) ||
 				(isVerticalNav && isVerticalSplit)
 			) {
-				// Find which child we are
 				const currentChildIndex = parent.children.indexOf(currentNode.id)
 				if (currentChildIndex === -1) break
 
-				// Determine target child based on direction
 				let targetChildIndex = -1
 				if (direction === 'left' || direction === 'up') {
 					targetChildIndex = currentChildIndex - 1
@@ -508,20 +484,17 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 					targetChildIndex = currentChildIndex + 1
 				}
 
-				// Check if target child exists
 				if (
 					targetChildIndex >= 0 &&
 					targetChildIndex < parent.children.length
 				) {
 					const targetChildId = parent.children[targetChildIndex]
 					if (targetChildId) {
-						// Find the first pane in the target subtree
 						return findFirstPane(state.nodes, targetChildId)
 					}
 				}
 			}
 
-			// Move up to the next level
 			currentNode = parent
 			parentId = parent.parentId
 		}
@@ -547,10 +520,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 			setActiveTab(focusedPaneId, nextTab.id)
 		}
 	}
-
-	// ========================================================================
-	// Scroll Sync
-	// ========================================================================
 
 	function linkScrollSync(tabIdList: TabId[], mode: ScrollSyncMode): string {
 		const groupId = generateId()
@@ -579,10 +548,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 			})
 		)
 	}
-
-	// ========================================================================
-	// Serialization
-	// ========================================================================
 
 	function getLayoutTree(): SerializedLayout {
 		const nodes: SerializedNode[] = Object.values(state.nodes).map((node) => {
@@ -641,7 +606,7 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 					type: 'pane',
 					tabs: (serialized.tabs ?? []).map((t) => ({
 						...t,
-						viewMode: t.viewMode ?? 'editor', // Default to 'editor' for backward compatibility
+						viewMode: t.viewMode ?? 'editor',
 					})),
 					activeTabId: serialized.activeTabId ?? null,
 					viewSettings: serialized.viewSettings ?? createDefaultViewSettings(),

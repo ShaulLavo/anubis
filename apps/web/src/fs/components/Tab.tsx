@@ -86,7 +86,6 @@ export const Tab = (props: TabProps) => {
 			<FileIcon name={props.label} size={14} class="shrink-0" />
 			<span class="max-w-48 truncate">{props.label}</span>
 
-			{/* View mode indicator (Requirements 8.1, 8.2, 8.3) */}
 			<Show when={shouldShowViewModeIndicator()}>
 				<span
 					class={getViewModeIndicatorClass() + ' text-ui-xs'}

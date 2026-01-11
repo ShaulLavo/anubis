@@ -6,10 +6,19 @@
  * shared buffer for content while maintaining independent tab state.
  * Supports multiple view modes: editor, ui (settings).
  *
- * Requirements: 2.1, 2.5, 8.1, 8.2, 8.4, View Mode Support
+ * Requirements: 2.1, 2.5, 5.3, 5.4, 5.5, 8.1, 8.2, 8.4, View Mode Support
  */
 
-import { createEffect, createMemo, createResource, createSignal, Match, onCleanup, onMount, Switch } from 'solid-js'
+import {
+	createEffect,
+	createMemo,
+	createResource,
+	createSignal,
+	Match,
+	onCleanup,
+	Show,
+	Switch,
+} from 'solid-js'
 import { Editor } from '@repo/code-editor'
 import { CursorMode } from '@repo/code-editor'
 import type {
@@ -24,6 +33,11 @@ import { SettingsTab } from '~/settings/components/SettingsTab'
 import type { Tab, EditorPane } from '../types'
 import { createScrollSyncCoordinator } from '../createScrollSyncCoordinator'
 import type { ScrollEvent } from '../createScrollSyncCoordinator'
+import {
+	FileLoadingErrorDisplay,
+	FileLoadingIndicator,
+	BinaryFileIndicator,
+} from './FileLoadingErrorDisplay'
 
 export interface FileTabProps {
 	tab: Tab
@@ -50,17 +64,23 @@ export function FileTab(props: FileTabProps) {
 	})
 
 	// Register for file IMMEDIATELY (not in onMount) so buffer exists when memo runs
-	resourceManager.registerTabForFile(props.tab.id, props.filePath)
+	createEffect(() => {
+		resourceManager.registerTabForFile(props.tab.id, props.filePath)
 
-	onCleanup(() => {
-		resourceManager.unregisterTabFromFile(props.tab.id, props.filePath)
+		onCleanup(() => {
+			resourceManager.unregisterTabFromFile(props.tab.id, props.filePath)
+		})
 	})
 
-	// Get shared buffer - resource was just registered above, so it exists
 	const buffer = createMemo(() => resourceManager.getBuffer(props.filePath))
 
-	// Get highlight state - track the accessor functions
-	const highlightState = createMemo(() => resourceManager.getHighlightState(props.filePath))
+	const highlightState = createMemo(() =>
+		resourceManager.getHighlightState(props.filePath)
+	)
+
+	const loadingState = createMemo(() =>
+		resourceManager.getLoadingState(props.filePath)
+	)
 
 	// Create reactive accessors for highlights
 	const highlights = createMemo(() => {
@@ -77,11 +97,10 @@ export function FileTab(props: FileTabProps) {
 			captures: state.captures,
 			folds: state.folds,
 			brackets: state.brackets,
-			errors: state.errors
+			errors: state.errors,
 		}
 	})
 
-	// Subscribe to edits from other tabs
 	createEffect(() => {
 		const sharedBuffer = buffer()
 		if (!sharedBuffer) return
@@ -167,38 +186,55 @@ export function FileTab(props: FileTabProps) {
 		layoutManager.setTabDirty(props.pane.id, props.tab.id, false)
 	}
 
-	const editorProps = createMemo(
-		(): EditorProps => {
-			const doc = document()
-			const highlightData = highlights()
-			const tsWorker = treeSitterWorker()
+	const editorProps = createMemo((): EditorProps => {
+		const doc = document()
+		const highlightData = highlights()
+		const tsWorker = treeSitterWorker()
 
-			return {
-				document: doc,
-				isFileSelected: () => true,
-				stats: () => undefined,
-				fontSize: () => props.pane.viewSettings.fontSize,
-				fontFamily: () => 'JetBrains Mono, monospace',
-				cursorMode: () => CursorMode.Regular,
-				tabSize: () => 4,
-				registerEditorArea: (resolver) => focus.registerArea('editor', resolver),
-				activeScopes: focus.activeScopes,
-				highlights: highlightData?.captures,
-				folds: highlightData?.folds,
-				brackets: highlightData?.brackets,
-				errors: highlightData?.errors,
-				treeSitterWorker: tsWorker ?? undefined,
-				onSave: handleSave,
-				initialScrollPosition: () => initialScrollPosition(),
-				onScrollPositionChange: handleScrollPositionChange,
-				initialVisibleContent: () => undefined,
-				onCaptureVisibleContent: () => {},
-			}
+		return {
+			document: doc,
+			isFileSelected: () => true,
+			stats: () => undefined,
+			fontSize: () => props.pane.viewSettings.fontSize,
+			fontFamily: () => 'JetBrains Mono, monospace',
+			cursorMode: () => CursorMode.Regular,
+			tabSize: () => 4,
+			registerEditorArea: (resolver) => focus.registerArea('editor', resolver),
+			activeScopes: focus.activeScopes,
+			highlights: highlightData?.captures,
+			folds: highlightData?.folds,
+			brackets: highlightData?.brackets,
+			errors: highlightData?.errors,
+			treeSitterWorker: tsWorker ?? undefined,
+			onSave: handleSave,
+			initialScrollPosition: () => initialScrollPosition(),
+			onScrollPositionChange: handleScrollPositionChange,
+			initialVisibleContent: () => undefined,
+			onCaptureVisibleContent: () => {},
 		}
-	)
+	})
 
 	// Must be an accessor function for reactivity in SolidJS
 	const viewMode = () => props.tab.viewMode ?? 'editor'
+
+	// Reactive accessors for loading state
+	const status = () => loadingState()?.status() ?? 'idle'
+	const error = () => loadingState()?.error() ?? null
+	const isBinary = () => loadingState()?.isBinary() ?? false
+	const progress = () => loadingState()?.progress() ?? 0
+	const fileSize = () => loadingState()?.fileSize() ?? null
+	const retryCount = () => loadingState()?.retryCount() ?? 0
+
+	// Handle retry for errors
+	const handleRetry = () => {
+		const state = loadingState()
+		if (state) {
+			state.incrementRetryCount()
+			state.setStatus('loading')
+			state.setError(null)
+			// Trigger reload - the parent should handle the actual file loading
+		}
+	}
 
 	return (
 		<div
@@ -207,16 +243,39 @@ export function FileTab(props: FileTabProps) {
 			data-file-path={props.filePath}
 			data-tab-id={props.tab.id}
 		>
-			<Switch fallback={<Editor {...editorProps()} />}>
-				{/* Settings file in UI mode */}
-				<Match when={viewMode() === 'ui'}>
-					<SettingsTab
-						initialCategory={currentCategory()}
-						currentCategory={currentCategory()}
-						onCategoryChange={setCurrentCategory}
-					/>
-				</Match>
-			</Switch>
+			<Show when={status() === 'loading'}>
+				<FileLoadingIndicator filePath={props.filePath} progress={progress()} />
+			</Show>
+
+			<Show when={status() === 'error' && error()}>
+				<FileLoadingErrorDisplay
+					error={error()!}
+					filePath={props.filePath}
+					retryCount={retryCount()}
+					onRetry={handleRetry}
+				/>
+			</Show>
+
+			<Show when={isBinary() && status() !== 'error'}>
+				<BinaryFileIndicator
+					filePath={props.filePath}
+					fileSize={fileSize() ?? undefined}
+				/>
+			</Show>
+
+			<Show
+				when={status() !== 'loading' && status() !== 'error' && !isBinary()}
+			>
+				<Switch fallback={<Editor {...editorProps()} />}>
+					<Match when={viewMode() === 'ui'}>
+						<SettingsTab
+							initialCategory={currentCategory()}
+							currentCategory={currentCategory()}
+							onCategoryChange={setCurrentCategory}
+						/>
+					</Match>
+				</Switch>
+			</Show>
 		</div>
 	)
 }

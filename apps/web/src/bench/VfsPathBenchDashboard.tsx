@@ -346,7 +346,6 @@ export const VfsPathBenchDashboard = () => {
 
 	return (
 		<div class="h-screen flex flex-col overflow-hidden bg-background text-foreground font-sans selection:bg-primary/30">
-			{/* Header */}
 			<header class="border-b border-border bg-card shrink-0">
 				<div class="max-w-6xl mx-auto px-6 py-6">
 					<Flex justifyContent="between">
@@ -386,7 +385,6 @@ export const VfsPathBenchDashboard = () => {
 			</header>
 
 			<main class="flex-1 flex flex-col min-h-0 w-full max-w-6xl mx-auto px-6 py-6">
-				{/* Error */}
 				<Show when={error()}>
 					<Alert
 						variant="destructive"
@@ -396,7 +394,6 @@ export const VfsPathBenchDashboard = () => {
 					</Alert>
 				</Show>
 
-				{/* Progress */}
 				<Show when={progress()}>
 					<div class="mb-6 shrink-0">
 						<div class="flex items-center justify-between text-sm text-muted-foreground mb-2">
@@ -420,7 +417,6 @@ export const VfsPathBenchDashboard = () => {
 					</div>
 				</Show>
 
-				{/* Results Table */}
 				<Show when={scenarioStates().length > 0}>
 					<div class="rounded-lg border border-border overflow-hidden bg-card shadow-sm flex flex-col flex-1 min-h-0">
 						<VfsPathResultsTable data={scenarioStates()} />
@@ -434,7 +430,6 @@ export const VfsPathBenchDashboard = () => {
 					</div>
 				</Show>
 
-				{/* Empty State */}
 				<Show when={!running() && scenarioStates().length === 0}>
 					<div class="flex flex-col items-center justify-center flex-1 text-center">
 						<div class="w-16 h-16 mb-6 rounded-full bg-muted flex items-center justify-center">

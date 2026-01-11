@@ -155,16 +155,14 @@ describe('TabBar Component', () => {
 
 	it('includes scrollbar styling classes for better UX', async () => {
 		renderTabBar()
-		
+
 		const tabBar = document.querySelector('.tab-bar')
 		expect(tabBar).toBeTruthy()
-		
-		// Check for scrollbar styling classes (if they exist in the implementation)
-		const hasScrollbarStyling = 
-			tabBar?.classList.contains('scrollbar-thin') ||
-			tabBar?.classList.contains('scrollbar-track-transparent') ||
-			tabBar?.classList.contains('scrollbar-thumb-border')
-		
+
+		// Scrollbar classes are on the inner scroll container (child of .tab-bar)
+		const scrollContainer = tabBar?.querySelector('.scrollbar-thin')
+		const hasScrollbarStyling = scrollContainer !== null
+
 		// This test verifies the scrollbar styling is present
 		expect(hasScrollbarStyling).toBe(true)
 	})

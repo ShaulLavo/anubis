@@ -8,12 +8,36 @@
 
 import { describe, test, expect } from 'vitest'
 import fc from 'fast-check'
+import { createRoot } from 'solid-js'
 import { createLayoutManager } from './createLayoutManager'
 import { createScrollSyncCoordinator } from './createScrollSyncCoordinator'
 import type { ScrollEvent, ScrollSyncCoordinator } from './createScrollSyncCoordinator'
 import type { LayoutManager } from './createLayoutManager'
 import type { ScrollSyncMode, TabId } from './types'
 import { createFileContent } from './types'
+
+/**
+ * Helper: Create a layout manager within a reactive root.
+ */
+function createTestManager(): LayoutManager {
+	let manager!: LayoutManager
+	createRoot(() => {
+		manager = createLayoutManager()
+		manager.initialize()
+	})
+	return manager
+}
+
+/**
+ * Helper: Create a scroll sync coordinator within a reactive root.
+ */
+function createTestCoordinator(layoutManager: LayoutManager): ScrollSyncCoordinator {
+	let coordinator!: ScrollSyncCoordinator
+	createRoot(() => {
+		coordinator = createScrollSyncCoordinator(layoutManager)
+	})
+	return coordinator
+}
 
 describe('Scroll Sync Proportionality', () => {
 	test('Property 9: Link tabs, scroll one, verify proportional scroll in others', () => {
@@ -33,8 +57,7 @@ describe('Scroll Sync Proportionality', () => {
 				// Generate number of tabs to link (2-4)
 				fc.integer({ min: 2, max: 4 }),
 				(mode, scrollData, numTabs) => {
-					const layoutManager = createLayoutManager()
-					layoutManager.initialize()
+					const layoutManager = createTestManager()
 
 					const rootPaneId = layoutManager.state.rootId
 					const tabIds: TabId[] = []
@@ -56,8 +79,8 @@ describe('Scroll Sync Proportionality', () => {
 					expect(groups[0]?.tabIds).toEqual(tabIds)
 					expect(groups[0]?.mode).toBe(mode)
 
-					// Create scroll sync coordinator
-					const coordinator = createScrollSyncCoordinator(layoutManager)
+					// Create scroll sync coordinator (in reactive root)
+					const coordinator = createTestCoordinator(layoutManager)
 
 					// Create scroll event for first tab
 					const sourceTabId = tabIds[0]!
@@ -121,8 +144,7 @@ describe('Scroll Sync Proportionality', () => {
 					clientWidth: fc.integer({ min: 300, max: 600 }),
 				}),
 				(mode, scrollData) => {
-					const layoutManager = createLayoutManager()
-					layoutManager.initialize()
+					const layoutManager = createTestManager()
 
 					const rootPaneId = layoutManager.state.rootId
 
@@ -134,7 +156,7 @@ describe('Scroll Sync Proportionality', () => {
 					// Link only tab1 and tab2
 					layoutManager.linkScrollSync([tab1Id, tab2Id], mode)
 
-					const coordinator = createScrollSyncCoordinator(layoutManager)
+					const coordinator = createTestCoordinator(layoutManager)
 
 					// Get initial state of tab3
 					const tab3Initial = layoutManager.getAllTabs().find((t) => t.tab.id === tab3Id)!.tab.state
@@ -165,8 +187,7 @@ describe('Scroll Sync Proportionality', () => {
 	})
 
 	test('unlinking scroll sync stops synchronization', () => {
-		const layoutManager = createLayoutManager()
-		layoutManager.initialize()
+		const layoutManager = createTestManager()
 
 		const rootPaneId = layoutManager.state.rootId
 
@@ -182,7 +203,7 @@ describe('Scroll Sync Proportionality', () => {
 		layoutManager.unlinkScrollSync(groupId)
 		expect(layoutManager.state.scrollSyncGroups).toHaveLength(0)
 
-		const coordinator = createScrollSyncCoordinator(layoutManager)
+		const coordinator = createTestCoordinator(layoutManager)
 
 		// Get initial state of tab2
 		const tab2Initial = layoutManager.getAllTabs().find((t) => t.tab.id === tab2Id)!.tab.state

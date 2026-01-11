@@ -67,10 +67,8 @@ export const useFileSelection = ({
 			settingsState.values['ui.fileSelection.animation']
 		const selectionAnimationDefault =
 			settingsState.defaults['ui.fileSelection.animation']
-		const resolvedSelectionAnimation =
-			(selectionAnimationValue ?? selectionAnimationDefault) as
-				| string
-				| undefined
+		const resolvedSelectionAnimation = (selectionAnimationValue ??
+			selectionAnimationDefault) as string | undefined
 
 		if (resolvedSelectionAnimation === FileSelectionAnimation.None) {
 			return FileSelectionAnimation.None
@@ -92,7 +90,6 @@ export const useFileSelection = ({
 			return
 		}
 
-		// Handle clearing selection (empty path)
 		if (!path) {
 			batch(() => {
 				setSelectedPath(undefined)
@@ -193,7 +190,7 @@ export const useFileSelection = ({
 							// Binary files: load both binary preview AND text content
 							// Text content is needed for editor mode (broken UTF-8 display like VS Code)
 							binaryPreviewBytes = previewBytes
-							
+
 							// Also load full content as UTF-8 text for editor mode
 							const buffer = await timeAsync('read-file-buffer', () =>
 								readFileBuffer(source, path)
@@ -203,7 +200,7 @@ export const useFileSelection = ({
 							const textBytes = new Uint8Array(buffer)
 							const text = textDecoder.decode(textBytes)
 							selectedFileContentValue = text
-							
+
 							fileStatsResult =
 								existingFileStats ??
 								timeSync('binary-file-metadata', () =>
@@ -234,8 +231,8 @@ export const useFileSelection = ({
 										}
 									})
 									.catch(() => {
-									// Tree-sitter parse failed
-								})
+										// Tree-sitter parse failed
+									})
 							}
 
 							fileStatsResult = timeSync('parse-file-buffer', () =>

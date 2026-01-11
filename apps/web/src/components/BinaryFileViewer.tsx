@@ -206,7 +206,6 @@ export const BinaryFileViewer = (props: BinaryFileViewerProps) => {
 					</div>
 				}
 			>
-				{/* Column headers */}
 				<div class="border-b border-zinc-800/30 bg-zinc-900/30 px-3 py-1 text-[10px] text-zinc-500 font-mono">
 					<div class="flex items-center gap-4">
 						<span class="w-16 shrink-0 text-right">Offset</span>

@@ -202,7 +202,7 @@ describe('Portal State Preservation (Property 10)', () => {
 							}),
 							fc.record({
 								type: fc.constant('resize' as const),
-								size1: fc.float({ min: 0.2, max: 0.8, noNaN: true }),
+								size1: fc.float({ min: Math.fround(0.2), max: Math.fround(0.8), noNaN: true }),
 							})
 						),
 						{ minLength: 1, maxLength: 5 }

@@ -24,20 +24,19 @@ export const useSelectedFileTabs = (params: UseSelectedFileTabsParams) => {
 	})
 
 	createEffect(() => {
-		// Tab IDs are now just file paths
 		params.setOpenTabs(tabsState())
 	})
 
 	const handleTabSelect = (tabId: string) => {
 		if (!tabId) return
-		// Tab ID is now just the file path
+
 		if (tabId === params.selectedPath()) return
 		void params.selectPath(tabId)
 	}
 
 	const handleTabClose = (tabId: string) => {
 		const selectedPath = params.selectedPath()
-		// Tab ID is now just the file path
+
 		const isClosingActiveTab = tabId === selectedPath
 		const previousTabId = isClosingActiveTab
 			? tabsActions.getPreviousTab(tabId)
@@ -52,18 +51,13 @@ export const useSelectedFileTabs = (params: UseSelectedFileTabsParams) => {
 	}
 
 	const tabLabel = (tabId: string) => {
-		// Tab ID is now just the file path
 		const path = tabId
-
-		// Get the base file name
 		const fileName = path.split('/').pop() || path
-
 		return fileName
 	}
 
 	// Enhanced tooltip information for tabs (Requirements 8.4)
 	const getTabTooltip = (tabId: string) => {
-		// Tab ID is now just the file path
 		const path = tabId
 		return path
 	}
@@ -74,7 +68,6 @@ export const useSelectedFileTabs = (params: UseSelectedFileTabsParams) => {
 		return availableModes.length > 1
 	}
 
-	// Get available view modes for a file
 	const getAvailableViewModes = (path: string) => {
 		return detectAvailableViewModes(path)
 	}

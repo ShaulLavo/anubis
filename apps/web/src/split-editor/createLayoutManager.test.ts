@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fc from 'fast-check'
+import { createRoot } from 'solid-js'
 import { createLayoutManager } from './createLayoutManager'
 import type { LayoutManager } from './createLayoutManager'
 import type {
@@ -16,11 +17,44 @@ import { isContainer, isPane } from './types'
  */
 describe('Layout Manager Properties', () => {
 	let manager: LayoutManager
+	let dispose: () => void
 
 	beforeEach(() => {
-		manager = createLayoutManager()
-		manager.initialize()
+		dispose = createRoot((d) => {
+			manager = createLayoutManager()
+			manager.initialize()
+			return d
+		})
 	})
+
+	afterEach(() => {
+		dispose?.()
+	})
+
+	/**
+	 * Helper: Create a layout manager within a reactive root.
+	 * Returns the manager - the root is disposed when the test ends.
+	 */
+	function createTestManager(): LayoutManager {
+		let testManager!: LayoutManager
+		createRoot(() => {
+			testManager = createLayoutManager()
+			testManager.initialize()
+		})
+		return testManager
+	}
+
+	/**
+	 * Helper: Create an uninitialized layout manager within a reactive root.
+	 * Use this when you need to call restoreLayout instead of initialize.
+	 */
+	function createUninitializedManager(): LayoutManager {
+		let testManager!: LayoutManager
+		createRoot(() => {
+			testManager = createLayoutManager()
+		})
+		return testManager
+	}
 
 	/**
 	 * Helper: Get all pane IDs from the layout
@@ -98,9 +132,8 @@ describe('Layout Manager Properties', () => {
 					),
 				}),
 				(config) => {
-					// Reset manager for each test
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager for each test (in reactive root)
+					manager = createTestManager()
 
 					// Verify initial state is valid
 					expect(validateTreeIntegrity()).toBe(true)
@@ -164,9 +197,8 @@ describe('Layout Manager Properties', () => {
 					splitCount: fc.integer({ min: 1, max: 5 }),
 				}),
 				(config) => {
-					// Reset manager for each test
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager for each test (in reactive root)
+					manager = createTestManager()
 
 					const initialPaneCount = getAllPaneIds().length
 					expect(initialPaneCount).toBe(1)
@@ -240,9 +272,8 @@ describe('Layout Manager Properties', () => {
 					closeIndex: fc.integer({ min: 0, max: 10 }),
 				}),
 				(config) => {
-					// Reset manager for each test
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager for each test (in reactive root)
+					manager = createTestManager()
 
 					// Create some splits first
 					for (let i = 0; i < config.splitCount; i++) {
@@ -335,9 +366,8 @@ describe('Layout Manager Properties', () => {
 	it('property: cannot close the last remaining pane', () => {
 		fc.assert(
 			fc.property(fc.constant(null), () => {
-				// Reset manager
-				manager = createLayoutManager()
-				manager.initialize()
+				// Reset manager (in reactive root)
+				manager = createTestManager()
 
 				const panes = getAllPaneIds()
 				expect(panes.length).toBe(1)
@@ -368,9 +398,8 @@ describe('Layout Manager Properties', () => {
 					direction: fc.constantFrom<SplitDirection>('horizontal', 'vertical'),
 				}),
 				(config) => {
-					// Reset manager
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager (in reactive root)
+					manager = createTestManager()
 
 					const initialPaneId = manager.state.rootId
 
@@ -408,9 +437,8 @@ describe('Layout Manager Properties', () => {
 					tabCount: fc.integer({ min: 1, max: 5 }),
 				}),
 				(config) => {
-					// Reset manager
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager (in reactive root)
+					manager = createTestManager()
 
 					const initialPaneId = manager.state.rootId
 
@@ -483,9 +511,8 @@ describe('Layout Manager Properties', () => {
 					activeTabIndex: fc.integer({ min: 0, max: 7 }),
 				}),
 				(config) => {
-					// Reset manager
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager (in reactive root)
+					manager = createTestManager()
 
 					const paneId = manager.state.rootId
 
@@ -561,9 +588,8 @@ describe('Layout Manager Properties', () => {
 					),
 				}),
 				(config) => {
-					// Reset manager for each test
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager for each test (in reactive root)
+					manager = createTestManager()
 
 					// Build a layout with splits
 					for (let i = 0; i < config.splitCount; i++) {
@@ -631,8 +657,8 @@ describe('Layout Manager Properties', () => {
 						}
 					}
 
-					// Create a new manager and restore
-					const restoredManager = createLayoutManager()
+					// Create a new manager and restore (in reactive root)
+					const restoredManager = createUninitializedManager()
 					restoredManager.restoreLayout(serialized)
 
 					// Verify restored state matches original
@@ -692,9 +718,8 @@ describe('Layout Manager Properties', () => {
 					isDirty: fc.boolean(),
 				}),
 				(config) => {
-					// Reset manager
-					manager = createLayoutManager()
-					manager.initialize()
+					// Reset manager (in reactive root)
+					manager = createTestManager()
 
 					const paneId = manager.state.rootId
 
@@ -734,8 +759,8 @@ describe('Layout Manager Properties', () => {
 					expect(serializedTab?.state.cursorPosition.column).toBe(config.column)
 					expect(serializedTab?.isDirty).toBe(config.isDirty)
 
-					// Restore and verify
-					const restoredManager = createLayoutManager()
+					// Restore and verify (in reactive root)
+					const restoredManager = createUninitializedManager()
 					restoredManager.restoreLayout(serialized)
 
 					const restoredPane = restoredManager.state.nodes[paneId] as EditorPane
@@ -779,9 +804,8 @@ describe('Layout Manager Properties', () => {
 						),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -892,9 +916,8 @@ describe('Layout Manager Properties', () => {
 						column: fc.integer({ min: 0, max: 100 }),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -915,8 +938,8 @@ describe('Layout Manager Properties', () => {
 						// Serialize
 						const serialized = testManager.getLayoutTree()
 
-						// Restore to a new manager
-						const restoredManager = createLayoutManager()
+						// Restore to a new manager (in reactive root)
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify state was preserved
@@ -944,9 +967,8 @@ describe('Layout Manager Properties', () => {
 						direction: fc.constantFrom<SplitDirection>('horizontal', 'vertical'),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const initialPaneId = testManager.state.rootId
 
@@ -1003,9 +1025,8 @@ describe('Layout Manager Properties', () => {
 							.map(s => `/test/${s.replace(/\s/g, '_')}.txt`),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -1040,9 +1061,8 @@ describe('Layout Manager Properties', () => {
 						cycleCount: fc.integer({ min: 1, max: 10 }),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 						testManager.setFocusedPane(paneId)
@@ -1086,9 +1106,8 @@ describe('Layout Manager Properties', () => {
 							.map(s => `/test/${s.replace(/\s/g, '_')}.json`),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -1107,8 +1126,8 @@ describe('Layout Manager Properties', () => {
 						const serializedTab = serializedPane?.tabs?.find(t => t.id === tabId)
 						expect(serializedTab?.viewMode).toBe(config.viewMode)
 
-						// Restore to new manager
-						const restoredManager = createLayoutManager()
+						// Restore to new manager (in reactive root)
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify view mode was restored
@@ -1135,9 +1154,8 @@ describe('Layout Manager Properties', () => {
 						),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -1198,9 +1216,8 @@ describe('Layout Manager Properties', () => {
 						viewMode: fc.constantFrom<'editor' | 'ui' | 'binary'>('editor', 'ui', 'binary'),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -1228,9 +1245,8 @@ describe('Layout Manager Properties', () => {
 						direction: fc.constantFrom<SplitDirection>('horizontal', 'vertical'),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const pane1Id = testManager.state.rootId
 
@@ -1307,9 +1323,8 @@ describe('Layout Manager Properties', () => {
 						),
 					}),
 					(config) => {
-						// Create and initialize first manager
-						const manager1 = createLayoutManager()
-						manager1.initialize()
+						// Create and initialize first manager (in reactive root)
+						const manager1 = createTestManager()
 
 						// Build complex layout
 						for (let i = 0; i < config.splitCount; i++) {
@@ -1359,8 +1374,8 @@ describe('Layout Manager Properties', () => {
 						// Serialize
 						const serialized = manager1.getLayoutTree()
 
-						// Create new manager and restore
-						const manager2 = createLayoutManager()
+						// Create new manager and restore (in reactive root)
+						const manager2 = createUninitializedManager()
 						manager2.restoreLayout(serialized)
 
 						// Verify structure matches
@@ -1403,8 +1418,7 @@ describe('Layout Manager Properties', () => {
 						activeIndex: fc.integer({ min: 0, max: 5 }),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 
@@ -1425,9 +1439,9 @@ describe('Layout Manager Properties', () => {
 							manager.setActiveTab(paneId, activeTabId)
 						}
 
-						// Serialize and restore
+						// Serialize and restore (in reactive root)
 						const serialized = manager.getLayoutTree()
-						const restoredManager = createLayoutManager()
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify active tab is preserved
@@ -1454,8 +1468,7 @@ describe('Layout Manager Properties', () => {
 						tabCount: fc.integer({ min: 1, max: 5 }),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 
@@ -1475,8 +1488,8 @@ describe('Layout Manager Properties', () => {
 						expect(serialized.rootId).toBe(paneId)
 						expect(serialized.nodes.length).toBeGreaterThan(0)
 
-						// Restoration should succeed
-						const restoredManager = createLayoutManager()
+						// Restoration should succeed (in reactive root)
+						const restoredManager = createUninitializedManager()
 						expect(() => restoredManager.restoreLayout(serialized)).not.toThrow()
 
 						// All tabs should be restored
@@ -1496,8 +1509,7 @@ describe('Layout Manager Properties', () => {
 						closeIndex: fc.integer({ min: 0, max: 4 }),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 
@@ -1511,9 +1523,9 @@ describe('Layout Manager Properties', () => {
 							tabIds.push(tabId)
 						}
 
-						// Serialize and restore
+						// Serialize and restore (in reactive root)
 						const serialized = manager.getLayoutTree()
-						const restoredManager = createLayoutManager()
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Close a tab (simulating missing file removal)
@@ -1549,8 +1561,7 @@ describe('Layout Manager Properties', () => {
 						column: fc.integer({ min: 0, max: 500 }),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 						const tabId = manager.openTab(paneId, {
@@ -1563,9 +1574,9 @@ describe('Layout Manager Properties', () => {
 							cursorPosition: { line: config.line, column: config.column },
 						})
 
-						// Serialize and restore
+						// Serialize and restore (in reactive root)
 						const serialized = manager.getLayoutTree()
-						const restoredManager = createLayoutManager()
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify cursor position
@@ -1587,8 +1598,7 @@ describe('Layout Manager Properties', () => {
 						scrollLeft: fc.integer({ min: 0, max: 5000 }),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 						const tabId = manager.openTab(paneId, {
@@ -1602,9 +1612,9 @@ describe('Layout Manager Properties', () => {
 							scrollLeft: config.scrollLeft,
 						})
 
-						// Serialize and restore
+						// Serialize and restore (in reactive root)
 						const serialized = manager.getLayoutTree()
-						const restoredManager = createLayoutManager()
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify scroll state
@@ -1625,8 +1635,7 @@ describe('Layout Manager Properties', () => {
 						isDirty: fc.boolean(),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 						const tabId = manager.openTab(paneId, {
@@ -1637,9 +1646,9 @@ describe('Layout Manager Properties', () => {
 						// Set dirty state
 						manager.setTabDirty(paneId, tabId, config.isDirty)
 
-						// Serialize and restore
+						// Serialize and restore (in reactive root)
 						const serialized = manager.getLayoutTree()
-						const restoredManager = createLayoutManager()
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify dirty state
@@ -1664,8 +1673,7 @@ describe('Layout Manager Properties', () => {
 						viewMode: fc.constantFrom<'editor' | 'ui' | 'binary'>('editor', 'ui', 'binary'),
 					}),
 					(config) => {
-						const manager = createLayoutManager()
-						manager.initialize()
+						const manager = createTestManager()
 
 						const paneId = manager.state.rootId
 						const tabId = manager.openTab(paneId, {
@@ -1682,9 +1690,9 @@ describe('Layout Manager Properties', () => {
 						manager.setTabDirty(paneId, tabId, config.isDirty)
 						manager.setTabViewMode(paneId, tabId, config.viewMode)
 
-						// Serialize and restore
+						// Serialize and restore (in reactive root)
 						const serialized = manager.getLayoutTree()
-						const restoredManager = createLayoutManager()
+						const restoredManager = createUninitializedManager()
 						restoredManager.restoreLayout(serialized)
 
 						// Verify all state
@@ -1716,9 +1724,8 @@ describe('Layout Manager Properties', () => {
 						),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 
@@ -1762,9 +1769,8 @@ describe('Layout Manager Properties', () => {
 							.map(s => `/test/${s.replace(/\s/g, '_')}.txt`),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const pane1Id = testManager.state.rootId
 
@@ -1807,9 +1813,8 @@ describe('Layout Manager Properties', () => {
 						),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						let currentPaneId = testManager.state.rootId
 
@@ -1856,9 +1861,8 @@ describe('Layout Manager Properties', () => {
 						tabsPerPane: fc.integer({ min: 1, max: 4 }),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const pane1Id = testManager.state.rootId
 
@@ -1917,9 +1921,8 @@ describe('Layout Manager Properties', () => {
 						fileCount: fc.integer({ min: 2, max: 10 }),
 					}),
 					(config) => {
-						// Reset manager
-						const testManager = createLayoutManager()
-						testManager.initialize()
+						// Reset manager (in reactive root)
+						const testManager = createTestManager()
 
 						const paneId = testManager.state.rootId
 

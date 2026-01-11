@@ -99,7 +99,6 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		maxTabs: MAX_EDITOR_TABS,
 	})
 
-	// Create the current tab ID for the active tab (now just the file path)
 	const currentTabId = () => {
 		return state.lastKnownFilePath
 	}
@@ -129,11 +128,9 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			filePath: () => state.lastKnownFilePath,
 		})
 
-	// Create a mapping from tab IDs to dirty status (tab IDs are now just file paths)
 	const tabDirtyStatus = () => {
 		const dirtyStatus: Record<string, boolean> = {}
 		for (const tabId of tabsState()) {
-			// Tab ID is now just the file path
 			dirtyStatus[tabId] = !!state.dirtyPaths[tabId]
 		}
 		return dirtyStatus
@@ -151,7 +148,6 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		const requestedMode =
 			storedMode || viewModeRegistry.getDefaultMode(tabPath, stats)
 
-		// Ensure the view mode is valid for this file
 		return getValidViewMode(requestedMode, tabPath, stats)
 	}
 
@@ -277,7 +273,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 					</Match>
 
 					<Match when={!props.isFileSelected()}>
-						<p class="mt-2 text-ui text-zinc-500"></p>
+						<p class="mt-2 text-ui text-zinc-500" />
 					</Match>
 				</Switch>
 			</Flex>

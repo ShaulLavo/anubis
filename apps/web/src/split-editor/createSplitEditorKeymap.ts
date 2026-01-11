@@ -120,6 +120,56 @@ export function createSplitEditorKeymap(layoutManager: LayoutManager) {
 		},
 	})
 
+	// Close current tab (not pane)
+	keymap.registerCommand({
+		id: 'split-editor.close-tab',
+		run: ({ app }) => {
+			if (!app) return
+			const focusedPaneId = app.layoutManager.state.focusedPaneId
+			if (!focusedPaneId) return
+			const pane = app.layoutManager.state.nodes[focusedPaneId]
+			if (!pane || pane.type !== 'pane') return
+			const activeTabId = pane.activeTabId
+			if (activeTabId) {
+				app.layoutManager.closeTab(focusedPaneId, activeTabId)
+			}
+		},
+	})
+
+	// Direct tab access (Alt+1 through Alt+9)
+	for (let i = 1; i <= 9; i++) {
+		keymap.registerCommand({
+			id: `split-editor.go-to-tab-${i}`,
+			run: ({ app }) => {
+				if (!app) return
+				const focusedPaneId = app.layoutManager.state.focusedPaneId
+				if (!focusedPaneId) return
+				const pane = app.layoutManager.state.nodes[focusedPaneId]
+				if (!pane || pane.type !== 'pane') return
+				const tab = pane.tabs[i - 1]
+				if (tab) {
+					app.layoutManager.setActiveTab(focusedPaneId, tab.id)
+				}
+			},
+		})
+	}
+
+	// Go to last tab
+	keymap.registerCommand({
+		id: 'split-editor.go-to-last-tab',
+		run: ({ app }) => {
+			if (!app) return
+			const focusedPaneId = app.layoutManager.state.focusedPaneId
+			if (!focusedPaneId) return
+			const pane = app.layoutManager.state.nodes[focusedPaneId]
+			if (!pane || pane.type !== 'pane') return
+			const lastTab = pane.tabs[pane.tabs.length - 1]
+			if (lastTab) {
+				app.layoutManager.setActiveTab(focusedPaneId, lastTab.id)
+			}
+		},
+	})
+
 	// Register keybindings
 	keymap.registerKeybinding({
 		id: 'focus-up',
@@ -225,6 +275,35 @@ export function createSplitEditorKeymap(layoutManager: LayoutManager) {
 		},
 	})
 
+	// Close tab (not pane)
+	keymap.registerKeybinding({
+		id: 'close-tab',
+		shortcut: 'alt+w',
+		options: {
+			preventDefault: true,
+		},
+	})
+
+	// Alt+1-9 for direct tab access
+	for (let i = 1; i <= 9; i++) {
+		keymap.registerKeybinding({
+			id: `go-to-tab-${i}`,
+			shortcut: `alt+${i}`,
+			options: {
+				preventDefault: true,
+			},
+		})
+	}
+
+	// Alt+0 for last tab
+	keymap.registerKeybinding({
+		id: 'go-to-last-tab',
+		shortcut: 'alt+0',
+		options: {
+			preventDefault: true,
+		},
+	})
+
 	// Bind commands to keybindings
 	keymap.bindCommand({
 		scope: 'split-editor',
@@ -302,6 +381,29 @@ export function createSplitEditorKeymap(layoutManager: LayoutManager) {
 		scope: 'split-editor',
 		shortcut: 'cmd+3',
 		commandId: 'split-editor.focus-pane-3',
+	})
+
+	// Close current tab
+	keymap.bindCommand({
+		scope: 'split-editor',
+		shortcut: 'alt+w',
+		commandId: 'split-editor.close-tab',
+	})
+
+	// Direct tab access (Alt+1-9)
+	for (let i = 1; i <= 9; i++) {
+		keymap.bindCommand({
+			scope: 'split-editor',
+			shortcut: `alt+${i}`,
+			commandId: `split-editor.go-to-tab-${i}`,
+		})
+	}
+
+	// Alt+0 for last tab
+	keymap.bindCommand({
+		scope: 'split-editor',
+		shortcut: 'alt+0',
+		commandId: 'split-editor.go-to-last-tab',
 	})
 
 	return keymap

@@ -32,6 +32,9 @@ export interface PersistedLayoutManager extends LayoutManager {
 export function createPersistedLayoutManager(options: LayoutManagerOptions = {}): PersistedLayoutManager {
 	const baseManager = createLayoutManager(options);
 
+	// Track whether we've initialized (to prevent persisting before restore)
+	let isInitialized = false;
+
 	// Create persisted signal for layout storage
 	const layoutSignal = createSignal<SerializedLayout | null>(null);
 	const [persistedLayout, setPersistedLayout] = makePersisted(layoutSignal, {
@@ -48,6 +51,9 @@ export function createPersistedLayoutManager(options: LayoutManagerOptions = {})
 
 	// Debounced persistence function
 	function persistLayout(): void {
+		// Don't persist before initialization is complete
+		if (!isInitialized) return;
+
 		if (debounceTimeout) {
 			clearTimeout(debounceTimeout);
 		}
@@ -68,6 +74,54 @@ export function createPersistedLayoutManager(options: LayoutManagerOptions = {})
 			debounceTimeout = null;
 		}, DEBOUNCE_MS);
 	}
+
+	// Set up auto-persistence effect at creation time (inside reactive context)
+	// This effect will run whenever the layout state changes
+	createEffect(() => {
+		// Access state properties to track them reactively
+		const rootId = baseManager.state.rootId;
+		const nodes = baseManager.state.nodes;
+		// Track these properties without using their values
+		void baseManager.state.focusedPaneId;
+		void baseManager.state.scrollSyncGroups;
+
+		// Deep track all nodes and their tabs to detect any changes
+		// This is necessary because SolidJS only tracks accessed properties
+		let tabCount = 0;
+		for (const nodeId of Object.keys(nodes)) {
+			const node = nodes[nodeId];
+			if (node && 'tabs' in node) {
+				// Track activeTabId to detect tab selection changes
+				void node.activeTabId;
+				// Access tabs array and its length to track changes
+				const tabs = node.tabs;
+				tabCount += tabs.length;
+				// Access each tab's properties to track changes
+				for (const tab of tabs) {
+					void tab.id;
+					void tab.content;
+					void tab.isDirty;
+					void tab.viewMode;
+					void tab.state;
+				}
+			}
+		}
+
+		console.log('[PersistedLayoutManager] Effect triggered, rootId:', rootId, 'nodeCount:', Object.keys(nodes).length, 'totalTabs:', tabCount);
+
+		// Only persist if we have a valid layout (rootId exists) and we're initialized
+		if (isInitialized && rootId && Object.keys(nodes).length > 0) {
+			persistLayout();
+		}
+	});
+
+	// Clean up debounce timeout when reactive context is disposed
+	onCleanup(() => {
+		if (debounceTimeout) {
+			clearTimeout(debounceTimeout);
+			debounceTimeout = null;
+		}
+	});
 
 	// Override initialize to restore from storage first
 	const originalInitialize = baseManager.initialize;
@@ -108,53 +162,8 @@ export function createPersistedLayoutManager(options: LayoutManagerOptions = {})
 			originalInitialize();
 		}
 
-		// Set up auto-persistence effect after initialization
-		// This effect will run whenever the layout state changes
-		createEffect(() => {
-			// Access state properties to track them reactively
-			const rootId = baseManager.state.rootId;
-			const nodes = baseManager.state.nodes;
-			// Track these properties without using their values
-			void baseManager.state.focusedPaneId;
-			void baseManager.state.scrollSyncGroups;
-
-			// Deep track all nodes and their tabs to detect any changes
-			// This is necessary because SolidJS only tracks accessed properties
-			let tabCount = 0;
-			for (const nodeId of Object.keys(nodes)) {
-				const node = nodes[nodeId];
-				if (node && 'tabs' in node) {
-					// Track activeTabId to detect tab selection changes
-					void node.activeTabId;
-					// Access tabs array and its length to track changes
-					const tabs = node.tabs;
-					tabCount += tabs.length;
-					// Access each tab's properties to track changes
-					for (const tab of tabs) {
-						void tab.id;
-						void tab.content;
-						void tab.isDirty;
-						void tab.viewMode;
-						void tab.state;
-					}
-				}
-			}
-
-			console.log('[PersistedLayoutManager] Effect triggered, rootId:', rootId, 'nodeCount:', Object.keys(nodes).length, 'totalTabs:', tabCount);
-
-			// Only persist if we have a valid layout (rootId exists)
-			if (rootId && Object.keys(nodes).length > 0) {
-				persistLayout();
-			}
-		});
-
-		// Clean up debounce timeout on cleanup
-		onCleanup(() => {
-			if (debounceTimeout) {
-				clearTimeout(debounceTimeout);
-				debounceTimeout = null;
-			}
-		});
+		// Mark as initialized to enable persistence
+		isInitialized = true;
 	}
 
 	function clearPersistedLayout(): void {

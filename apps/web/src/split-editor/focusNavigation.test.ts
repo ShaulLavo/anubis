@@ -8,8 +8,22 @@
 
 import { describe, it, expect } from 'vitest'
 import fc from 'fast-check'
+import { createRoot } from 'solid-js'
 import { createLayoutManager } from './createLayoutManager'
+import type { LayoutManager } from './createLayoutManager'
 import type { SplitDirection } from './types'
+
+/**
+ * Helper: Create a layout manager within a reactive root.
+ */
+function createTestManager(): LayoutManager {
+	let manager!: LayoutManager
+	createRoot(() => {
+		manager = createLayoutManager()
+		manager.initialize()
+	})
+	return manager
+}
 
 describe('Property 8: Focus Navigation Consistency', () => {
 	it('should move focus to geometrically adjacent pane when navigating', () => {
@@ -25,8 +39,7 @@ describe('Property 8: Focus Navigation Consistency', () => {
 				),
 				fc.constantFrom<'up' | 'down' | 'left' | 'right'>('up', 'down', 'left', 'right'),
 				(splitOps, navDirection) => {
-					const manager = createLayoutManager()
-					manager.initialize()
+					const manager = createTestManager()
 
 					// Apply split operations to create a layout
 					for (const op of splitOps) {
@@ -83,8 +96,7 @@ describe('Property 8: Focus Navigation Consistency', () => {
 			fc.property(
 				fc.constantFrom<'up' | 'down' | 'left' | 'right'>('up', 'down', 'left', 'right'),
 				(direction) => {
-					const manager = createLayoutManager()
-					manager.initialize()
+					const manager = createTestManager()
 
 					// Test with single pane - focus should not change
 					const initialPane = manager.state.focusedPaneId
@@ -139,8 +151,7 @@ describe('Property 8: Focus Navigation Consistency', () => {
 					{ minLength: 1, maxLength: 10 }
 				),
 				(splitOps, navSequence) => {
-					const manager = createLayoutManager()
-					manager.initialize()
+					const manager = createTestManager()
 
 					// Create layout
 					for (const op of splitOps) {

@@ -39,7 +39,6 @@ const applyEnvFile = (filePath: string, shouldOverride: boolean) => {
 	}
 }
 
-// Apply env files
 for (const { dir, allowDirOverride } of envDirectories) {
 	for (const { name, allowOverride } of envFiles) {
 		const filePath = path.join(dir, name)
@@ -48,7 +47,6 @@ for (const { dir, allowDirOverride } of envDirectories) {
 	}
 }
 
-// Define the schema for build-time configuration
 const envSchema = z.object({
 	VITE_WEB_PORT: z.coerce.number().int().positive().default(3000),
 	VITE_SERVER_PORT: z.coerce.number().int().positive().default(3001),

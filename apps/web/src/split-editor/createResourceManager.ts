@@ -3,6 +3,8 @@
  *
  * Manages shared resources (tree-sitter workers, syntax highlighting, buffers)
  * across tabs showing the same file. Uses reference counting for cleanup.
+ *
+ * Requirements: 5.3, 5.4, 5.5 - Error handling, file type detection, large files
  */
 
 import { createSignal, type Accessor } from 'solid-js';
@@ -20,6 +22,11 @@ import {
 	applyTreeSitterEdit,
 } from '../treeSitter/workerClient';
 import type { TreeSitterEditPayload } from '../workers/treeSitter/types';
+import {
+	createFileLoadingState,
+	type FileLoadingState,
+	type FileLoadingError,
+} from './fileLoadingErrors';
 
 /** Text edit operation */
 export interface TextEdit {
@@ -76,6 +83,9 @@ interface FileResource {
 
 	/** Worker initialized flag */
 	workerReady: boolean;
+
+	/** File loading state (error handling, progress, etc.) */
+	loadingState: FileLoadingState;
 }
 
 /** Resource Manager interface */
@@ -85,6 +95,9 @@ export interface ResourceManager {
 
 	/** Get highlight state for a file */
 	getHighlightState: (filePath: string) => HighlightState | undefined;
+
+	/** Get loading state for a file */
+	getLoadingState: (filePath: string) => FileLoadingState | undefined;
 
 	/** Register a tab as using a file */
 	registerTabForFile: (tabId: TabId, filePath: string) => void;
@@ -106,6 +119,15 @@ export interface ResourceManager {
 
 	/** Pre-populate content for a file before any tabs register */
 	preloadFileContent: (filePath: string, content: string) => void;
+
+	/** Set an error for a file */
+	setFileError: (filePath: string, error: FileLoadingError | null) => void;
+
+	/** Set loading status for a file */
+	setFileLoadingStatus: (filePath: string, status: 'idle' | 'loading' | 'loaded' | 'error') => void;
+
+	/** Set file metadata (size, binary detection) */
+	setFileMetadata: (filePath: string, metadata: { size?: number; isBinary?: boolean }) => void;
 
 	/** Cleanup resources for a specific file (call when tab is actually closed) */
 	cleanupFileResources: (filePath: string) => void;
@@ -244,6 +266,7 @@ export function createResourceManager(): ResourceManager {
 				buffer: createSharedBuffer(filePath),
 				highlights: createHighlightStateForFile(),
 				workerReady: false,
+				loadingState: createFileLoadingState(),
 			};
 			resources.set(filePath, resource);
 		}
@@ -337,6 +360,44 @@ export function createResourceManager(): ResourceManager {
 	function preloadFileContent(filePath: string, content: string): void {
 		const resource = getOrCreateResource(filePath);
 		resource.buffer.setContent(content);
+		resource.loadingState.setStatus('loaded');
+	}
+
+	/** Get loading state for a file */
+	function getLoadingState(filePath: string): FileLoadingState | undefined {
+		return resources.get(filePath)?.loadingState;
+	}
+
+	/** Set an error for a file */
+	function setFileError(filePath: string, error: FileLoadingError | null): void {
+		const resource = resources.get(filePath);
+		if (resource) {
+			resource.loadingState.setError(error);
+			if (error) {
+				resource.loadingState.setStatus('error');
+			}
+		}
+	}
+
+	/** Set loading status for a file */
+	function setFileLoadingStatus(filePath: string, status: 'idle' | 'loading' | 'loaded' | 'error'): void {
+		const resource = resources.get(filePath);
+		if (resource) {
+			resource.loadingState.setStatus(status);
+		}
+	}
+
+	/** Set file metadata (size, binary detection) */
+	function setFileMetadata(filePath: string, metadata: { size?: number; isBinary?: boolean }): void {
+		const resource = resources.get(filePath);
+		if (resource) {
+			if (metadata.size !== undefined) {
+				resource.loadingState.setFileSize(metadata.size);
+			}
+			if (metadata.isBinary !== undefined) {
+				resource.loadingState.setIsBinary(metadata.isBinary);
+			}
+		}
 	}
 
 	/** Cleanup resources for a specific file (call when tab is actually closed) */
@@ -347,6 +408,7 @@ export function createResourceManager(): ResourceManager {
 	return {
 		getBuffer,
 		getHighlightState,
+		getLoadingState,
 		registerTabForFile,
 		unregisterTabFromFile,
 		hasResourcesForFile,
@@ -354,6 +416,9 @@ export function createResourceManager(): ResourceManager {
 		getTrackedFiles,
 		cleanup,
 		preloadFileContent,
+		setFileError,
+		setFileLoadingStatus,
+		setFileMetadata,
 		cleanupFileResources,
 		// Legacy aliases for backward compatibility with tests
 		registerPaneForFile: registerTabForFile,

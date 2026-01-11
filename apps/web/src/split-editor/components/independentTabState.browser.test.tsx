@@ -72,21 +72,21 @@ describe('Property Test: Independent Tab State', () => {
 					)
 
 					// Open same file in two different panes
-					const pane1Id = layoutManager.state.rootId
-					const tab1Id = layoutManager.openTab(
+					const pane1Id = lm.state.rootId
+					const tab1Id = lm.openTab(
 						pane1Id,
 						createFileContent(config.filePath)
 					)
 
-					const pane2Id = layoutManager.splitPane(pane1Id, 'horizontal')
+					const pane2Id = lm.splitPane(pane1Id, 'horizontal')
 
-					const tab2Id = layoutManager.openTab(
+					const tab2Id = lm.openTab(
 						pane2Id,
 						createFileContent(config.filePath)
 					)
 
 					// Set different states for each tab
-					layoutManager.updateTabState(pane1Id, tab1Id, {
+					lm.updateTabState(pane1Id, tab1Id, {
 						scrollTop: config.tab1State.scrollTop,
 						scrollLeft: config.tab1State.scrollLeft,
 						cursorPosition: {
@@ -96,7 +96,7 @@ describe('Property Test: Independent Tab State', () => {
 						selections: [],
 					})
 
-					layoutManager.updateTabState(pane2Id, tab2Id, {
+					lm.updateTabState(pane2Id, tab2Id, {
 						scrollTop: config.tab2State.scrollTop,
 						scrollLeft: config.tab2State.scrollLeft,
 						cursorPosition: {
@@ -107,8 +107,8 @@ describe('Property Test: Independent Tab State', () => {
 					})
 
 					// Get the actual tab states from the layout
-					const pane1 = layoutManager.state.nodes[pane1Id] as EditorPane
-					const pane2 = layoutManager.state.nodes[pane2Id] as EditorPane
+					const pane1 = lm.state.nodes[pane1Id] as EditorPane
+					const pane2 = lm.state.nodes[pane2Id] as EditorPane
 
 					const actualTab1 = pane1.tabs.find((t) => t.id === tab1Id)
 					const actualTab2 = pane2.tabs.find((t) => t.id === tab2Id)

@@ -43,12 +43,10 @@ export interface PaletteActions {
 	activateSelected(): void
 }
 
-// Helper function to detect mode from query
 function detectModeFromQuery(query: string): PaletteMode {
 	return query.startsWith('>') ? 'command' : 'file'
 }
 
-// Helper function to transform SearchResult to PaletteResult
 function fileToResult(file: SearchResult): PaletteResult {
 	const fileName = file.path.split('/').pop() || file.path
 	return {
@@ -59,7 +57,6 @@ function fileToResult(file: SearchResult): PaletteResult {
 	}
 }
 
-// Helper function to transform CommandDescriptor to PaletteResult
 function commandToResult(cmd: CommandDescriptor): PaletteResult {
 	return {
 		id: `cmd:${cmd.id}`,
@@ -71,7 +68,6 @@ function commandToResult(cmd: CommandDescriptor): PaletteResult {
 	}
 }
 
-// Search function extracted for use with createResource
 async function performSearch(searchQuery: string): Promise<PaletteResult[]> {
 	if (!searchQuery.trim()) {
 		return []
@@ -81,13 +77,11 @@ async function performSearch(searchQuery: string): Promise<PaletteResult[]> {
 		const currentMode = detectModeFromQuery(searchQuery)
 
 		if (currentMode === 'command') {
-			// Remove the '>' prefix for command search
 			const commandQuery = searchQuery.slice(1).trim()
 			const registry = getCommandPaletteRegistry()
 			const commands = registry.search(commandQuery)
 			return commands.map(commandToResult)
 		} else {
-			// File mode search
 			const files = await searchService.search(searchQuery)
 			return files.map(fileToResult)
 		}
@@ -102,27 +96,20 @@ export function useCommandPalette(): [
 	actions: PaletteActions,
 	results: () => PaletteResult[],
 ] {
-	// Get FS actions for file opening
 	const [, fsActions] = useFs()
 
-	// State signals
 	const [isOpen, setIsOpen] = createSignal(false)
 	const [query, setQuerySignal] = createSignal('')
 	const [selectedIndex, setSelectedIndex] = createSignal(0)
 
-	// Focus manager for focus restoration
 	// const focusManager = useFocusManager() // TODO: Will be used in later tasks
 	let previousActiveElement: HTMLElement | null = null
 
-	// Computed mode based on query
 	const mode = createMemo(() => detectModeFromQuery(query()))
 
-	// Use transition for smooth updates - keeps old results visible while loading new ones
 	const [pending, start] = useTransition()
 
-	// Resource-based search - automatically refetches when query changes
 	const [searchResults] = createResource(
-		// Only fetch when palette is open and query exists
 		() => (isOpen() ? query() : null),
 		async (searchQuery) => {
 			if (!searchQuery) return []
@@ -130,10 +117,8 @@ export function useCommandPalette(): [
 		}
 	)
 
-	// Memoized results accessor that handles loading state
 	const results = createMemo(() => searchResults() ?? [])
 
-	// Computed state object (no longer includes results or loading - those are separate)
 	const state = createMemo(
 		(): PaletteState => ({
 			isOpen: isOpen(),
@@ -144,10 +129,8 @@ export function useCommandPalette(): [
 		})
 	)
 
-	// Actions
 	const actions: PaletteActions = {
 		open(openMode?: PaletteMode) {
-			// Store current active element for focus restoration
 			if (document.activeElement instanceof HTMLElement) {
 				previousActiveElement = document.activeElement
 			}
@@ -171,7 +154,6 @@ export function useCommandPalette(): [
 				setSelectedIndex(0)
 			})
 
-			// Restore focus to previous element
 			if (previousActiveElement) {
 				previousActiveElement.focus()
 				previousActiveElement = null
@@ -179,11 +161,9 @@ export function useCommandPalette(): [
 		},
 
 		setQuery(newQuery: string) {
-			// Wrap query update in transition - this keeps old results visible
-			// while new search results are loading
 			start(() => {
 				setQuerySignal(newQuery)
-				setSelectedIndex(0) // Reset selection when query changes
+				setSelectedIndex(0)
 			})
 		},
 
@@ -242,8 +222,7 @@ export function useCommandPalette(): [
 			})
 
 			if (selectedResult.kind === 'file') {
-				// Handle file activation by opening it in the tab system
-				const filePath = selectedResult.description // The full file path is stored in description
+				const filePath = selectedResult.description
 				console.log(`[useCommandPalette] activateSelected: opening file`, {
 					filePath,
 				})
@@ -259,7 +238,6 @@ export function useCommandPalette(): [
 						})
 						.catch((error) => {
 							console.error('[useCommandPalette] Failed to open file:', error)
-							// If file not found, remove stale entry from search index
 							const errorMsg =
 								error instanceof Error ? error.message : String(error)
 							if (
@@ -280,7 +258,6 @@ export function useCommandPalette(): [
 					actions.close()
 				}
 			} else if (selectedResult.kind === 'command') {
-				// Execute command
 				const commandId = selectedResult.id.replace('cmd:', '')
 				const registry = getCommandPaletteRegistry()
 
