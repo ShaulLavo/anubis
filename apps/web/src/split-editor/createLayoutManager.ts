@@ -27,7 +27,6 @@ import type {
 import {
 	createDefaultTabState,
 	createDefaultViewSettings,
-	createEmptyContent,
 	isContainer,
 	isPane,
 } from './types'
@@ -203,7 +202,9 @@ export function createLayoutManager() {
 					sibling.parentId = grandparentId
 
 					if (grandparentId) {
-						const grandparent = s.nodes[grandparentId] as SplitContainer | undefined
+						const grandparent = s.nodes[grandparentId] as
+							| SplitContainer
+							| undefined
 						if (grandparent && isContainer(grandparent)) {
 							const parentIndex = grandparent.children.indexOf(parentId)
 							if (parentIndex !== -1) {
@@ -307,7 +308,8 @@ export function createLayoutManager() {
 				produce((s) => {
 					const fromPane = s.nodes[fromPaneId] as EditorPane | undefined
 					const toPane = s.nodes[toPaneId] as EditorPane | undefined
-					if (!fromPane || !toPane || !isPane(fromPane) || !isPane(toPane)) return
+					if (!fromPane || !toPane || !isPane(fromPane) || !isPane(toPane))
+						return
 
 					const tabIndex = fromPane.tabs.findIndex((t) => t.id === tabId)
 					if (tabIndex === -1) return
@@ -334,7 +336,11 @@ export function createLayoutManager() {
 		})
 	}
 
-	function updateTabState(paneId: NodeId, tabId: TabId, updates: Partial<TabState>): void {
+	function updateTabState(
+		paneId: NodeId,
+		tabId: TabId,
+		updates: Partial<TabState>
+	): void {
 		setState(
 			produce((s) => {
 				const pane = s.nodes[paneId] as EditorPane | undefined
@@ -366,7 +372,10 @@ export function createLayoutManager() {
 	// Pane Operations
 	// ========================================================================
 
-	function updateViewSettings(paneId: NodeId, settings: Partial<ViewSettings>): void {
+	function updateViewSettings(
+		paneId: NodeId,
+		settings: Partial<ViewSettings>
+	): void {
 		setState(
 			produce((s) => {
 				const pane = s.nodes[paneId] as EditorPane | undefined
@@ -376,7 +385,10 @@ export function createLayoutManager() {
 		)
 	}
 
-	function updateSplitSizes(containerId: NodeId, sizes: [number, number]): void {
+	function updateSplitSizes(
+		containerId: NodeId,
+		sizes: [number, number]
+	): void {
 		setState(
 			produce((s) => {
 				const container = s.nodes[containerId]
@@ -443,7 +455,10 @@ export function createLayoutManager() {
 				}
 
 				// Check if target child exists
-				if (targetChildIndex >= 0 && targetChildIndex < parent.children.length) {
+				if (
+					targetChildIndex >= 0 &&
+					targetChildIndex < parent.children.length
+				) {
 					const targetChildId = parent.children[targetChildIndex]
 					if (targetChildId) {
 						// Find the first pane in the target subtree
@@ -471,7 +486,8 @@ export function createLayoutManager() {
 		if (currentIndex === -1) return
 
 		const delta = direction === 'next' ? 1 : -1
-		const nextIndex = (currentIndex + delta + pane.tabs.length) % pane.tabs.length
+		const nextIndex =
+			(currentIndex + delta + pane.tabs.length) % pane.tabs.length
 		const nextTab = pane.tabs[nextIndex]
 		if (nextTab) {
 			setActiveTab(focusedPaneId, nextTab.id)

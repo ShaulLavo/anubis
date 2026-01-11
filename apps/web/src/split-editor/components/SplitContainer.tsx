@@ -12,6 +12,7 @@ import {
 } from '@repo/ui/resizable'
 import { SplitNode } from './SplitNode'
 import { useLayoutManager } from './SplitEditor'
+import { MIN_PANE_SIZE, CONTAINMENT_MODE } from '../constants'
 import type { SplitContainer as SplitContainerType } from '../types'
 
 export interface SplitContainerProps {
@@ -34,11 +35,13 @@ export function SplitContainer(props: SplitContainerProps) {
 			class="flex size-full"
 			orientation={props.node.direction}
 			onSizesChange={handleSizesChange}
+			style={{ contain: CONTAINMENT_MODE }}
 		>
 			<ResizablePanel
 				initialSize={props.node.sizes[0]}
-				minSize={0.05}
+				minSize={MIN_PANE_SIZE}
 				class="min-h-0 min-w-0 overflow-hidden"
+				style={{ contain: CONTAINMENT_MODE }}
 			>
 				<SplitNode nodeId={props.node.children[0]} />
 			</ResizablePanel>
@@ -48,8 +51,9 @@ export function SplitContainer(props: SplitContainerProps) {
 			/>
 			<ResizablePanel
 				initialSize={props.node.sizes[1]}
-				minSize={0.05}
+				minSize={MIN_PANE_SIZE}
 				class="min-h-0 min-w-0 overflow-hidden"
+				style={{ contain: CONTAINMENT_MODE }}
 			>
 				<SplitNode nodeId={props.node.children[1]} />
 			</ResizablePanel>
