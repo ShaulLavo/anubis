@@ -6,6 +6,10 @@ import {
 import { type Accessor, For, Show, createMemo, createSignal } from 'solid-js'
 import type { ParseResult } from '@repo/utils'
 
+// TODO: Currently we only show previewBytes (first ~8KB) for binary files.
+// We want to support loading and viewing the entire binary file with virtualized
+// scrolling through all bytes, not just the preview portion.
+
 const BYTES_PER_ROW = 16
 const LINE_HEIGHT_RATIO = 1.55
 const MIN_ROW_HEIGHT = 18

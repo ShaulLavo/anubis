@@ -140,6 +140,16 @@ export type EditorProps = {
 	initialScrollPosition?: Accessor<ScrollPosition | undefined>
 	/** Called when scroll position changes to save for later restoration */
 	onScrollPositionChange?: (position: ScrollPosition) => void
+	/** Initial cursor position to restore (activates cursor if provided) */
+	initialCursorPosition?: Accessor<{ line: number; column: number } | undefined>
+	/** Called when cursor position changes to save for later restoration */
+	onCursorPositionChange?: (position: { line: number; column: number }) => void
+	/** Called when user tries to edit but document is not editable */
+	onEditBlocked?: () => void
+	/** Initial selections to restore when switching back to this file */
+	initialSelections?: Accessor<SelectionRange[] | undefined>
+	/** Called when selections change to save for later restoration */
+	onSelectionsChange?: (selections: SelectionRange[]) => void
 	/** Initial visible content snapshot for instant rendering on tab switch */
 	initialVisibleContent?: Accessor<VisibleContentSnapshot | undefined>
 	/** Called to capture visible content when switching away from this file */
@@ -153,6 +163,16 @@ export type EditorProps = {
 export type ScrollPosition = {
 	lineIndex: number
 	scrollLeft: number
+}
+
+/**
+ * Selection range within a file.
+ * anchor is where selection started (immovable end)
+ * focus is where selection ends (cursor position)
+ */
+export type SelectionRange = {
+	anchor: number
+	focus: number
 }
 
 export type LineEntry = {

@@ -9,12 +9,11 @@ export const useCursorVisualState = (props: CursorProps) => {
 	const hasCursor = createMemo(() => Boolean(cursor.state.hasCursor))
 
 	const isVisible = createMemo(() => {
+		if (!hasCursor()) return false
 		const line = cursor.state.position.line
-		return (
-			hasCursor() &&
-			line >= props.visibleLineStart &&
-			line <= props.visibleLineEnd
-		)
+		// During file loading, visibleLineEnd might be -1 or invalid
+		if (props.visibleLineEnd < 0) return line === 0
+		return line >= props.visibleLineStart && line <= props.visibleLineEnd
 	})
 
 	const shouldBlink = createMemo(() => cursor.state.isBlinking)

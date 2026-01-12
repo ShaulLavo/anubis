@@ -8,13 +8,10 @@
  */
 
 import { createMemo, Show } from 'solid-js'
-import { VsEdit } from '@repo/icons/vs/VsEdit'
-import { VsSettingsGear } from '@repo/icons/vs/VsSettingsGear'
 import { useLayoutManager } from './SplitEditor'
 import { FileIcon } from '../../fs/components/FileIcon'
 import { TabContextMenu } from './TabContextMenu'
 import type { Tab } from '../types'
-import type { ViewMode } from '../../fs/types/ViewMode'
 
 export interface TabItemProps {
 	tab: Tab
@@ -41,16 +38,6 @@ export function TabItem(props: TabItemProps) {
 		return 'Untitled'
 	})
 
-	// Check if this file supports view mode toggle (settings files)
-	const supportsViewModeToggle = createMemo(() => {
-		if (props.tab.content.type !== 'file' || !props.tab.content.filePath) {
-			return false
-		}
-		const path = props.tab.content.filePath
-		// Settings files in .system directory or ending with Settings.json
-		return path.includes('.system') && path.endsWith('.json')
-	})
-
 	const handleClick = (e: MouseEvent) => {
 		e.stopPropagation()
 		layout.setActiveTab(props.paneId, props.tab.id)
@@ -59,12 +46,6 @@ export function TabItem(props: TabItemProps) {
 	const handleClose = (e: MouseEvent) => {
 		e.stopPropagation()
 		layout.closeTab(props.paneId, props.tab.id)
-	}
-
-	const handleViewModeToggle = (e: MouseEvent) => {
-		e.stopPropagation()
-		const newMode: ViewMode = props.tab.viewMode === 'editor' ? 'ui' : 'editor'
-		layout.setTabViewMode(props.paneId, props.tab.id, newMode)
 	}
 
 	return (
@@ -104,35 +85,6 @@ export function TabItem(props: TabItemProps) {
 							title="Unsaved changes"
 							aria-label="Unsaved changes"
 						/>
-					</Show>
-
-					<Show when={supportsViewModeToggle()}>
-						<button
-							class="flex h-5 w-5 shrink-0 items-center justify-center rounded transition-colors hover:bg-surface-3 focus:outline-none focus:ring-1 focus:ring-primary"
-							classList={{
-								'text-primary': props.tab.viewMode === 'ui',
-								'text-muted-foreground': props.tab.viewMode !== 'ui',
-							}}
-							onClick={handleViewModeToggle}
-							title={
-								props.tab.viewMode === 'editor'
-									? 'Switch to UI view'
-									: 'Switch to editor view'
-							}
-							aria-label={
-								props.tab.viewMode === 'editor'
-									? 'Switch to UI view'
-									: 'Switch to editor view'
-							}
-							tabindex={-1}
-						>
-							<Show
-								when={props.tab.viewMode === 'editor'}
-								fallback={<VsEdit class="h-3.5 w-3.5" />}
-							>
-								<VsSettingsGear class="h-3.5 w-3.5" />
-							</Show>
-						</button>
 					</Show>
 
 					<button

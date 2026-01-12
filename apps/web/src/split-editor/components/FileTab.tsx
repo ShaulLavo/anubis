@@ -27,6 +27,7 @@ import type {
 	ScrollPosition,
 	DocumentIncrementalEdit,
 } from '@repo/code-editor'
+import { toast } from '@repo/ui/toaster'
 import { useLayoutManager, useResourceManager } from './SplitEditor'
 import { useFocusManager } from '~/focus/focusManager'
 import { getTreeSitterWorker } from '~/treeSitter/workerClient'
@@ -212,6 +213,25 @@ export function FileTab(props: FileTabProps) {
 		return pos
 	})
 
+	// Restore cursor position from persisted tab state
+	// Only provide if we have a non-zero position (user has interacted before)
+	const initialCursorPosition = createMemo(() => {
+		const pos = props.tab.state.cursorPosition
+		// Only restore if there's a meaningful position (not default 0,0)
+		if (pos.line === 0 && pos.column === 0) return undefined
+		return pos
+	})
+
+	const handleCursorPositionChange = (position: { line: number; column: number }) => {
+		layoutManager.updateTabState(props.pane.id, props.tab.id, {
+			cursorPosition: position,
+		})
+	}
+
+	const handleEditBlocked = () => {
+		toast.error('This file is read-only')
+	}
+
 	const handleSave = () => {
 		layoutManager.setTabDirty(props.pane.id, props.tab.id, false)
 	}
@@ -259,6 +279,9 @@ export function FileTab(props: FileTabProps) {
 			onSave: handleSave,
 			initialScrollPosition: () => initialScrollPosition(),
 			onScrollPositionChange: handleScrollPositionChange,
+			initialCursorPosition: () => initialCursorPosition(),
+			onCursorPositionChange: handleCursorPositionChange,
+			onEditBlocked: handleEditBlocked,
 			initialVisibleContent: () => undefined,
 			onCaptureVisibleContent: () => {},
 			precomputedLineStarts: cachedLineStarts,

@@ -4,6 +4,7 @@ import type { FsSource } from '~/fs/types'
 import { formatBytes } from '@repo/utils'
 import { useFocusManager, type FocusArea } from '~/focus/focusManager'
 import { AnimatedModeToggle } from '@repo/ui/AnimatedModeToggle'
+import { VsCheck } from '@repo/icons/vs/VsCheck'
 
 const SOURCE_LABELS: Record<FsSource, string> = {
 	local: 'Local Folder',
@@ -119,7 +120,12 @@ export const StatusBar = () => {
 							<span
 								class={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-semibold text-ui-xs ${indicator().class}`}
 							>
-								<Show when={indicator().showSpinner}>
+								<Show
+									when={indicator().showSpinner}
+									fallback={
+										<VsCheck class="mr-0.5 h-3 w-3 text-green-500" />
+									}
+								>
 									<span
 										aria-hidden="true"
 										class="mr-1 h-2 w-2 animate-spin rounded-full border border-current border-t-transparent"

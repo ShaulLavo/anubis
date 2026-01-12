@@ -142,7 +142,10 @@ export const TextEditorView = (props: EditorProps) => {
 	)
 
 	let settleScheduled = false
+	let lastSettledPath: string | undefined
 	createEffect(() => {
+		const currentPath = props.document.filePath()
+
 		if (!shouldGateEditsForPrecompute()) {
 			settleScheduled = false
 			precomputeReleased = false
@@ -154,6 +157,18 @@ export const TextEditorView = (props: EditorProps) => {
 			settleScheduled = false
 			precomputeReleased = false
 			if (precomputeSettled()) setPrecomputeSettled(false)
+			return
+		}
+
+		// Warm cache: if precomputed data is already ready when we first check this file,
+		// settle immediately without waiting for RAF+idle (no heavy computation happened)
+		if (lastSettledPath !== currentPath && isPrecomputedReady()) {
+			lastSettledPath = currentPath
+			if (!precomputeReleased) {
+				precomputeReleased = true
+				releasePrecomputedSegments()
+			}
+			setPrecomputeSettled(true)
 			return
 		}
 
@@ -175,6 +190,7 @@ export const TextEditorView = (props: EditorProps) => {
 						}
 
 						const commit = () => {
+							lastSettledPath = currentPath
 							setPrecomputeSettled(true)
 						}
 
@@ -311,6 +327,7 @@ export const TextEditorView = (props: EditorProps) => {
 		onIncrementalEditStart: handleIncrementalEditStart,
 		onIncrementalEdit: handleIncrementalEdit,
 		onSave: untrack(() => props.onSave),
+		onEditBlocked: untrack(() => props.onEditBlocked),
 	})
 
 	const mouseSelection = createMouseSelection({
@@ -369,18 +386,20 @@ export const TextEditorView = (props: EditorProps) => {
 	createEffect(() => {
 		const element = scrollElement()
 		const onScroll = props.onScrollPositionChange
-		// 		console.log(`[TextEditorView] scroll listener effect: hasElement=${!!element}, hasOnScroll=${!!onScroll}`)
+		console.log(`[TextEditorView] scroll listener effect: hasElement=${!!element}, hasOnScroll=${!!onScroll}`)
 		if (!element || !onScroll) return
 
 		const handleScroll = () => {
 			if (saveTimeoutId != null) clearTimeout(saveTimeoutId)
 			saveTimeoutId = setTimeout(() => {
 				const range = layout.visibleLineRange()
-				// 				console.log(`[TextEditorView] handleScroll saving position: start=${range.start}, scrollLeft=${element.scrollLeft}`)
-				onScroll({
+				const pos = {
 					lineIndex: range.start,
 					scrollLeft: element.scrollLeft,
-				})
+				}
+				console.log(`[TextEditorView] handleScroll BEFORE onScroll:`, pos)
+				onScroll(pos)
+				console.log(`[TextEditorView] handleScroll AFTER onScroll`)
 			}, 150)
 		}
 
@@ -388,6 +407,90 @@ export const TextEditorView = (props: EditorProps) => {
 		onCleanup(() => {
 			element.removeEventListener('scroll', handleScroll)
 			if (saveTimeoutId != null) clearTimeout(saveTimeoutId)
+		})
+	})
+
+	// Restore cursor position from persisted tab state (activates cursor)
+	let cursorRestoreAttemptedForPath: string | undefined
+	createEffect(() => {
+		const path = props.document.filePath()
+		const initialCursor = props.initialCursorPosition?.()
+		const lineCount = cursor.lines.lineCount()
+
+		// Only restore if we have a cached position and haven't restored for this path yet
+		if (
+			initialCursor &&
+			cursorRestoreAttemptedForPath !== path &&
+			lineCount > 0 &&
+			!cursor.state.hasCursor
+		) {
+			cursorRestoreAttemptedForPath = path
+			// setCursorFromClick activates cursor (sets hasCursor: true)
+			cursor.actions.setCursorFromClick(initialCursor.line, initialCursor.column)
+		}
+	})
+
+	// Save cursor position changes to tab state
+	let cursorSaveTimeoutId: ReturnType<typeof setTimeout> | undefined
+	createEffect(() => {
+		const onCursorChange = props.onCursorPositionChange
+		if (!onCursorChange) return
+
+		const line = cursor.state.position.line
+		const column = cursor.state.position.column
+
+		// Debounce saves
+		if (cursorSaveTimeoutId != null) clearTimeout(cursorSaveTimeoutId)
+		cursorSaveTimeoutId = setTimeout(() => {
+			onCursorChange({ line, column })
+		}, 150)
+
+		onCleanup(() => {
+			if (cursorSaveTimeoutId != null) clearTimeout(cursorSaveTimeoutId)
+		})
+	})
+
+	// Restore selections from persisted tab state
+	let selectionRestoreAttemptedForPath: string | undefined
+	createEffect(() => {
+		const path = props.document.filePath()
+		const initialSelections = props.initialSelections?.()
+		const documentLength = cursor.documentLength()
+
+		// Only restore if we have cached selections and haven't restored for this path yet
+		if (
+			initialSelections &&
+			initialSelections.length > 0 &&
+			selectionRestoreAttemptedForPath !== path &&
+			documentLength > 0
+		) {
+			selectionRestoreAttemptedForPath = path
+			// Restore selections by setting each one
+			for (const selection of initialSelections) {
+				// Clamp to document bounds
+				const anchor = Math.min(selection.anchor, documentLength)
+				const focus = Math.min(selection.focus, documentLength)
+				cursor.actions.setSelection(anchor, focus)
+			}
+		}
+	})
+
+	// Save selection changes to tab state
+	let selectionSaveTimeoutId: ReturnType<typeof setTimeout> | undefined
+	createEffect(() => {
+		const onSelectionsChange = props.onSelectionsChange
+		if (!onSelectionsChange) return
+
+		const selections = cursor.state.selections
+
+		// Debounce saves
+		if (selectionSaveTimeoutId != null) clearTimeout(selectionSaveTimeoutId)
+		selectionSaveTimeoutId = setTimeout(() => {
+			onSelectionsChange(selections)
+		}, 150)
+
+		onCleanup(() => {
+			if (selectionSaveTimeoutId != null) clearTimeout(selectionSaveTimeoutId)
 		})
 	})
 

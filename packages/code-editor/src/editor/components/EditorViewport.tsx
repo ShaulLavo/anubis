@@ -1,4 +1,4 @@
-import { Show, type Accessor } from 'solid-js'
+import type { Accessor } from 'solid-js'
 import { Lines } from '../line/components/Lines'
 import { Cursor } from '../cursor/components/Cursor'
 import { SelectionLayer } from '../selection/components/SelectionLayer'
@@ -82,8 +82,7 @@ export const EditorViewport = (props: EditorViewportProps) => {
 					getLineY={props.layout.getLineY}
 				/>
 
-				<Show when={props.isEditable()}>
-					<Cursor
+				<Cursor
 						fontSize={props.fontSize()}
 						fontFamily={props.fontFamily()}
 						charWidth={props.layout.charWidth()}
@@ -94,8 +93,7 @@ export const EditorViewport = (props: EditorViewportProps) => {
 						getColumnOffset={props.layout.getColumnOffset}
 						getLineY={props.layout.getLineY}
 						cursorMode={props.cursorMode}
-					/>
-				</Show>
+				/>
 
 				<div class="flex h-full">
 					<LineGutters

@@ -53,6 +53,7 @@ export type TextEditorInputOptions = {
 	onIncrementalEditStart?: (edit: DocumentIncrementalEdit) => void
 	onIncrementalEdit?: (edit: DocumentIncrementalEdit) => void
 	onSave?: () => void
+	onEditBlocked?: () => void
 }
 
 export type TextEditorInputHandlers = {
@@ -106,7 +107,10 @@ export function createTextEditorInput(
 			mergeMode?: HistoryMergeMode
 		}
 	): boolean => {
-		if (!options.isEditable()) return false
+		if (!options.isEditable()) {
+			options.onEditBlocked?.()
+			return false
+		}
 
 		const documentLength = cursor.documentLength()
 		const normalizedStart = Math.min(start, end)

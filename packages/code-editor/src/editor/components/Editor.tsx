@@ -4,12 +4,11 @@ import { HistoryProvider } from '../history'
 import { TextEditorView } from './TextEditorView'
 
 export const Editor = (props: EditorProps) => {
-	// 	console.log('[Editor] render', {
-	// 		filePath: props.document.filePath(),
-	// 		contentLength: props.document.content()?.length,
-	// 		hasPrecomputedLineStarts: !!props.precomputedLineStarts,
-	// 		precomputedValue: props.precomputedLineStarts?.()?.length,
-	// 	})
+	console.log('[Editor] render', {
+		filePath: props.document.filePath(),
+		hasOnScrollPositionChange: !!props.onScrollPositionChange,
+		onScrollPositionChangeType: typeof props.onScrollPositionChange,
+	})
 	return (
 		<CursorProvider
 			filePath={props.document.filePath}
