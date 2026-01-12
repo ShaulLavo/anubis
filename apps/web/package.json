@@ -23,6 +23,9 @@
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@solidjs/testing-library": "^0.8.10",
+    "@tanstack/devtools-event-client": "^0.4.0",
+    "@tanstack/devtools-vite": "^0.4.1",
+    "@tanstack/solid-devtools": "^0.7.22",
     "@types/node": "^24.10.1",
     "@types/shell-quote": "^1.7.5",
     "@types/wicg-file-system-access": "^2023.10.7",

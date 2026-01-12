@@ -2,6 +2,7 @@ import path from 'node:path'
 import { defineConfig, type Plugin } from 'vite'
 import solidPlugin from 'vite-plugin-solid'
 import devtools from 'solid-devtools/vite'
+import { devtools as tanstackDevtools } from '@tanstack/devtools-vite'
 import tailwindcss from '@tailwindcss/vite'
 import { playwright } from '@vitest/browser-playwright'
 import { build } from 'vite'
@@ -67,6 +68,15 @@ export default defineConfig(() => {
 		// We already loaded and validated them in vite-env.ts.
 		envDir: path.resolve(__dirname, 'src/shims'),
 		plugins: [
+			// TanStack Devtools must be first plugin
+			tanstackDevtools({
+				eventBusConfig: {
+					port: 4206,
+					debug: true,
+				},
+				removeDevtoolsOnBuild: true,
+				enhancedLogs: { enabled: true },
+			}),
 			tailwindcss(),
 			devtools({
 				autoname: true,
