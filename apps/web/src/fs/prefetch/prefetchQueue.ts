@@ -12,6 +12,12 @@ import type {
 } from './treePrefetchWorkerTypes'
 import { searchService } from '../../search/SearchService'
 import type { FileMetadata } from '../../search/types'
+import {
+	generateShapeFingerprint,
+	loadPrefetchCache,
+	savePrefetchCache,
+	clearPrefetchCache,
+} from './prefetchCacheBackend'
 
 const MAX_PREFETCH_DEPTH = 6
 const MAX_PREFETCHED_DIRS = Infinity
@@ -19,11 +25,13 @@ const STATUS_SAMPLE_INTERVAL = 50
 const BATCH_SIZE = 8
 const BATCH_DELAY_MS = 4
 const INDEX_BATCH_SIZE = 100
+const CACHE_SAVE_INTERVAL = 100 // Save cache every N directories processed
 
 const now = () =>
 	typeof performance !== 'undefined' ? performance.now() : Date.now()
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
 type PrefetchPriority = 'primary' | 'deferred'
 
 type PrefetchQueueOptions = {
@@ -74,6 +82,9 @@ export class PrefetchQueue {
 
 	private indexBatch: FileMetadata[] = []
 	private indexFlushPromise: Promise<void> | null = null
+	private currentShapeFingerprint: string | undefined
+	private lastCacheSaveCount = 0
+	private cacheRestored = false
 
 	constructor(private readonly options: PrefetchQueueOptions) {
 		this.workerCount = Math.max(1, Math.floor(options.workerCount))
@@ -174,6 +185,10 @@ export class PrefetchQueue {
 		this.activeJobs.deferred = 0
 		this.primaryPhaseLogged = false
 		this.deferredPhaseLogged = false
+		// Reset cache tracking (but don't clear persistent cache)
+		this.currentShapeFingerprint = undefined
+		this.lastCacheSaveCount = 0
+		this.cacheRestored = false
 		this.emitStatus(false)
 	}
 
@@ -276,19 +291,42 @@ export class PrefetchQueue {
 			return { target: primaryTarget, priority: 'primary' }
 		}
 
+		// Primary queue is empty - check if we can move to deferred phase
 		if (!this.primaryPhaseComplete) {
 			if (this.activeJobs.primary === 0) {
+				// No active primary jobs, safe to mark complete
 				this.markPrimaryPhaseComplete()
 			} else {
-				return undefined
+				// There are active primary jobs - but if WE are the only worker
+				// still running (others have exited), we should NOT return undefined
+				// because no one else will mark primary complete.
+				// Instead, try to get a deferred target to keep making progress.
+				// The active primary job counter will be decremented when it finishes.
+				// This is a workaround for the race condition where workers exit
+				// while waiting for a primary job that's actually already done.
+				console.debug('[Prefetch] Primary queue empty but activeJobs.primary > 0, checking deferred anyway')
 			}
 		}
 
-		if (this.primaryPhaseComplete) {
+		// Always try deferred queue if primary is empty
+		// (primaryPhaseComplete might be false if activeJobs.primary > 0, but we still want to make progress)
+		if (this.primaryQueue.size === 0) {
+			console.debug('[Prefetch] Checking deferred queue, size:', this.deferredQueue.size)
 			const deferredTarget = this.takeFromQueue(this.deferredQueue)
 			if (deferredTarget) {
+				console.debug('[Prefetch] Got deferred target:', deferredTarget.path)
+				// If we're taking a deferred target while primary isn't "complete",
+				// mark it complete now since primary queue is empty
+				if (!this.primaryPhaseComplete && this.activeJobs.primary === 0) {
+					this.markPrimaryPhaseComplete()
+				}
 				return { target: deferredTarget, priority: 'deferred' }
 			}
+			// Deferred queue is empty
+			console.debug('[Prefetch] Deferred queue empty, activeJobs:', {
+				primary: this.activeJobs.primary,
+				deferred: this.activeJobs.deferred,
+			})
 			if (this.activeJobs.deferred === 0) {
 				this.flushPhaseResults('deferred')
 				if (!this.deferredPhaseLogged) {
@@ -354,6 +392,18 @@ export class PrefetchQueue {
 
 			const next = this.dequeueNextTarget()
 			if (!next) {
+				// Debug: log why worker is exiting with no target
+				if (this.primaryQueue.size > 0 || this.deferredQueue.size > 0) {
+					console.warn('[Prefetch] Worker exiting but queues not empty:', {
+						primaryQueue: this.primaryQueue.size,
+						deferredQueue: this.deferredQueue.size,
+						primaryPhaseComplete: this.primaryPhaseComplete,
+						activeJobs: {
+							primary: this.activeJobs.primary,
+							deferred: this.activeJobs.deferred,
+						},
+					})
+				}
 				return
 			}
 
@@ -362,9 +412,18 @@ export class PrefetchQueue {
 			this.activeJobs[priority] += 1
 
 			try {
+				// Debug: log when starting a job
+				if (priority === 'deferred') {
+					console.debug('[Prefetch] Starting deferred job:', target.path)
+				}
+				// Worker handles timeout internally and returns undefined on timeout
 				const subtree = await this.options.loadDirectory(target)
-				if (!subtree || sessionToken !== this.sessionToken) {
+				if (sessionToken !== this.sessionToken) {
 					return
+				}
+				if (!subtree) {
+					// Directory failed to load or timed out - skip it and continue
+					continue
 				}
 				this.sessionPrefetchCount += 1
 				const pending = this.ingestLoadedSubtree(subtree)
@@ -398,6 +457,7 @@ export class PrefetchQueue {
 					this.processedCount > 0 &&
 					this.processedCount % STATUS_SAMPLE_INTERVAL === 0
 				this.emitStatus(true, milestoneReached)
+				this.maybeSaveCache()
 				if (this.processedCount % BATCH_SIZE === 0) {
 					await delay(BATCH_DELAY_MS)
 				}
@@ -539,6 +599,17 @@ export class PrefetchQueue {
 			payload.milestone = milestonePayload
 		}
 
+		// Debug: log when status changes to help diagnose stuck state
+		if (!running && (this.primaryQueue.size > 0 || this.deferredQueue.size > 0)) {
+			console.warn('[Prefetch] Workers stopped but queues not empty:', {
+				running,
+				primaryQueue: this.primaryQueue.size,
+				deferredQueue: this.deferredQueue.size,
+				primaryPhaseComplete: this.primaryPhaseComplete,
+				activeJobs: { ...this.activeJobs },
+			})
+		}
+
 		this.options.callbacks.onStatus(payload)
 	}
 
@@ -558,9 +629,93 @@ export class PrefetchQueue {
 		this.runStartTime = undefined
 		this.loggedProcessedCount = this.processedCount
 		this.loggedIndexedCount = this.indexedFileCount
+
+		// Save final cache state when prefetch completes
+		void this.saveToCache()
 	}
 
 	private logPhaseCompletion(_kind: PrefetchPriority) {
 		// Phase completion logged
+	}
+
+	/**
+	 * Try to restore prefetch progress from the cache.
+	 * Returns true if cache was restored successfully.
+	 */
+	async tryRestoreFromCache(rootChildren: string[]): Promise<boolean> {
+		if (this.cacheRestored) return false
+
+		try {
+			const cached = await loadPrefetchCache()
+			if (!cached) return false
+
+			const currentFingerprint = generateShapeFingerprint(rootChildren)
+			this.currentShapeFingerprint = currentFingerprint
+
+			// Check if the filesystem shape has changed
+			if (cached.shapeFingerprint !== currentFingerprint) {
+				// Shape changed - invalidate cache and start fresh
+				await clearPrefetchCache()
+				return false
+			}
+
+			// Restore the state
+			for (const path of cached.loadedDirPaths) {
+				this.loadedDirPaths.add(path)
+			}
+			this.indexedFileCount = cached.indexedFileCount
+			this.lastCacheSaveCount = cached.loadedDirPaths.length
+			this.cacheRestored = true
+
+			return true
+		} catch {
+			return false
+		}
+	}
+
+	/**
+	 * Save current prefetch progress to the cache.
+	 */
+	private async saveToCache(): Promise<void> {
+		if (!this.currentShapeFingerprint) return
+
+		try {
+			await savePrefetchCache({
+				loadedDirPaths: Array.from(this.loadedDirPaths),
+				indexedFileCount: this.indexedFileCount,
+				shapeFingerprint: this.currentShapeFingerprint,
+				savedAt: Date.now(),
+			})
+			this.lastCacheSaveCount = this.loadedDirPaths.size
+		} catch {
+			// Ignore cache save errors
+		}
+	}
+
+	/**
+	 * Maybe save the cache if enough progress has been made since last save.
+	 */
+	private maybeSaveCache(): void {
+		const progress = this.loadedDirPaths.size - this.lastCacheSaveCount
+		if (progress >= CACHE_SAVE_INTERVAL) {
+			void this.saveToCache()
+		}
+	}
+
+	/**
+	 * Set the shape fingerprint from the root directory's children.
+	 * Call this when seeding the tree to enable cache validation.
+	 */
+	setShapeFingerprint(rootChildren: string[]): void {
+		this.currentShapeFingerprint = generateShapeFingerprint(rootChildren)
+	}
+
+	/**
+	 * Clear the prefetch cache (useful when the user wants a fresh start).
+	 */
+	async clearCache(): Promise<void> {
+		await clearPrefetchCache()
+		this.cacheRestored = false
+		this.lastCacheSaveCount = 0
 	}
 }

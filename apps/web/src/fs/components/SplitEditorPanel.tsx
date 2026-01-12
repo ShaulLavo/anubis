@@ -58,6 +58,7 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 	// Sync managers (initialized async in onMount)
 	let fileSyncManager: FileSyncManager | null = null
 	let editorSyncManager: EditorFileSyncManager | null = null
+	let unsubDirtyChange: (() => void) | null = null
 
 	// Notification system that uses toast
 	const notificationSystem: NotificationSystem = {
@@ -244,7 +245,7 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 			}
 
 			// Subscribe to dirty state changes and propagate to adapters
-			const unsubDirtyChange = layoutManager.onTabDirtyChange(
+			unsubDirtyChange = layoutManager.onTabDirtyChange(
 				(paneId, tabId, isDirty) => {
 					const pane = layoutManager.state.nodes[paneId]
 					if (!pane || !isPane(pane)) return
@@ -262,11 +263,6 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 				}
 			)
 
-			// Clean up subscription on unmount
-			onCleanup(() => {
-				unsubDirtyChange()
-			})
-
 			// Notify parent that sync manager is ready
 			props.onSyncManagerReady?.(editorSyncManager)
 			// 			console.error('[SplitEditorPanel] Failed to initialize sync managers:', error)
@@ -280,6 +276,9 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 
 	// Cleanup on unmount
 	onCleanup(() => {
+		// Unsubscribe from dirty state changes
+		unsubDirtyChange?.()
+
 		// Dispose all adapters
 		for (const adapter of editorAdapters.values()) {
 			adapter.dispose()

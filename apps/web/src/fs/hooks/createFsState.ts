@@ -4,12 +4,6 @@ import { createEffect, createMemo, createSignal } from 'solid-js'
 import { findNode } from '../runtime/tree'
 import type { FsState } from '../types'
 
-/**
- * Normalize path by stripping leading slash.
- * Cache keys use normalized paths (without leading slash).
- */
-const normalizePath = (path: string): string =>
-	path.startsWith('/') ? path.slice(1) : path
 import { createTreeState } from './createTreeState'
 import { createExpandedState } from './createExpandedState'
 import { createSelectionState } from './createSelectionState'
@@ -25,6 +19,9 @@ import { createErrorState } from './createErrorState'
 import { createScrollPositionState } from './createScrollPositionState'
 import { createVisibleContentState } from './createVisibleContentState'
 import { createViewModeState } from './createViewModeState'
+
+const normalizePath = (path: string): string =>
+	path.startsWith('/') ? path.slice(1) : path
 
 export const createFsState = () => {
 	const { tree, setTree } = createTreeState()
@@ -88,34 +85,36 @@ export const createFsState = () => {
 	const selectedNode = createMemo<FsTreeNode | undefined>(() =>
 		tree ? findNode(tree, selectedPath()) : undefined
 	)
-	
+
 	// Track the last known file path - this updates whenever a file path is selected,
 	// even if the file isn't in the tree yet (e.g., .system files from OPFS)
-	const [lastKnownFilePathSignal, setLastKnownFilePathSignal] = createSignal<string | undefined>(undefined)
-	
+	const [lastKnownFilePathSignal, setLastKnownFilePathSignal] = createSignal<
+		string | undefined
+	>(undefined)
+
 	// Update lastKnownFilePath when selectedPath changes to a file
 	createEffect(() => {
 		const path = selectedPath()
 		if (!path) return
-		
+
 		// Check if it's a file path (has an extension or is a known file)
 		const node = tree ? findNode(tree, path) : undefined
 		if (node?.kind === 'file') {
 			setLastKnownFilePathSignal(path)
 			return
 		}
-		
+
 		// If node not found but path looks like a file (has extension), treat it as a file
 		// This handles .system files that might not be in the tree yet
 		if (!node && path.includes('.') && !path.endsWith('/')) {
 			setLastKnownFilePathSignal(path)
 		}
 	})
-	
+
 	const lastKnownFileNode = createMemo<FsFileTreeNode | undefined>((prev) => {
 		const path = lastKnownFilePathSignal()
 		if (!path) return prev
-		
+
 		const node = tree ? findNode(tree, path) : undefined
 		if (node?.kind === 'file') {
 			return node

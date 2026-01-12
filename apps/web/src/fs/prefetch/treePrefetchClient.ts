@@ -36,6 +36,9 @@ export type TreePrefetchClient = {
 	ingestSubtree(node: FsDirTreeNode): Promise<void>
 	markDirLoaded(path: string): Promise<void>
 	dispose(): Promise<void>
+	tryRestoreFromCache(rootChildren: string[]): Promise<boolean>
+	setShapeFingerprint(rootChildren: string[]): void
+	clearCache(): Promise<void>
 }
 
 const createNoopTreePrefetchClient = (): TreePrefetchClient => ({
@@ -44,6 +47,11 @@ const createNoopTreePrefetchClient = (): TreePrefetchClient => ({
 	async ingestSubtree() {},
 	async markDirLoaded() {},
 	async dispose() {},
+	async tryRestoreFromCache() {
+		return false
+	},
+	setShapeFingerprint() {},
+	async clearCache() {},
 })
 
 export const createTreePrefetchClient = (
@@ -101,6 +109,17 @@ export const createTreePrefetchClient = (
 			await queue.dispose()
 			await pool.broadcast((remote) => remote.dispose())
 			await pool.destroy()
+		},
+		async tryRestoreFromCache(rootChildren: string[]) {
+			if (destroyed) return false
+			return queue.tryRestoreFromCache(rootChildren)
+		},
+		setShapeFingerprint(rootChildren: string[]) {
+			if (destroyed) return
+			queue.setShapeFingerprint(rootChildren)
+		},
+		async clearCache() {
+			await queue.clearCache()
 		},
 	}
 }

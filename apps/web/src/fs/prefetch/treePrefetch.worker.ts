@@ -11,6 +11,8 @@ import type {
 	TreePrefetchWorkerApi,
 } from './treePrefetchWorkerTypes'
 
+const LOAD_TIMEOUT_MS = 5_000 // 5 second timeout for loading a directory
+
 let ctx: FsContext | undefined
 let initialized = false
 let fallbackRootName = 'root'
@@ -28,15 +30,34 @@ const deriveDirName = (path: string) => {
 	return segments[segments.length - 1] ?? fallbackRootName
 }
 
+const withTimeout = <T>(
+	promise: Promise<T>,
+	ms: number,
+	timeoutValue: T
+): Promise<T> => {
+	let timeoutId: ReturnType<typeof setTimeout>
+	const timeoutPromise = new Promise<T>((resolve) => {
+		timeoutId = setTimeout(() => resolve(timeoutValue), ms)
+	})
+	return Promise.race([promise, timeoutPromise]).finally(() =>
+		clearTimeout(timeoutId)
+	)
+}
+
 const loadDirectoryTarget = async (
 	target: PrefetchTarget
 ): Promise<FsDirTreeNode | undefined> => {
 	const context = ensureContext()
 
-	const result = await walkDirectory(
-		context,
-		{ path: target.path, name: target.name || deriveDirName(target.path) },
-		{ includeDirs: true, includeFiles: true, withMeta: false }
+	// Add timeout to prevent hanging on slow/unresponsive directories
+	const result = await withTimeout(
+		walkDirectory(
+			context,
+			{ path: target.path, name: target.name || deriveDirName(target.path) },
+			{ includeDirs: true, includeFiles: true, withMeta: false }
+		),
+		LOAD_TIMEOUT_MS,
+		undefined
 	)
 
 	if (!result) {
@@ -65,9 +86,13 @@ const api: TreePrefetchWorkerApi = {
 		ctx = createFs(payload.rootHandle)
 		fallbackRootName = payload.rootName || 'root'
 		initialized = true
+		console.debug('[PrefetchWorker] Initialized')
 	},
 	async loadDirectory(target) {
-		if (!initialized) return undefined
+		if (!initialized) {
+			console.warn('[PrefetchWorker] loadDirectory called but not initialized')
+			return undefined
+		}
 		return loadDirectoryTarget(target)
 	},
 	async dispose() {
