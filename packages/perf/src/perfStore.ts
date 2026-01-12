@@ -33,6 +33,21 @@ const DEFAULT_MAX_ENTRIES = Infinity
 let maxEntries = DEFAULT_MAX_ENTRIES
 let records: PerfRecord[] = []
 
+// Callback for notifying listeners when a record is added
+type RecordCallback = (record: PerfRecord) => void
+let onRecordCallback: RecordCallback | null = null
+
+/**
+ * Register a callback to be notified when a performance record is added.
+ * Used by devtools to receive real-time performance data.
+ */
+export const onRecord = (callback: RecordCallback): (() => void) => {
+	onRecordCallback = callback
+	return () => {
+		onRecordCallback = null
+	}
+}
+
 const generateId = (): string => {
 	return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 }
@@ -85,6 +100,16 @@ export const record = async (
 
 	records.push(newRecord)
 	trimIfNeeded()
+
+	// Notify listeners (used by devtools)
+	if (onRecordCallback) {
+		try {
+			onRecordCallback(newRecord)
+		} catch {
+			// Ignore errors from callback
+		}
+	}
+
 	return newRecord
 }
 

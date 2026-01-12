@@ -1,35 +1,52 @@
-import { type Component } from 'solid-js'
+import { createSignal, Show, type Component } from 'solid-js'
+import { StoreBenchPanel } from '../benchmarks/StoreBenchPanel'
+import { VfsPathBenchPanel } from '../benchmarks/VfsPathBenchPanel'
+import { ScrollBenchPanel } from '../benchmarks/ScrollBenchPanel'
+
+type BenchmarkId = 'storage' | 'vfs-path' | 'scroll'
+
+const benchmarks: { id: BenchmarkId; label: string }[] = [
+	{ id: 'storage', label: 'Storage' },
+	{ id: 'vfs-path', label: 'VFS Path' },
+	{ id: 'scroll', label: 'Scroll' },
+]
 
 /**
- * Benchmarks tab for running VFS and scroll benchmarks
- * TODO: Migrate benchmark dashboards here
+ * Benchmarks tab containing sub-panels for different benchmark types
  */
 export const BenchmarksTab: Component = () => {
+	const [activeBenchmark, setActiveBenchmark] =
+		createSignal<BenchmarkId>('storage')
+
 	return (
-		<div class="h-full flex flex-col p-2">
-			<div class="text-gray-500 text-center py-8">
-				<p class="mb-2">Benchmarks Panel</p>
-				<p class="text-xs">
-					Run storage and scroll performance benchmarks.
-					<br />
-					Benchmarks will be migrated from /bench routes in a future update.
-				</p>
-				<div class="mt-4 flex gap-2 justify-center">
-					<a
-						href="/bench"
-						target="_blank"
-						class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm text-gray-200"
+		<div class="h-full flex flex-col">
+			{/* Sub-tab navigation */}
+			<div class="flex items-center gap-1 px-2 py-1 border-b border-border bg-muted/30">
+				{benchmarks.map((bench) => (
+					<button
+						class={`px-3 py-1 text-xs font-medium rounded transition-colors ${
+							activeBenchmark() === bench.id
+								? 'bg-background text-foreground shadow-sm'
+								: 'text-muted-foreground hover:text-foreground'
+						}`}
+						onClick={() => setActiveBenchmark(bench.id)}
 					>
-						Storage Bench
-					</a>
-					<a
-						href="/vfs-bench"
-						target="_blank"
-						class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-sm text-gray-200"
-					>
-						VFS Path Bench
-					</a>
-				</div>
+						{bench.label}
+					</button>
+				))}
+			</div>
+
+			{/* Benchmark content */}
+			<div class="flex-1 overflow-hidden">
+				<Show when={activeBenchmark() === 'storage'}>
+					<StoreBenchPanel />
+				</Show>
+				<Show when={activeBenchmark() === 'vfs-path'}>
+					<VfsPathBenchPanel />
+				</Show>
+				<Show when={activeBenchmark() === 'scroll'}>
+					<ScrollBenchPanel />
+				</Show>
 			</div>
 		</div>
 	)

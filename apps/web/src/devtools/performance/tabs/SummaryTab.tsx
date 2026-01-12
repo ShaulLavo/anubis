@@ -10,7 +10,10 @@ export const SummaryTab: Component = () => {
 
 	// Refresh summary every second
 	onMount(() => {
-		const refresh = () => setSummary(getSummary())
+		const refresh = async () => {
+			const data = await getSummary()
+			setSummary(data)
+		}
 		refresh()
 		const interval = setInterval(refresh, 1000)
 		onCleanup(() => clearInterval(interval))
@@ -19,7 +22,7 @@ export const SummaryTab: Component = () => {
 	return (
 		<div class="h-full flex flex-col p-2">
 			<div class="flex items-center justify-between mb-2">
-				<span class="text-sm text-gray-400">
+				<span class="text-sm text-muted-foreground">
 					{summary().length} operation types
 				</span>
 			</div>
@@ -28,14 +31,14 @@ export const SummaryTab: Component = () => {
 				<Show
 					when={summary().length > 0}
 					fallback={
-						<div class="text-gray-500 text-center py-8">
+						<div class="text-muted-foreground text-center py-8">
 							No performance data collected yet.
 						</div>
 					}
 				>
 					<table class="w-full text-sm">
-						<thead class="sticky top-0 bg-gray-900">
-							<tr class="text-gray-400 text-left">
+						<thead class="sticky top-0 bg-background">
+							<tr class="text-muted-foreground text-left">
 								<th class="px-2 py-1">Operation</th>
 								<th class="px-2 py-1 text-right">Count</th>
 								<th class="px-2 py-1 text-right">Avg</th>
@@ -48,11 +51,11 @@ export const SummaryTab: Component = () => {
 						<tbody>
 							<For each={summary()}>
 								{(item) => (
-									<tr class="border-b border-gray-800 hover:bg-gray-800/50">
-										<td class="px-2 py-1 font-mono text-gray-200">
+									<tr class="border-b border-border hover:bg-muted/50">
+										<td class="px-2 py-1 font-mono text-foreground">
 											{item.name}
 										</td>
-										<td class="px-2 py-1 text-right text-gray-400">
+										<td class="px-2 py-1 text-right text-muted-foreground">
 											{item.count}
 										</td>
 										<td class="px-2 py-1 text-right">

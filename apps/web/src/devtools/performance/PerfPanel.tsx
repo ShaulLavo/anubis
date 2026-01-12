@@ -1,7 +1,6 @@
 import { createSignal, onMount, onCleanup, Show, type Component } from 'solid-js'
 import type { PerfRecord } from '@repo/perf'
-import { clear as clearPerfStore } from '@repo/perf'
-import { perfEventClient } from './perfEventClient'
+import { clear as clearPerfStore, onRecord, getHistory } from '@repo/perf'
 import { TimelineTab } from './tabs/TimelineTab'
 import { SummaryTab } from './tabs/SummaryTab'
 import { TracesTab } from './tabs/TracesTab'
@@ -23,12 +22,16 @@ export const PerfPanel: Component = () => {
 	const [activeTab, setActiveTab] = createSignal<TabId>('timeline')
 	const [records, setRecords] = createSignal<PerfRecord[]>([])
 
-	onMount(() => {
-		// Subscribe to performance records from the event client
-		const cleanup = perfEventClient.on('record', (e) => {
-			setRecords((prev) => [...prev.slice(-99), e.payload]) // Keep last 100
-		})
-		onCleanup(cleanup)
+	// Subscribe synchronously so onCleanup runs within reactive context
+	const unsubscribe = onRecord((record) => {
+		setRecords((prev) => [...prev.slice(-99), record])
+	})
+	onCleanup(unsubscribe)
+
+	onMount(async () => {
+		// Load existing history
+		const history = await getHistory()
+		setRecords(history.slice(-100) as PerfRecord[])
 	})
 
 	const handleClear = () => {
@@ -37,16 +40,16 @@ export const PerfPanel: Component = () => {
 	}
 
 	return (
-		<div class="h-full flex flex-col bg-gray-900 text-gray-100">
+		<div class="h-full flex flex-col bg-background text-foreground">
 			{/* Tab bar */}
-			<div class="flex items-center border-b border-gray-700">
+			<div class="flex items-center border-b border-border">
 				<div class="flex">
 					{tabs.map((tab) => (
 						<button
 							class={`px-4 py-2 text-sm font-medium transition-colors ${
 								activeTab() === tab.id
-									? 'text-purple-400 border-b-2 border-purple-400'
-									: 'text-gray-400 hover:text-gray-200'
+									? 'text-primary border-b-2 border-primary'
+									: 'text-muted-foreground hover:text-foreground'
 							}`}
 							onClick={() => setActiveTab(tab.id)}
 						>
@@ -56,7 +59,7 @@ export const PerfPanel: Component = () => {
 				</div>
 				<div class="flex-1" />
 				<button
-					class="px-3 py-1 mr-2 text-xs text-gray-400 hover:text-gray-200 hover:bg-gray-700 rounded"
+					class="px-3 py-1 mr-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded"
 					onClick={handleClear}
 				>
 					Clear

@@ -16,6 +16,7 @@ export {
 	clear,
 	exportData,
 	configureMaxEntries,
+	onRecord,
 	type PerfRecord,
 	type PerfBreakdownEntry,
 	type PerfSummary,
