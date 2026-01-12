@@ -38,10 +38,22 @@ type SplitEditorPanelProps = {
 }
 
 export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
-	const [state] = useFs()
+	const [state, actions] = useFs()
+	const { fileCache } = actions
 
 	// Create resource manager first (needed for layout manager callback)
-	const resourceManager = createResourceManager()
+	// Pass callback to persist highlights when tree-sitter parsing completes
+	const resourceManager = createResourceManager({
+		onHighlightsUpdate: (filePath, data) => {
+			// Persist highlights to IndexedDB for instant loading on next visit
+			fileCache.set(filePath, {
+				highlights: data.captures,
+				brackets: data.brackets,
+				folds: data.folds,
+				errors: data.errors,
+			})
+		},
+	})
 
 	// Create persisted layout manager with tab close callback for resource cleanup
 	const layoutManager = createPersistedLayoutManager({
@@ -88,6 +100,24 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 					const content = await readFileText(source, filePath)
 
 					resourceManager.preloadFileContent(filePath, content)
+
+					// Hydrate cached highlights from file cache (IndexedDB)
+					// This provides instant highlighting on tab switch
+					const cachedEntry = await fileCache.getAsync(filePath)
+					if (cachedEntry.highlights || cachedEntry.brackets || cachedEntry.folds || cachedEntry.errors) {
+						console.log('[SplitEditorPanel] Hydrating cached highlights for', filePath, {
+							highlights: cachedEntry.highlights?.length ?? 0,
+							brackets: cachedEntry.brackets?.length ?? 0,
+							folds: cachedEntry.folds?.length ?? 0,
+							errors: cachedEntry.errors?.length ?? 0,
+						})
+						resourceManager.hydrateCachedHighlights(filePath, {
+							captures: cachedEntry.highlights,
+							brackets: cachedEntry.brackets,
+							folds: cachedEntry.folds,
+							errors: cachedEntry.errors,
+						})
+					}
 				} catch (error) {
 					console.warn(
 						`[SplitEditorPanel] Failed to preload: ${filePath}`,
@@ -214,6 +244,24 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 			// Always load the content (even for binary files, to allow viewing as text)
 			resourceManager.preloadFileContent(filePath, fileContent)
 			resourceManager.setFileLoadingStatus(filePath, 'loaded')
+
+			// Hydrate cached highlights from file cache (IndexedDB)
+			// This provides instant highlighting on tab switch
+			const cachedEntry = await fileCache.getAsync(filePath)
+			if (cachedEntry.highlights || cachedEntry.brackets || cachedEntry.folds || cachedEntry.errors) {
+				console.log('[SplitEditorPanel] Hydrating cached highlights for', filePath, {
+					highlights: cachedEntry.highlights?.length ?? 0,
+					brackets: cachedEntry.brackets?.length ?? 0,
+					folds: cachedEntry.folds?.length ?? 0,
+					errors: cachedEntry.errors?.length ?? 0,
+				})
+				resourceManager.hydrateCachedHighlights(filePath, {
+					captures: cachedEntry.highlights,
+					brackets: cachedEntry.brackets,
+					folds: cachedEntry.folds,
+					errors: cachedEntry.errors,
+				})
+			}
 		} catch (error) {
 			console.error(
 				`[SplitEditorPanel] Failed to load file content for ${filePath}:`,

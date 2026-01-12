@@ -102,6 +102,14 @@ function buildLineStartsFromText(text: string): number[] {
 	return starts;
 }
 
+/** Cached highlight data from persistent storage */
+export interface CachedHighlightData {
+	captures?: TreeSitterCapture[];
+	brackets?: BracketInfo[];
+	folds?: FoldRange[];
+	errors?: TreeSitterError[];
+}
+
 /** Resource Manager interface */
 export interface ResourceManager {
 	/** Get shared buffer for a file */
@@ -136,6 +144,9 @@ export interface ResourceManager {
 
 	/** Pre-populate content for a file before any tabs register */
 	preloadFileContent: (filePath: string, content: string) => void;
+
+	/** Hydrate highlight state from cached data (call before tree-sitter finishes) */
+	hydrateCachedHighlights: (filePath: string, data: CachedHighlightData) => void;
 
 	/** Set an error for a file */
 	setFileError: (filePath: string, error: FileLoadingError | null) => void;
@@ -269,8 +280,26 @@ function createHighlightStateForFile(): HighlightState {
 	};
 }
 
+/** Callback for persisting highlights to cache */
+export type OnHighlightsUpdate = (
+	filePath: string,
+	data: {
+		captures: TreeSitterCapture[];
+		brackets: BracketInfo[];
+		folds: FoldRange[];
+		errors: TreeSitterError[];
+	}
+) => void;
+
+/** Options for creating the resource manager */
+export interface ResourceManagerOptions {
+	/** Called when tree-sitter parsing completes with new highlights */
+	onHighlightsUpdate?: OnHighlightsUpdate;
+}
+
 /** Create the resource manager */
-export function createResourceManager(): ResourceManager {
+export function createResourceManager(options: ResourceManagerOptions = {}): ResourceManager {
+	const { onHighlightsUpdate } = options;
 	// Track resources per file
 	const resources = new Map<string, FileResource>();
 
@@ -310,6 +339,18 @@ export function createResourceManager(): ResourceManager {
 					const parseResult = await parseBufferWithTreeSitter(filePath, buffer);
 					if (parseResult) {
 						resource.highlights.updateFromParseResult(parseResult);
+
+						// Notify callback to persist highlights to cache
+						if (onHighlightsUpdate) {
+							console.log('[ResourceManager] Persisting highlights after tree-sitter parse', {
+								filePath,
+								captures: parseResult.captures.length,
+								brackets: parseResult.brackets.length,
+								folds: parseResult.folds.length,
+								errors: parseResult.errors.length,
+							});
+							onHighlightsUpdate(filePath, parseResult);
+						}
 					}
 				} catch (parseError) {
 					console.error(`[ResourceManager] Parse failed for ${filePath}:`, parseError);
@@ -437,6 +478,32 @@ export function createResourceManager(): ResourceManager {
 		resources.delete(filePath);
 	}
 
+	/** Hydrate highlight state from cached data */
+	function hydrateCachedHighlights(filePath: string, data: CachedHighlightData): void {
+		const resource = resources.get(filePath);
+		if (!resource) {
+			console.warn(`[ResourceManager] hydrateCachedHighlights: no resource for ${filePath}`);
+			return;
+		}
+
+		const hasData = data.captures?.length || data.brackets?.length || data.folds?.length || data.errors?.length;
+		if (!hasData) {
+			return;
+		}
+
+		console.log(`[ResourceManager] hydrateCachedHighlights: ${filePath}`, {
+			captures: data.captures?.length ?? 0,
+			brackets: data.brackets?.length ?? 0,
+			folds: data.folds?.length ?? 0,
+			errors: data.errors?.length ?? 0,
+		});
+
+		if (data.captures) resource.highlights.setCaptures(data.captures);
+		if (data.brackets) resource.highlights.setBrackets(data.brackets);
+		if (data.folds) resource.highlights.setFolds(data.folds);
+		if (data.errors) resource.highlights.setErrors(data.errors);
+	}
+
 	return {
 		getBuffer,
 		getHighlightState,
@@ -449,6 +516,7 @@ export function createResourceManager(): ResourceManager {
 		getTrackedFiles,
 		cleanup,
 		preloadFileContent,
+		hydrateCachedHighlights,
 		setFileError,
 		setFileLoadingStatus,
 		setFileMetadata,
