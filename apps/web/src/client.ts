@@ -11,6 +11,8 @@ const isBinaryResponse = (response: Response) => {
 	return normalized.startsWith('font/')
 }
 
+// TODO: Investigate why bun version mismatch keeps happening - causes elysia type incompatibility
+// @ts-expect-error Elysia treaty type mismatch due to different bun versions resolving different elysia instances
 export const client = treaty<App>(env.apiOrigin, {
 	onResponse: async (response) => {
 		if (!isBinaryResponse(response)) return null

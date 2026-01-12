@@ -30,27 +30,26 @@ global.sessionStorage = {
 	key: vi.fn(),
 }
 
-// Mock window object
-Object.defineProperty(global, 'window', {
-	value: {
-		addEventListener: vi.fn(),
-		removeEventListener: vi.fn(),
-		location: {
-			href: 'http://localhost:3000',
-			origin: 'http://localhost:3000',
-		},
-	},
-	writable: true,
-})
+// Extend window object with any missing methods (don't replace it)
+if (typeof window !== 'undefined') {
+	// Add any missing properties needed for tests
+	if (!window.location) {
+		Object.defineProperty(window, 'location', {
+			value: {
+				href: 'http://localhost:3000',
+				origin: 'http://localhost:3000',
+			},
+			writable: true,
+		})
+	}
+}
 
-// Mock document object
-Object.defineProperty(global, 'document', {
-	value: {
-		fonts: {
+// Mock document.fonts if not present (extend, don't replace document)
+if (typeof document !== 'undefined' && !document.fonts) {
+	Object.defineProperty(document, 'fonts', {
+		value: {
 			add: vi.fn(),
 		},
-		addEventListener: vi.fn(),
-		removeEventListener: vi.fn(),
-	},
-	writable: true,
-})
+		writable: true,
+	})
+}
