@@ -38,6 +38,8 @@ export type FileCacheEntry = {
 	errors?: TreeSitterError[]
 	scrollPosition?: ScrollPosition
 	visibleContent?: VisibleContentSnapshot
+	/** Cached line start offsets for instant tab switching */
+	lineStarts?: number[]
 }
 
 export type FileCacheController = {
@@ -50,6 +52,7 @@ export type FileCacheController = {
 	clearMemory: () => void
 	getAsync: (path: string) => Promise<FileCacheEntry>
 	getScrollPosition: (path: string) => ScrollPosition | undefined
+	getLineStarts: (path: string) => number[] | undefined
 	setActiveFile: (path: string | null) => void
 	setOpenTabs: (paths: string[]) => void
 	getStats: () => Promise<CacheStats>
@@ -316,6 +319,15 @@ export const createFileCacheController = ({
 		return tieredCache.getScrollPosition(p)
 	}
 
+	const getLineStarts = (path: string): number[] | undefined => {
+		const p = normalizePath(path)
+		// Check memory first (from stats.lineStarts)
+		const stats = state.fileStats[p]
+		if (stats?.lineStarts) return stats.lineStarts
+		// Fall back to warm cache
+		return tieredCache.getLineStarts(p)
+	}
+
 	const getStats = async (): Promise<CacheStats> => {
 		return tieredCache.getStats()
 	}
@@ -334,6 +346,7 @@ export const createFileCacheController = ({
 		clearMemory,
 		getAsync,
 		getScrollPosition,
+		getLineStarts,
 		setActiveFile,
 		setOpenTabs,
 		getStats,

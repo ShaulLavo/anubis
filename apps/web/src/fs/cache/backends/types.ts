@@ -37,7 +37,7 @@ export interface TierRoutingConfig {
 }
 
 export const DEFAULT_ROUTING: TierRoutingConfig = {
-	warm: ['scrollPosition', 'visibleContent'],
+	warm: ['scrollPosition', 'visibleContent', 'lineStarts'],
 	cold: [
 		'stats',
 		'highlights',

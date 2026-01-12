@@ -85,6 +85,15 @@ export class TieredCacheController {
 		return undefined
 	}
 
+	getLineStarts(path: string): number[] | undefined {
+		const key = `v1:${path}:lineStarts`
+		const value = this.warmBackend.get(key)
+		if (value !== null) {
+			return value as number[]
+		}
+		return undefined
+	}
+
 	get(path: string): FileCacheEntry {
 		if (this.activeFileState.isActive(path)) {
 			return this.activeFileState.getActiveEntry() ?? {}
@@ -367,6 +376,7 @@ export class TieredCacheController {
 			'errors',
 			'scrollPosition',
 			'visibleContent',
+			'lineStarts',
 		]
 
 		for (const dataType of dataTypes) {
@@ -392,6 +402,7 @@ export class TieredCacheController {
 			'errors',
 			'scrollPosition',
 			'visibleContent',
+			'lineStarts',
 		]
 
 		const promises = dataTypes.map(async (dataType) => {
