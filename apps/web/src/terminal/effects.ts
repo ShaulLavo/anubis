@@ -71,7 +71,7 @@ export async function batchTypeEffect(
 		// Update each line
 		for (let i = 0; i < lineStates.length; i++) {
 			const state = lineStates[i]
-			if (state.done) continue
+			if (!state || state.done) continue
 
 			// Check if this row should start yet (staggered start)
 			if (!state.started) {
