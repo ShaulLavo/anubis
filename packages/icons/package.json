@@ -238,6 +238,7 @@
     "build": "bun ./scripts/build.ts",
     "init": "bun run fetch-icons && bun run build",
     "fetch-icons": "bun ./scripts/fetch-packs.ts",
+    "fetch-icons:force": "bun ./scripts/fetch-packs.ts --force",
     "depcheck": "depcheck",
     "unimported": "unimported",
     "tsprune": "ts-prune",
