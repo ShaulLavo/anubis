@@ -342,6 +342,7 @@ export const useFileSelection = ({
 
 	const updateSelectedFileScrollPosition: FsContextValue[1]['updateSelectedFileScrollPosition'] =
 		(scrollPosition) => {
+			console.log('[useFileSelection] updateSelectedFileScrollPosition called', scrollPosition)
 			const path = state.lastKnownFilePath
 			if (!path) return
 			fileCache.set(path, { scrollPosition })
@@ -354,6 +355,20 @@ export const useFileSelection = ({
 			fileCache.set(path, { visibleContent })
 		}
 
+	const updateSelectedFileCursorPosition: FsContextValue[1]['updateSelectedFileCursorPosition'] =
+		(cursorPosition) => {
+			const path = state.lastKnownFilePath
+			if (!path) return
+			fileCache.set(path, { cursorPosition })
+		}
+
+	const updateSelectedFileSelections: FsContextValue[1]['updateSelectedFileSelections'] =
+		(selections) => {
+			const path = state.lastKnownFilePath
+			if (!path) return
+			fileCache.set(path, { selections })
+		}
+
 	return {
 		selectPath,
 		updateSelectedFilePieceTable,
@@ -363,5 +378,7 @@ export const useFileSelection = ({
 		updateSelectedFileErrors,
 		updateSelectedFileScrollPosition,
 		updateSelectedFileVisibleContent,
+		updateSelectedFileCursorPosition,
+		updateSelectedFileSelections,
 	}
 }

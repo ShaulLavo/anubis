@@ -2,7 +2,6 @@ import { VsClose } from '@repo/icons/vs/VsClose'
 import { VsCircleFilled } from '@repo/icons/vs/VsCircleFilled'
 import { createSignal, Show } from 'solid-js'
 import { FileIcon } from './FileIcon'
-import type { ViewMode } from '../types/ViewMode'
 import { Button } from '@repo/ui/button'
 
 type TabProps = {
@@ -13,8 +12,6 @@ type TabProps = {
 	onSelect?: (value: string) => void
 	onClose?: (value: string) => void
 	title?: string
-	viewMode?: ViewMode
-	availableViewModes?: ViewMode[]
 }
 
 export const Tab = (props: TabProps) => {
@@ -27,43 +24,6 @@ export const Tab = (props: TabProps) => {
 	const handleClose = (e: MouseEvent) => {
 		e.stopPropagation()
 		props.onClose?.(props.value)
-	}
-
-	// Determine if we should show view mode indicator (Requirements 8.1, 8.2, 8.3)
-	const shouldShowViewModeIndicator = () => {
-		return (
-			props.viewMode &&
-			props.availableViewModes &&
-			props.availableViewModes.length > 1 &&
-			props.viewMode !== 'editor'
-		)
-	}
-
-	// Get view mode indicator styling
-	const getViewModeIndicatorClass = () => {
-		const baseClass =
-			'inline-flex items-center justify-center w-4 h-4 font-bold rounded-sm'
-
-		switch (props.viewMode) {
-			case 'ui':
-				return `${baseClass} bg-blue-500/20 text-blue-400 border border-blue-500/30`
-			case 'binary':
-				return `${baseClass} bg-orange-500/20 text-orange-400 border border-orange-500/30`
-			default:
-				return `${baseClass} bg-gray-500/20 text-gray-400 border border-gray-500/30`
-		}
-	}
-
-	// Get view mode indicator text
-	const getViewModeIndicatorText = () => {
-		switch (props.viewMode) {
-			case 'ui':
-				return 'UI'
-			case 'binary':
-				return 'BIN'
-			default:
-				return props.viewMode?.toUpperCase().slice(0, 3) || ''
-		}
 	}
 
 	return (
@@ -85,15 +45,6 @@ export const Tab = (props: TabProps) => {
 		>
 			<FileIcon name={props.label} size={14} class="shrink-0" />
 			<span class="max-w-48 truncate">{props.label}</span>
-
-			<Show when={shouldShowViewModeIndicator()}>
-				<span
-					class={getViewModeIndicatorClass() + ' text-ui-xs'}
-					title={`${getViewModeIndicatorText()} mode`}
-				>
-					{getViewModeIndicatorText()}
-				</span>
-			</Show>
 
 			{props.onClose && (
 				<Button

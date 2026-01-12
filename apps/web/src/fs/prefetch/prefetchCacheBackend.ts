@@ -13,8 +13,8 @@ const STORE_NAME = 'cache'
 const CACHE_KEY = 'prefetch-state'
 
 export type PrefetchCacheState = {
-	/** Set of directory paths that have been fully indexed */
-	loadedDirPaths: string[]
+	/** Map of directory path to file count (used to avoid double-counting) */
+	loadedDirFileCounts: Record<string, number>
 	/** Number of files indexed so far */
 	indexedFileCount: number
 	/** Fingerprint of the root directory shape for cache invalidation */

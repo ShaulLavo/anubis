@@ -14,7 +14,7 @@ import type { FsSource } from '../types'
 import type { ViewMode } from '../types/ViewMode'
 import { getValidViewMode } from '../utils/viewModeDetection'
 import { FsContext, type FsContextValue } from './FsContext'
-import { replaceDirNodeInTree } from '../utils/treeNodes'
+import { replaceDirNodeInTree, batchReplaceDirNodes } from '../utils/treeNodes'
 import { makeTreePrefetch } from '../hooks/useTreePrefetch'
 import { useDirectoryLoader } from '../hooks/useDirectoryLoader'
 import { useFileSelection } from '../hooks/useFileSelection'
@@ -58,6 +58,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 		registerDeferredMetadata,
 		clearDeferredMetadata,
 		setScrollPosition,
+		setCursorPosition,
+		setSelections,
 		setVisibleContent,
 		setViewMode,
 		collapseAll,
@@ -72,6 +74,17 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setViewMode(path, validViewMode, stats)
 	}
 
+	// Wrapper for cache controller - handles undefined to clear
+	const setViewModeForCache = (path: string, viewMode?: ViewMode) => {
+		if (viewMode === undefined) {
+			// Clear view mode by setting to default
+			const stats = state.fileStats[path]
+			setViewMode(path, 'editor', stats)
+		} else {
+			setViewModeWithStats(path, viewMode)
+		}
+	}
+
 	const fileCache = createFileCacheControllerV2({
 		state,
 		setPieceTable,
@@ -81,7 +94,11 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setBrackets,
 		setErrors,
 		setScrollPosition,
+		setCursorPosition,
+		setSelections,
 		setVisibleContent,
+		setViewMode: setViewModeForCache,
+		setDirtyPath,
 	})
 
 	const setDirNode = (path: string, node: FsDirTreeNode) => {
@@ -95,10 +112,26 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setTree(() => nextTree)
 	}
 
+	// Batch version for prefetch - applies multiple updates in one tree traversal
+	const setBatchDirNodes = (nodes: FsDirTreeNode[]) => {
+		if (!state.tree || nodes.length === 0) return
+		const replacements = new Map<string, FsDirTreeNode>()
+		for (const node of nodes) {
+			if (node.path) {
+				replacements.set(node.path, node)
+			}
+		}
+		if (replacements.size === 0) return
+		const nextTree = batchReplaceDirNodes(state.tree, replacements)
+		if (nextTree === state.tree) return
+		setTree(() => nextTree)
+	}
+
 	const { treePrefetchClient, runPrefetchTask, disposeTreePrefetchClient } =
 		makeTreePrefetch({
 			state,
 			setDirNode,
+			setBatchDirNodes,
 			setLastPrefetchedPath,
 			setBackgroundPrefetching,
 			setBackgroundIndexedFileCount,
@@ -128,6 +161,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 		updateSelectedFileErrors,
 		updateSelectedFileScrollPosition,
 		updateSelectedFileVisibleContent,
+		updateSelectedFileCursorPosition,
+		updateSelectedFileSelections,
 	} = useFileSelection({
 		state,
 		setSelectedPath,
@@ -277,6 +312,29 @@ export function FsProvider(props: { children: JSX.Element }) {
 		void refresh(state.activeSource ?? DEFAULT_SOURCE).then(() => {
 			void startObserving()
 		})
+
+		// Flush cache before page unload to persist view state (scroll, cursor, selection)
+		// Note: lsCache.flush() is synchronous and runs first, so view state will be saved
+		const handleFlush = () => {
+			void fileCache.flush()
+		}
+
+		// Multiple events to catch all cases:
+		// - beforeunload: standard page unload
+		// - pagehide: more reliable in some browsers
+		// - visibilitychange: mobile/tab switching
+		window.addEventListener('beforeunload', handleFlush)
+		window.addEventListener('pagehide', handleFlush)
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'hidden') {
+				handleFlush()
+			}
+		})
+
+		onCleanup(() => {
+			window.removeEventListener('beforeunload', handleFlush)
+			window.removeEventListener('pagehide', handleFlush)
+		})
 	})
 
 	// Listen for settings file changes from the UI
@@ -351,6 +409,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 			updateSelectedFileErrors,
 			updateSelectedFileScrollPosition,
 			updateSelectedFileVisibleContent,
+			updateSelectedFileCursorPosition,
+			updateSelectedFileSelections,
 			setViewMode: setViewModeWithStats,
 			fileCache,
 			saveFile,

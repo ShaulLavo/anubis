@@ -9,9 +9,11 @@ import { normalizeDirNodeMetadata } from '../utils/treeNodes'
 import type {
 	PrefetchTarget,
 	TreePrefetchWorkerApi,
+	DirectoryLoadResult,
+	IndexableFile,
 } from './treePrefetchWorkerTypes'
 
-const LOAD_TIMEOUT_MS = 5_000 // 5 second timeout for loading a directory
+const LOAD_TIMEOUT_MS = 30_000 // 30 second timeout for loading large directories
 
 let ctx: FsContext | undefined
 let initialized = false
@@ -44,9 +46,42 @@ const withTimeout = <T>(
 	)
 }
 
+/**
+ * Extract pending targets, file count, and indexable files from a directory node.
+ * This preprocessing happens in the worker to avoid main thread work.
+ */
+const extractFromNode = (node: FsDirTreeNode): {
+	pendingTargets: PrefetchTarget[]
+	fileCount: number
+	filesToIndex: IndexableFile[]
+} => {
+	const pendingTargets: PrefetchTarget[] = []
+	const filesToIndex: IndexableFile[] = []
+	let fileCount = 0
+
+	for (const child of node.children) {
+		if (child.kind === 'file') {
+			fileCount++
+			filesToIndex.push({ path: child.path, kind: 'file' })
+		} else if (child.kind === 'dir') {
+			filesToIndex.push({ path: child.path, kind: 'dir' })
+			if (child.isLoaded === false) {
+				pendingTargets.push({
+					path: child.path,
+					name: child.name,
+					depth: child.depth,
+					parentPath: child.parentPath,
+				})
+			}
+		}
+	}
+
+	return { pendingTargets, fileCount, filesToIndex }
+}
+
 const loadDirectoryTarget = async (
 	target: PrefetchTarget
-): Promise<FsDirTreeNode | undefined> => {
+): Promise<DirectoryLoadResult | undefined> => {
 	const context = ensureContext()
 
 	// Add timeout to prevent hanging on slow/unresponsive directories
@@ -78,7 +113,51 @@ const loadDirectoryTarget = async (
 		target.depth
 	)
 
-	return treeNode
+	// Precompute pending targets, file count, and indexable files in the worker
+	const { pendingTargets, fileCount, filesToIndex } = extractFromNode(treeNode)
+
+	return { node: treeNode, pendingTargets, fileCount, filesToIndex }
+}
+
+/**
+ * Extract all pending targets from a tree. Runs entirely in worker.
+ */
+const extractPendingTargetsFromTree = (tree: FsDirTreeNode): {
+	targets: PrefetchTarget[]
+	loadedPaths: string[]
+	totalFileCount: number
+} => {
+	const targets: PrefetchTarget[] = []
+	const loadedPaths: string[] = []
+	let totalFileCount = 0
+	const stack: FsDirTreeNode[] = [tree]
+
+	while (stack.length) {
+		const dir = stack.pop()!
+
+		if (dir.isLoaded !== false) {
+			loadedPaths.push(dir.path ?? '')
+
+			for (const child of dir.children) {
+				if (child.kind === 'file') {
+					totalFileCount++
+				} else if (child.kind === 'dir') {
+					if (child.isLoaded === false) {
+						targets.push({
+							path: child.path,
+							name: child.name,
+							depth: child.depth,
+							parentPath: child.parentPath,
+						})
+					} else {
+						stack.push(child)
+					}
+				}
+			}
+		}
+	}
+
+	return { targets, loadedPaths, totalFileCount }
 }
 
 const api: TreePrefetchWorkerApi = {
@@ -86,14 +165,13 @@ const api: TreePrefetchWorkerApi = {
 		ctx = createFs(payload.rootHandle)
 		fallbackRootName = payload.rootName || 'root'
 		initialized = true
-		console.debug('[PrefetchWorker] Initialized')
 	},
 	async loadDirectory(target) {
-		if (!initialized) {
-			console.warn('[PrefetchWorker] loadDirectory called but not initialized')
-			return undefined
-		}
+		if (!initialized) return undefined
 		return loadDirectoryTarget(target)
+	},
+	async extractPendingTargets(tree) {
+		return extractPendingTargetsFromTree(tree)
 	},
 	async dispose() {
 		ctx = undefined

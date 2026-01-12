@@ -62,18 +62,18 @@ export function createIndexedDBBackend(): PersistenceBackend {
 					const tx = db.transaction(STORE_NAME, 'readwrite')
 					const store = tx.objectStore(STORE_NAME)
 
-					// Only persist serializable data
+					// Only persist content state (view state is in localStorage)
 					const toSave = {
 						path,
+						// Content state
 						pieceTable: state.pieceTable,
 						stats: state.stats,
 						syntax: state.syntax,
-						scrollPosition: state.scrollPosition,
-						visibleContent: state.visibleContent,
-						viewMode: state.viewMode,
 						previewBytes: state.previewBytes,
 						lineStarts: state.lineStarts,
 						lastAccessed: state.lastAccessed,
+						// Note: scrollPosition, visibleContent, viewMode, cursorPosition,
+						// selections, isDirty are now stored in localStorage for instant reload
 					}
 
 					const request = store.put(toSave)

@@ -13,7 +13,7 @@ import type {
 	ScrollPosition,
 } from '../cache/fileCacheController'
 import type { FsState, FsSource } from '../types'
-import type { HighlightTransform } from '../store/types'
+import type { HighlightTransform, CursorPosition, SelectionRange } from '../store/types'
 import type { ViewMode } from '../types/ViewMode'
 
 export type SelectPathOptions = {
@@ -51,6 +51,12 @@ export type FsActions = {
 	) => void
 	updateSelectedFileVisibleContent: (
 		visibleContent: VisibleContentSnapshot | undefined
+	) => void
+	updateSelectedFileCursorPosition: (
+		cursorPosition: CursorPosition | undefined
+	) => void
+	updateSelectedFileSelections: (
+		selections: SelectionRange[] | undefined
 	) => void
 	setViewMode: (path: string, viewMode: ViewMode) => void
 	fileCache: FileCacheController

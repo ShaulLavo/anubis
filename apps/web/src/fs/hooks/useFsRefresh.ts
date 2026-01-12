@@ -206,6 +206,20 @@ export const useFsRefresh = ({
 					rootPath: built.path ?? '',
 					rootName: built.name || 'root',
 				})
+
+				// Get root children names for cache fingerprint
+				const rootChildrenNames = (built.children ?? []).map((c) => c.name)
+
+				// Try to restore from cache - restores loadedDirPaths so we don't re-prefetch them
+				const cacheRestored =
+					await treePrefetchClient.tryRestoreFromCache(rootChildrenNames)
+
+				if (!cacheRestored) {
+					// Set fingerprint for future cache saves
+					treePrefetchClient.setShapeFingerprint(rootChildrenNames)
+				}
+
+				// Always seed the tree - if cache was restored, already-loaded dirs will be skipped
 				runPrefetchTask(
 					treePrefetchClient.seedTree(built),
 					'Failed to seed prefetch worker'

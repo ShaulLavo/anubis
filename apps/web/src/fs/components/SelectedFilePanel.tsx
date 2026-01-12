@@ -50,6 +50,8 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 			updateSelectedFileErrors,
 			updateSelectedFileScrollPosition,
 			updateSelectedFileVisibleContent,
+			updateSelectedFileCursorPosition,
+			updateSelectedFileSelections,
 			setViewMode,
 			saveFile,
 			fileCache,
@@ -201,8 +203,6 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 				onClose={handleTabClose}
 				getLabel={tabLabel}
 				getTooltip={getTabTooltip}
-				getViewMode={getTabViewMode}
-				getAvailableViewModes={getTabAvailableViewModes}
 				dirtyPaths={tabDirtyStatus()}
 				rightSlot={() => (
 					<ViewModeToggle
@@ -242,8 +242,22 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 							treeSitterWorker={treeSitterWorker() ?? undefined}
 							documentVersion={documentVersion}
 							onSave={() => void saveFile()}
-							initialScrollPosition={() => state.selectedFileScrollPosition}
+							initialScrollPosition={() => {
+								const pos = state.selectedFileScrollPosition
+								console.log('[SelectedFilePanel] initialScrollPosition accessor called', pos)
+								return pos
+							}}
 							onScrollPositionChange={updateSelectedFileScrollPosition}
+							initialCursorPosition={() => {
+								const pos = state.selectedFileCursorPosition
+								console.log('[SelectedFilePanel] initialCursorPosition accessor called', pos)
+								return pos
+							}}
+							onCursorPositionChange={(pos) =>
+								updateSelectedFileCursorPosition({ ...pos, offset: 0 })
+							}
+							initialSelections={() => state.selectedFileSelections}
+							onSelectionsChange={updateSelectedFileSelections}
 							initialVisibleContent={() => state.selectedFileVisibleContent}
 							onCaptureVisibleContent={updateSelectedFileVisibleContent}
 						/>

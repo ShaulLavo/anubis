@@ -1,6 +1,5 @@
 import type { FsDirTreeNode } from '@repo/fs'
 import { batch, getOwner, onCleanup } from 'solid-js'
-import { findNode } from '../runtime/tree'
 import type { FsState } from '../types'
 import { createTreePrefetchClient } from '../prefetch/treePrefetchClient'
 import type {
@@ -9,13 +8,13 @@ import type {
 	PrefetchErrorPayload,
 	PrefetchStatusPayload,
 } from '../prefetch/treePrefetchWorkerTypes'
-import { normalizeDirNodeMetadata } from '../utils/treeNodes'
-import { scheduleMicrotask } from '../utils/schedule'
+import { createBatchScheduler } from '../utils/schedule'
 import { toast } from '@repo/ui/toaster'
 
 type MakeTreePrefetchOptions = {
 	state: FsState
 	setDirNode: (path: string, node: FsDirTreeNode) => void
+	setBatchDirNodes: (nodes: FsDirTreeNode[]) => void
 	setLastPrefetchedPath: (path: string | undefined) => void
 	setBackgroundPrefetching: (value: boolean) => void
 	setBackgroundIndexedFileCount: (value: number) => void
@@ -33,6 +32,7 @@ type MakeTreePrefetchOptions = {
 export const makeTreePrefetch = ({
 	state,
 	setDirNode,
+	setBatchDirNodes,
 	setLastPrefetchedPath,
 	setBackgroundPrefetching,
 	setBackgroundIndexedFileCount,
@@ -44,10 +44,10 @@ export const makeTreePrefetch = ({
 	enableCaching = true, // Default to enabled for persistent tree cache
 }: MakeTreePrefetchOptions) => {
 	const handlePrefetchStatus = (status: PrefetchStatusPayload) => {
+		const shouldShowPrefetching =
+			status.running || status.pending > 0 || status.deferred > 0
 		batch(() => {
-			setBackgroundPrefetching(
-				status.running || status.pending > 0 || status.deferred > 0
-			)
+			setBackgroundPrefetching(shouldShowPrefetching)
 			setBackgroundIndexedFileCount(status.indexedFileCount)
 			setPrefetchProcessedCount(status.processedCount)
 			setPrefetchLastDurationMs(status.lastDurationMs)
@@ -75,27 +75,33 @@ export const makeTreePrefetch = ({
 		})
 	}
 
-	const handlePrefetchResult = (payload: PrefetchDirectoryLoadedPayload) => {
-		const node = payload.node
-		scheduleMicrotask(() => {
+	// Batch prefetch results to avoid flooding the main thread
+	// This collects incoming directories and applies them in chunks with yielding
+	const prefetchBatcher = createBatchScheduler<FsDirTreeNode>(
+		(nodes) => {
 			const latestTree = state.tree
 			if (!latestTree) return
-			const latestDir = findNode(latestTree, node.path)
-			if (!latestDir || latestDir.kind !== 'dir') return
-			const normalized = normalizeDirNodeMetadata(
-				node,
-				latestDir.parentPath,
-				latestDir.depth
-			)
+
+			// Apply all nodes in a single tree traversal + single reactivity batch
 			batch(() => {
-				setDirNode(node.path, normalized)
-				setLastPrefetchedPath(node.path)
+				setBatchDirNodes(nodes)
+				const lastNode = nodes[nodes.length - 1]
+				if (lastNode) {
+					setLastPrefetchedPath(lastNode.path)
+				}
 			})
-		})
+		},
+		{ maxBatchSize: 50, flushDelayMs: 50 }
+	)
+
+	const handlePrefetchResult = (payload: PrefetchDirectoryLoadedPayload) => {
+		prefetchBatcher.add(payload.node)
 	}
 
-	const handleDeferredMetadata = (payload: PrefetchDeferredMetadataPayload) => {
-		registerDeferredMetadata(payload.node)
+	const handleDeferredMetadata = (_payload: PrefetchDeferredMetadataPayload) => {
+		// Disabled: registerDeferredMetadata was updating a store for every deferred
+		// directory (thousands in node_modules) but the data was never used anywhere.
+		// This was causing main thread to hang.
 	}
 
 	const treePrefetchClient = createTreePrefetchClient(

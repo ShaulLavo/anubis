@@ -11,14 +11,17 @@ import { createFilePath, type FilePath } from '@repo/fs'
 import { createFileStateStore } from '../store'
 import { createIndexedDBBackend } from '../store/IndexedDBBackend'
 import { timestamp } from '../freshness'
-import type { SyntaxData, ScrollPosition } from '../store/types'
+import type { SyntaxData, ScrollPosition, CursorPosition, SelectionRange } from '../store/types'
+import type { ViewMode } from '../types/ViewMode'
 import type { FsState } from '../types'
+import { createLocalStorageCache, type LocalStorageCache } from './LocalStorageCache'
 
-export type { ScrollPosition }
+export type { ScrollPosition, CursorPosition, SelectionRange }
 
 export const DISABLE_CACHE = false as const
 
 export type FileCacheEntry = {
+	// Content state (IndexedDB)
 	pieceTable?: PieceTableSnapshot
 	stats?: ParseResult
 	previewBytes?: Uint8Array
@@ -26,9 +29,14 @@ export type FileCacheEntry = {
 	folds?: FoldRange[]
 	brackets?: BracketInfo[]
 	errors?: TreeSitterError[]
-	scrollPosition?: ScrollPosition
-	visibleContent?: VisibleContentSnapshot
 	lineStarts?: number[]
+	// View state (localStorage)
+	scrollPosition?: ScrollPosition
+	cursorPosition?: CursorPosition
+	selections?: SelectionRange[]
+	visibleContent?: VisibleContentSnapshot
+	viewMode?: ViewMode
+	isDirty?: boolean
 }
 
 export type CacheStats = {
@@ -67,7 +75,11 @@ type FileCacheControllerOptions = {
 		| 'fileBrackets'
 		| 'fileErrors'
 		| 'scrollPositions'
+		| 'cursorPositions'
+		| 'fileSelections'
 		| 'visibleContents'
+		| 'fileViewModes'
+		| 'dirtyPaths'
 	>
 	setPieceTable: (path: string, snapshot?: PieceTableSnapshot) => void
 	setFileStats: (path: string, stats?: ParseResult) => void
@@ -76,7 +88,11 @@ type FileCacheControllerOptions = {
 	setBrackets: (path: string, brackets?: BracketInfo[]) => void
 	setErrors: (path: string, errors?: TreeSitterError[]) => void
 	setScrollPosition: (path: string, position?: ScrollPosition) => void
+	setCursorPosition: (path: string, position?: CursorPosition) => void
+	setSelections: (path: string, selections?: SelectionRange[]) => void
 	setVisibleContent: (path: string, content?: VisibleContentSnapshot) => void
+	setViewMode: (path: string, mode?: ViewMode) => void
+	setDirtyPath: (path: string, isDirty?: boolean) => void
 }
 
 export const createFileCacheControllerV2 = ({
@@ -88,12 +104,17 @@ export const createFileCacheControllerV2 = ({
 	setBrackets,
 	setErrors,
 	setScrollPosition,
+	setCursorPosition,
+	setSelections,
 	setVisibleContent,
+	setViewMode,
+	setDirtyPath,
 }: FileCacheControllerOptions): FileCacheController => {
 	const store = createFileStateStore({
 		persistence: createIndexedDBBackend(),
 		persistenceDebounceMs: 150,
 	})
+	const lsCache = createLocalStorageCache()
 	const previews: Record<string, Uint8Array | undefined> = {}
 
 	const toFilePath = (path: string): FilePath => createFilePath(path)
@@ -102,7 +123,11 @@ export const createFileCacheControllerV2 = ({
 		if (DISABLE_CACHE) return {}
 		const p = normalizePath(path)
 
-		return {
+		// Get view state from localStorage (sync)
+		const lsState = lsCache.get(p)
+
+		const result = {
+			// Content state (from memory)
 			pieceTable: state.pieceTables[p],
 			stats: state.fileStats[p],
 			previewBytes: previews[p],
@@ -110,56 +135,110 @@ export const createFileCacheControllerV2 = ({
 			folds: state.fileFolds[p],
 			brackets: state.fileBrackets[p],
 			errors: state.fileErrors[p],
-			scrollPosition: state.scrollPositions[p],
-			visibleContent: state.visibleContents[p],
+			// View state (from memory, fallback to localStorage)
+			scrollPosition: state.scrollPositions[p] ?? lsState?.scroll ?? undefined,
+			cursorPosition: state.cursorPositions[p] ?? lsState?.cursor ?? undefined,
+			selections: state.fileSelections[p] ?? lsState?.selections ?? undefined,
+			visibleContent: state.visibleContents[p] ?? lsState?.visible ?? undefined,
+			viewMode: state.fileViewModes[p] ?? lsState?.viewMode ?? undefined,
+			isDirty: state.dirtyPaths[p] ?? lsState?.isDirty ?? undefined,
 		}
+
+		console.log('[FileCacheController] get()', {
+			path: p,
+			memoryScroll: state.scrollPositions[p],
+			lsScroll: lsState?.scroll,
+			resultScroll: result.scrollPosition,
+		})
+
+		return result
 	}
 
 	const set = (path: string, entry: FileCacheEntry) => {
+		console.log('[FileCacheController] set() called', {
+			path,
+			hasScrollPosition: entry.scrollPosition !== undefined,
+			hasCursorPosition: entry.cursorPosition !== undefined,
+			hasSelections: entry.selections !== undefined,
+			scrollPosition: entry.scrollPosition,
+		})
 		if (!path || DISABLE_CACHE) return
 		const p = normalizePath(path)
 
+		// Update memory state
 		batch(() => {
+			// Content state
 			if (entry.pieceTable !== undefined) setPieceTable(p, entry.pieceTable)
 			if (entry.stats !== undefined) setFileStats(p, entry.stats)
 			if (entry.highlights !== undefined) setHighlights(p, entry.highlights)
 			if (entry.folds !== undefined) setFolds(p, entry.folds)
 			if (entry.brackets !== undefined) setBrackets(p, entry.brackets)
 			if (entry.errors !== undefined) setErrors(p, entry.errors)
-			if (entry.scrollPosition !== undefined) setScrollPosition(p, entry.scrollPosition)
-			if (entry.visibleContent !== undefined) setVisibleContent(p, entry.visibleContent)
 			if (entry.previewBytes !== undefined) previews[p] = entry.previewBytes
+			// View state
+			if (entry.scrollPosition !== undefined) setScrollPosition(p, entry.scrollPosition)
+			if (entry.cursorPosition !== undefined) setCursorPosition(p, entry.cursorPosition)
+			if (entry.selections !== undefined) setSelections(p, entry.selections)
+			if (entry.visibleContent !== undefined) setVisibleContent(p, entry.visibleContent)
+			if (entry.viewMode !== undefined) setViewMode(p, entry.viewMode)
+			if (entry.isDirty !== undefined) setDirtyPath(p, entry.isDirty)
 		})
 
-		const fp = toFilePath(p)
-		store.update(fp, {
-			...(entry.pieceTable !== undefined && {
-				pieceTable: timestamp(entry.pieceTable),
-			}),
-			...(entry.stats !== undefined && {
-				stats: timestamp(entry.stats),
-			}),
-			...((entry.highlights !== undefined ||
-				entry.folds !== undefined ||
-				entry.brackets !== undefined ||
-				entry.errors !== undefined) && {
-				syntax: timestamp<SyntaxData>({
-					highlights: entry.highlights ?? [],
-					brackets: entry.brackets ?? [],
-					folds: entry.folds ?? [],
-					errors: entry.errors ?? [],
+		// Write view state to localStorage (sync, debounced)
+		const hasViewState =
+			entry.scrollPosition !== undefined ||
+			entry.cursorPosition !== undefined ||
+			entry.selections !== undefined ||
+			entry.visibleContent !== undefined ||
+			entry.viewMode !== undefined ||
+			entry.isDirty !== undefined
+
+		if (hasViewState) {
+			lsCache.set(p, {
+				...(entry.scrollPosition !== undefined && { scroll: entry.scrollPosition }),
+				...(entry.cursorPosition !== undefined && { cursor: entry.cursorPosition }),
+				...(entry.selections !== undefined && { selections: entry.selections }),
+				...(entry.visibleContent !== undefined && { visible: entry.visibleContent }),
+				...(entry.viewMode !== undefined && { viewMode: entry.viewMode }),
+				...(entry.isDirty !== undefined && { isDirty: entry.isDirty }),
+			})
+		}
+
+		// Write content state to IndexedDB (async, debounced)
+		const hasContentState =
+			entry.pieceTable !== undefined ||
+			entry.stats !== undefined ||
+			entry.highlights !== undefined ||
+			entry.folds !== undefined ||
+			entry.brackets !== undefined ||
+			entry.errors !== undefined ||
+			entry.previewBytes !== undefined
+
+		if (hasContentState) {
+			const fp = toFilePath(p)
+			store.update(fp, {
+				...(entry.pieceTable !== undefined && {
+					pieceTable: timestamp(entry.pieceTable),
 				}),
-			}),
-			...(entry.scrollPosition !== undefined && {
-				scrollPosition: timestamp(entry.scrollPosition),
-			}),
-			...(entry.visibleContent !== undefined && {
-				visibleContent: timestamp(entry.visibleContent),
-			}),
-			...(entry.previewBytes !== undefined && {
-				previewBytes: entry.previewBytes,
-			}),
-		})
+				...(entry.stats !== undefined && {
+					stats: timestamp(entry.stats),
+				}),
+				...((entry.highlights !== undefined ||
+					entry.folds !== undefined ||
+					entry.brackets !== undefined ||
+					entry.errors !== undefined) && {
+					syntax: timestamp<SyntaxData>({
+						highlights: entry.highlights ?? [],
+						brackets: entry.brackets ?? [],
+						folds: entry.folds ?? [],
+						errors: entry.errors ?? [],
+					}),
+				}),
+				...(entry.previewBytes !== undefined && {
+					previewBytes: entry.previewBytes,
+				}),
+			})
+		}
 	}
 
 	const clearBuffer = (path: string) => {
@@ -186,16 +265,25 @@ export const createFileCacheControllerV2 = ({
 		if (!path) return
 		const p = normalizePath(path)
 		batch(() => {
+			// Content state
 			setPieceTable(p, undefined)
 			setFileStats(p, undefined)
 			setHighlights(p, undefined)
 			setFolds(p, undefined)
 			setBrackets(p, undefined)
 			setErrors(p, undefined)
-			setScrollPosition(p, undefined)
-			setVisibleContent(p, undefined)
 			delete previews[p]
+			// View state
+			setScrollPosition(p, undefined)
+			setCursorPosition(p, undefined)
+			setSelections(p, undefined)
+			setVisibleContent(p, undefined)
+			setViewMode(p, undefined)
+			setDirtyPath(p, undefined)
 		})
+		// Clear from localStorage
+		lsCache.clear(p)
+		// Clear from IndexedDB
 		store.remove(toFilePath(p)).catch((error) => {
 			console.warn(`FileCacheControllerV2: Failed to clear path ${p}:`, error)
 		})
@@ -203,16 +291,25 @@ export const createFileCacheControllerV2 = ({
 
 	const clearAll = () => {
 		batch(() => {
+			// Content state
 			for (const path of Object.keys(state.pieceTables)) setPieceTable(path, undefined)
 			for (const path of Object.keys(state.fileStats)) setFileStats(path, undefined)
 			for (const path of Object.keys(state.fileHighlights)) setHighlights(path, undefined)
 			for (const path of Object.keys(state.fileFolds)) setFolds(path, undefined)
 			for (const path of Object.keys(state.fileBrackets)) setBrackets(path, undefined)
 			for (const path of Object.keys(state.fileErrors)) setErrors(path, undefined)
-			for (const path of Object.keys(state.scrollPositions)) setScrollPosition(path, undefined)
-			for (const path of Object.keys(state.visibleContents)) setVisibleContent(path, undefined)
 			for (const path of Object.keys(previews)) delete previews[path]
+			// View state
+			for (const path of Object.keys(state.scrollPositions)) setScrollPosition(path, undefined)
+			for (const path of Object.keys(state.cursorPositions)) setCursorPosition(path, undefined)
+			for (const path of Object.keys(state.fileSelections)) setSelections(path, undefined)
+			for (const path of Object.keys(state.visibleContents)) setVisibleContent(path, undefined)
+			for (const path of Object.keys(state.fileViewModes)) setViewMode(path, undefined)
+			for (const path of Object.keys(state.dirtyPaths)) setDirtyPath(path, undefined)
 		})
+		// Clear localStorage
+		lsCache.clearAll()
+		// Clear IndexedDB
 		store.clear().catch((error) => {
 			console.warn('FileCacheControllerV2: Failed to clear all:', error)
 		})
@@ -220,15 +317,21 @@ export const createFileCacheControllerV2 = ({
 
 	const clearMemory = () => {
 		batch(() => {
+			// Content state
 			for (const path of Object.keys(state.pieceTables)) setPieceTable(path, undefined)
 			for (const path of Object.keys(state.fileStats)) setFileStats(path, undefined)
 			for (const path of Object.keys(state.fileHighlights)) setHighlights(path, undefined)
 			for (const path of Object.keys(state.fileFolds)) setFolds(path, undefined)
 			for (const path of Object.keys(state.fileBrackets)) setBrackets(path, undefined)
 			for (const path of Object.keys(state.fileErrors)) setErrors(path, undefined)
-			for (const path of Object.keys(state.scrollPositions)) setScrollPosition(path, undefined)
-			for (const path of Object.keys(state.visibleContents)) setVisibleContent(path, undefined)
 			for (const path of Object.keys(previews)) delete previews[path]
+			// View state
+			for (const path of Object.keys(state.scrollPositions)) setScrollPosition(path, undefined)
+			for (const path of Object.keys(state.cursorPositions)) setCursorPosition(path, undefined)
+			for (const path of Object.keys(state.fileSelections)) setSelections(path, undefined)
+			for (const path of Object.keys(state.visibleContents)) setVisibleContent(path, undefined)
+			for (const path of Object.keys(state.fileViewModes)) setViewMode(path, undefined)
+			for (const path of Object.keys(state.dirtyPaths)) setDirtyPath(path, undefined)
 		})
 	}
 
@@ -236,29 +339,41 @@ export const createFileCacheControllerV2 = ({
 		if (DISABLE_CACHE) return {}
 		const p = normalizePath(path)
 
+		// Step 1: Get from memory + localStorage (sync) - includes view state
 		const memoryEntry = get(p)
-		const hasMemoryData = Object.keys(memoryEntry).some(
-			(key) => memoryEntry[key as keyof FileCacheEntry] !== undefined
-		)
-		if (hasMemoryData) return memoryEntry
+		const hasContentInMemory =
+			memoryEntry.pieceTable !== undefined ||
+			memoryEntry.stats !== undefined ||
+			memoryEntry.highlights !== undefined
 
+		// If we have content in memory, return immediately
+		if (hasContentInMemory) return memoryEntry
+
+		// Step 2: Get content state from IndexedDB (async)
 		const fp = toFilePath(p)
 		const persistedState = await store.getAsync(fp)
-		if (!persistedState) return {}
 
+		// Build entry from IndexedDB content + existing view state
 		const entry: FileCacheEntry = {
-			pieceTable: persistedState.pieceTable?.value,
-			stats: persistedState.stats?.value,
-			previewBytes: persistedState.previewBytes ?? undefined,
-			highlights: persistedState.syntax?.value.highlights,
-			folds: persistedState.syntax?.value.folds,
-			brackets: persistedState.syntax?.value.brackets,
-			errors: persistedState.syntax?.value.errors,
-			scrollPosition: persistedState.scrollPosition?.value,
-			visibleContent: persistedState.visibleContent?.value,
-			lineStarts: persistedState.lineStarts ?? undefined,
+			// Content state from IndexedDB
+			pieceTable: persistedState?.pieceTable?.value,
+			stats: persistedState?.stats?.value,
+			previewBytes: persistedState?.previewBytes ?? undefined,
+			highlights: persistedState?.syntax?.value.highlights,
+			folds: persistedState?.syntax?.value.folds,
+			brackets: persistedState?.syntax?.value.brackets,
+			errors: persistedState?.syntax?.value.errors,
+			lineStarts: persistedState?.lineStarts ?? undefined,
+			// View state from memory/localStorage (already in memoryEntry)
+			scrollPosition: memoryEntry.scrollPosition,
+			cursorPosition: memoryEntry.cursorPosition,
+			selections: memoryEntry.selections,
+			visibleContent: memoryEntry.visibleContent,
+			viewMode: memoryEntry.viewMode,
+			isDirty: memoryEntry.isDirty,
 		}
 
+		// Populate memory with content state from IndexedDB
 		batch(() => {
 			if (entry.pieceTable) setPieceTable(p, entry.pieceTable)
 			if (entry.stats) setFileStats(p, entry.stats)
@@ -266,9 +381,14 @@ export const createFileCacheControllerV2 = ({
 			if (entry.folds) setFolds(p, entry.folds)
 			if (entry.brackets) setBrackets(p, entry.brackets)
 			if (entry.errors) setErrors(p, entry.errors)
-			if (entry.scrollPosition) setScrollPosition(p, entry.scrollPosition)
-			if (entry.visibleContent) setVisibleContent(p, entry.visibleContent)
 			if (entry.previewBytes) previews[p] = entry.previewBytes
+			// Also populate view state in memory from localStorage
+			if (entry.scrollPosition) setScrollPosition(p, entry.scrollPosition)
+			if (entry.cursorPosition) setCursorPosition(p, entry.cursorPosition)
+			if (entry.selections) setSelections(p, entry.selections)
+			if (entry.visibleContent) setVisibleContent(p, entry.visibleContent)
+			if (entry.viewMode) setViewMode(p, entry.viewMode)
+			if (entry.isDirty !== undefined) setDirtyPath(p, entry.isDirty)
 		})
 
 		return entry
@@ -276,7 +396,11 @@ export const createFileCacheControllerV2 = ({
 
 	const getScrollPosition = (path: string): ScrollPosition | undefined => {
 		const p = normalizePath(path)
-		return state.scrollPositions[p]
+		// Check memory first, then localStorage
+		const memoryScroll = state.scrollPositions[p]
+		if (memoryScroll) return memoryScroll
+		const lsState = lsCache.get(p)
+		return lsState?.scroll ?? undefined
 	}
 
 	const getLineStarts = (path: string): number[] | undefined => {
@@ -287,13 +411,19 @@ export const createFileCacheControllerV2 = ({
 	const setActiveFile = (_path: string | null): void => {}
 	const setOpenTabs = (_paths: string[]): void => {}
 
-	const getStats = async (): Promise<CacheStats> => ({
-		memoryEntries: store.size,
-		persistedEntries: 0,
-		totalSize: 0,
-	})
+	const getStats = async (): Promise<CacheStats> => {
+		const lsStats = lsCache.getStats()
+		return {
+			memoryEntries: store.size,
+			persistedEntries: lsStats.entries,
+			totalSize: lsStats.approximateSize,
+		}
+	}
 
 	const flush = async (): Promise<void> => {
+		// Flush localStorage (sync)
+		lsCache.flush()
+		// Flush IndexedDB (async)
 		await store.flush()
 	}
 

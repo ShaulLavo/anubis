@@ -119,15 +119,14 @@ export class ViewModeRegistry {
 		const normalizePath = (path: string): string => 
 			path.startsWith('/') ? path.slice(1) : path
 
-		// UI mode for settings files
+		// UI mode for user settings file only (not defaultSettings which is uneditable)
 		this.register({
 			id: 'ui',
 			label: 'UI',
 			icon: 'settings-gear',
 			isAvailable: (path) => {
 				const normalized = normalizePath(path)
-				return normalized === '.system/userSettings.json' || 
-				       normalized === '.system/settings.json'
+				return normalized === '.system/userSettings.json'
 			},
 		})
 

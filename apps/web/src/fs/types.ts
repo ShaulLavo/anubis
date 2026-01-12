@@ -8,7 +8,7 @@ import type {
 	FoldRange,
 } from '../workers/treeSitter/types'
 import type { DeferredDirMetadata } from './prefetch/treePrefetchWorkerTypes'
-import type { ScrollPosition, HighlightTransform } from './store/types'
+import type { ScrollPosition, HighlightTransform, CursorPosition, SelectionRange } from './store/types'
 import type { ViewMode } from './types/ViewMode'
 
 export type FsSource = 'memory' | 'local' | 'opfs'
@@ -53,6 +53,12 @@ export type FsState = {
 	dirtyPaths: Record<string, boolean>
 	scrollPositions: Record<string, ScrollPosition | undefined>
 	selectedFileScrollPosition?: ScrollPosition
+	/** Cursor positions for each file */
+	cursorPositions: Record<string, CursorPosition | undefined>
+	selectedFileCursorPosition?: CursorPosition
+	/** Selection ranges for each file */
+	fileSelections: Record<string, SelectionRange[] | undefined>
+	selectedFileSelections?: SelectionRange[]
 	/** Pre-computed visible content for instant tab switching */
 	visibleContents: Record<string, VisibleContentSnapshot | undefined>
 	selectedFileVisibleContent?: VisibleContentSnapshot

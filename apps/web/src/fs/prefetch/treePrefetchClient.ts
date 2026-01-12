@@ -72,6 +72,8 @@ export const createTreePrefetchClient = (
 		workerCount,
 		callbacks,
 		loadDirectory: (target) => pool.api.loadDirectory(target),
+		// Run tree extraction in worker to avoid main thread work
+		extractPendingTargets: (tree) => pool.api.extractPendingTargets(tree),
 	})
 
 	let destroyed = false

@@ -58,8 +58,32 @@ export type TreePrefetchWorkerCallbacks = {
 	onError?(payload: PrefetchErrorPayload): void
 }
 
+/** File/dir metadata for search indexing */
+export type IndexableFile = {
+	path: string
+	kind: 'file' | 'dir'
+}
+
+/** Result from loading a directory, with precomputed pending targets */
+export type DirectoryLoadResult = {
+	node: FsDirTreeNode
+	/** Child directories that need loading (isLoaded === false) */
+	pendingTargets: PrefetchTarget[]
+	/** Count of files in this directory (for indexing stats) */
+	fileCount: number
+	/** Files and dirs to index for search */
+	filesToIndex: IndexableFile[]
+}
+
 export type TreePrefetchWorkerApi = {
 	init(payload: TreePrefetchWorkerInitPayload): Promise<void>
-	loadDirectory(target: PrefetchTarget): Promise<FsDirTreeNode | undefined>
+	/** Load a directory and precompute pending targets in the worker */
+	loadDirectory(target: PrefetchTarget): Promise<DirectoryLoadResult | undefined>
+	/** Seed tree and extract all pending targets in the worker */
+	extractPendingTargets(tree: FsDirTreeNode): Promise<{
+		targets: PrefetchTarget[]
+		loadedPaths: string[]
+		totalFileCount: number
+	}>
 	dispose(): Promise<void>
 }

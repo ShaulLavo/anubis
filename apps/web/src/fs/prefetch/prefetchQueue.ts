@@ -9,6 +9,7 @@ import type {
 	PrefetchTarget,
 	TreePrefetchWorkerCallbacks,
 	DeferredDirMetadata,
+	DirectoryLoadResult,
 } from './treePrefetchWorkerTypes'
 import { searchService } from '../../search/SearchService'
 import type { FileMetadata } from '../../search/types'
@@ -19,13 +20,13 @@ import {
 	clearPrefetchCache,
 } from './prefetchCacheBackend'
 
-const MAX_PREFETCH_DEPTH = 6
+const MAX_PREFETCH_DEPTH = 20
 const MAX_PREFETCHED_DIRS = Infinity
-const STATUS_SAMPLE_INTERVAL = 50
-const BATCH_SIZE = 8
-const BATCH_DELAY_MS = 4
-const INDEX_BATCH_SIZE = 100
-const CACHE_SAVE_INTERVAL = 100 // Save cache every N directories processed
+const STATUS_SAMPLE_INTERVAL = 500 // Only emit status every N directories to reduce main thread load
+const BATCH_SIZE = 4 // Smaller batches to reduce per-batch time
+const BATCH_DELAY_MS = 16 // Longer delay to give main thread breathing room
+const INDEX_BATCH_SIZE = 500 // Larger batch before flushing to SQLite
+const CACHE_SAVE_INTERVAL = 200 // Save cache every N directories processed
 
 const now = () =>
 	typeof performance !== 'undefined' ? performance.now() : Date.now()
@@ -36,7 +37,14 @@ type PrefetchPriority = 'primary' | 'deferred'
 
 type PrefetchQueueOptions = {
 	workerCount: number
-	loadDirectory: (target: PrefetchTarget) => Promise<FsDirTreeNode | undefined>
+	/** Load directory with preprocessing done in worker */
+	loadDirectory: (target: PrefetchTarget) => Promise<DirectoryLoadResult | undefined>
+	/** Extract pending targets from tree (runs in worker) */
+	extractPendingTargets: (tree: FsDirTreeNode) => Promise<{
+		targets: PrefetchTarget[]
+		loadedPaths: string[]
+		totalFileCount: number
+	}>
 	callbacks: TreePrefetchWorkerCallbacks
 }
 
@@ -85,6 +93,8 @@ export class PrefetchQueue {
 	private currentShapeFingerprint: string | undefined
 	private lastCacheSaveCount = 0
 	private cacheRestored = false
+	private lastProgressCheck = 0
+	private restartWithoutProgressCount = 0
 
 	constructor(private readonly options: PrefetchQueueOptions) {
 		this.workerCount = Math.max(1, Math.floor(options.workerCount))
@@ -117,18 +127,36 @@ export class PrefetchQueue {
 			return
 		}
 
-		const pending = this.ingestLoadedSubtree(tree)
+		// Extract pending targets in the worker to avoid main thread work
+		const { targets, loadedPaths, totalFileCount } =
+			await this.options.extractPendingTargets(tree)
+
+		// Update tracking on main thread (lightweight)
+		for (const path of loadedPaths) {
+			this.loadedDirPaths.add(path)
+		}
+		this.indexedFileCount = totalFileCount
 
 		this.emitStatus(this.running)
-		this.enqueueTargets(pending)
+		this.enqueueTargets(targets)
 	}
 
-	enqueueSubtree(node: FsDirTreeNode) {
+	async enqueueSubtree(node: FsDirTreeNode) {
 		if (!node) return
 		this.dropTargetFromQueues(node.path)
-		const pending = this.ingestLoadedSubtree(node)
+
+		// Extract pending targets in worker (avoid main thread work)
+		const { targets, loadedPaths, totalFileCount } =
+			await this.options.extractPendingTargets(node)
+
+		for (const path of loadedPaths) {
+			this.loadedDirPaths.add(path)
+		}
+		// Add to existing count (don't overwrite)
+		this.indexedFileCount += totalFileCount
+
 		this.emitStatus(this.running)
-		this.enqueueTargets(pending)
+		this.enqueueTargets(targets)
 	}
 
 	markDirLoaded(path: string | undefined) {
@@ -189,6 +217,8 @@ export class PrefetchQueue {
 		this.currentShapeFingerprint = undefined
 		this.lastCacheSaveCount = 0
 		this.cacheRestored = false
+		this.lastProgressCheck = 0
+		this.restartWithoutProgressCount = 0
 		this.emitStatus(false)
 	}
 
@@ -265,7 +295,19 @@ export class PrefetchQueue {
 				this.running = false
 				this.emitStatus(false)
 				this.logCompletion()
-				if (!this.disposed && this.hasPendingTargets()) {
+				const pending = this.hasPendingTargets()
+				if (!this.disposed && pending) {
+					// Check if we're making progress
+					if (this.processedCount === this.lastProgressCheck) {
+						this.restartWithoutProgressCount++
+						if (this.restartWithoutProgressCount >= 3) {
+							// Don't restart again - we're stuck
+							return
+						}
+					} else {
+						this.lastProgressCheck = this.processedCount
+						this.restartWithoutProgressCount = 0
+					}
 					this.scheduleProcessing()
 				}
 			})
@@ -292,47 +334,24 @@ export class PrefetchQueue {
 		}
 
 		// Primary queue is empty - check if we can move to deferred phase
-		if (!this.primaryPhaseComplete) {
-			if (this.activeJobs.primary === 0) {
-				// No active primary jobs, safe to mark complete
-				this.markPrimaryPhaseComplete()
-			} else {
-				// There are active primary jobs - but if WE are the only worker
-				// still running (others have exited), we should NOT return undefined
-				// because no one else will mark primary complete.
-				// Instead, try to get a deferred target to keep making progress.
-				// The active primary job counter will be decremented when it finishes.
-				// This is a workaround for the race condition where workers exit
-				// while waiting for a primary job that's actually already done.
-				console.debug('[Prefetch] Primary queue empty but activeJobs.primary > 0, checking deferred anyway')
-			}
+		if (!this.primaryPhaseComplete && this.activeJobs.primary === 0) {
+			this.markPrimaryPhaseComplete()
 		}
 
-		// Always try deferred queue if primary is empty
-		// (primaryPhaseComplete might be false if activeJobs.primary > 0, but we still want to make progress)
-		if (this.primaryQueue.size === 0) {
-			console.debug('[Prefetch] Checking deferred queue, size:', this.deferredQueue.size)
-			const deferredTarget = this.takeFromQueue(this.deferredQueue)
-			if (deferredTarget) {
-				console.debug('[Prefetch] Got deferred target:', deferredTarget.path)
-				// If we're taking a deferred target while primary isn't "complete",
-				// mark it complete now since primary queue is empty
-				if (!this.primaryPhaseComplete && this.activeJobs.primary === 0) {
-					this.markPrimaryPhaseComplete()
-				}
-				return { target: deferredTarget, priority: 'deferred' }
+		// Try deferred queue (even if activeJobs.primary > 0 to avoid getting stuck)
+		const deferredTarget = this.takeFromQueue(this.deferredQueue)
+		if (deferredTarget) {
+			if (!this.primaryPhaseComplete && this.activeJobs.primary === 0) {
+				this.markPrimaryPhaseComplete()
 			}
-			// Deferred queue is empty
-			console.debug('[Prefetch] Deferred queue empty, activeJobs:', {
-				primary: this.activeJobs.primary,
-				deferred: this.activeJobs.deferred,
-			})
-			if (this.activeJobs.deferred === 0) {
-				this.flushPhaseResults('deferred')
-				if (!this.deferredPhaseLogged) {
-					this.deferredPhaseLogged = true
-					this.logPhaseCompletion('deferred')
-				}
+			return { target: deferredTarget, priority: 'deferred' }
+		}
+
+		if (this.activeJobs.deferred === 0) {
+			this.flushPhaseResults('deferred')
+			if (!this.deferredPhaseLogged) {
+				this.deferredPhaseLogged = true
+				this.logPhaseCompletion('deferred')
 			}
 		}
 
@@ -392,18 +411,6 @@ export class PrefetchQueue {
 
 			const next = this.dequeueNextTarget()
 			if (!next) {
-				// Debug: log why worker is exiting with no target
-				if (this.primaryQueue.size > 0 || this.deferredQueue.size > 0) {
-					console.warn('[Prefetch] Worker exiting but queues not empty:', {
-						primaryQueue: this.primaryQueue.size,
-						deferredQueue: this.deferredQueue.size,
-						primaryPhaseComplete: this.primaryPhaseComplete,
-						activeJobs: {
-							primary: this.activeJobs.primary,
-							deferred: this.activeJobs.deferred,
-						},
-					})
-				}
 				return
 			}
 
@@ -412,21 +419,30 @@ export class PrefetchQueue {
 			this.activeJobs[priority] += 1
 
 			try {
-				// Debug: log when starting a job
-				if (priority === 'deferred') {
-					console.debug('[Prefetch] Starting deferred job:', target.path)
-				}
-				// Worker handles timeout internally and returns undefined on timeout
-				const subtree = await this.options.loadDirectory(target)
+				const result = await this.options.loadDirectory(target)
 				if (sessionToken !== this.sessionToken) {
 					return
 				}
-				if (!subtree) {
+				if (!result) {
 					// Directory failed to load or timed out - skip it and continue
 					continue
 				}
+
+				// Use pre-computed data from worker (no main thread tree traversal!)
+				const { node: subtree, pendingTargets, fileCount, filesToIndex } = result
+
 				this.sessionPrefetchCount += 1
-				const pending = this.ingestLoadedSubtree(subtree)
+				this.loadedDirPaths.add(subtree.path ?? '')
+				this.indexedFileCount += fileCount
+
+				// Queue files for search indexing
+				if (filesToIndex.length > 0) {
+					this.indexBatch.push(...filesToIndex)
+					if (this.indexBatch.length >= INDEX_BATCH_SIZE) {
+						void this.flushIndexBatch()
+					}
+				}
+
 				const payload: PrefetchDirectoryLoadedPayload = { node: subtree }
 				if (priority === 'primary') {
 					this.pendingResults.primary.push(payload)
@@ -444,7 +460,7 @@ export class PrefetchQueue {
 						node: deferredMetadata,
 					})
 				}
-				this.enqueueTargets(pending)
+				this.enqueueTargets(pendingTargets)
 				if (!this.hasPrefetchBudget()) {
 					this.primaryQueue.clear()
 					this.deferredQueue.clear()
@@ -453,10 +469,10 @@ export class PrefetchQueue {
 				this.lastDurationMs = duration
 				this.totalDurationMs += duration
 				this.processedCount += 1
-				const milestoneReached =
-					this.processedCount > 0 &&
-					this.processedCount % STATUS_SAMPLE_INTERVAL === 0
-				this.emitStatus(true, milestoneReached)
+				// Only emit status every STATUS_SAMPLE_INTERVAL to avoid overwhelming main thread
+				if (this.processedCount % STATUS_SAMPLE_INTERVAL === 0) {
+					this.emitStatus(true, true)
+				}
 				this.maybeSaveCache()
 				if (this.processedCount % BATCH_SIZE === 0) {
 					await delay(BATCH_DELAY_MS)
@@ -501,77 +517,17 @@ export class PrefetchQueue {
 		this.deferredQueue.delete(path)
 	}
 
-	private trackLoadedDirectory(dir: FsDirTreeNode) {
-		if (dir.kind !== 'dir') return
-		if (dir.isLoaded === false) return
-		const path = dir.path ?? ''
-		this.loadedDirPaths.add(path)
-		const children = dir.children
-
-		const filesToIndex: FileMetadata[] = []
-
-		const fileCount = !children
-			? 0
-			: children.reduce((count, child) => {
-					if (child.kind === 'file') {
-						filesToIndex.push({ path: child.path, kind: 'file' })
-						return count + 1
-					} else if (child.kind === 'dir') {
-						filesToIndex.push({ path: child.path, kind: 'dir' })
-					}
-					return count
-				}, 0)
-
-		if (filesToIndex.length > 0) {
-			this.indexBatch.push(...filesToIndex)
-			if (this.indexBatch.length >= INDEX_BATCH_SIZE) {
-				void this.flushIndexBatch()
-			}
-		}
-
-		const previous = this.loadedDirFileCounts.get(path) ?? 0
-		if (fileCount === previous) return
-		this.loadedDirFileCounts.set(path, fileCount)
-		this.indexedFileCount += fileCount - previous
-	}
-
 	private async flushIndexBatch() {
 		if (this.indexBatch.length === 0) return
 		const batch = [...this.indexBatch]
 		this.indexBatch = []
 
+		// SQLite runs in a separate worker, so this just sends data via comlink
 		try {
 			await searchService.indexFiles(batch)
 		} catch {
 			// Failed to batch insert files to SQLite
 		}
-	}
-
-	private ingestLoadedSubtree(node: FsDirTreeNode) {
-		if (node.kind !== 'dir') return [] as PrefetchTarget[]
-		const stack: FsDirTreeNode[] = [node]
-		const pending: PrefetchTarget[] = []
-
-		while (stack.length) {
-			const dir = stack.pop()!
-			this.trackLoadedDirectory(dir)
-
-			for (const child of dir.children) {
-				if (child.kind !== 'dir') continue
-				if (child.isLoaded === false) {
-					pending.push({
-						path: child.path,
-						name: child.name,
-						depth: child.depth,
-						parentPath: child.parentPath,
-					})
-				} else {
-					stack.push(child)
-				}
-			}
-		}
-
-		return pending
 	}
 
 	private emitStatus(running: boolean, milestone = false) {
@@ -597,17 +553,6 @@ export class PrefetchQueue {
 				averageDurationMs: payload.averageDurationMs,
 			}
 			payload.milestone = milestonePayload
-		}
-
-		// Debug: log when status changes to help diagnose stuck state
-		if (!running && (this.primaryQueue.size > 0 || this.deferredQueue.size > 0)) {
-			console.warn('[Prefetch] Workers stopped but queues not empty:', {
-				running,
-				primaryQueue: this.primaryQueue.size,
-				deferredQueue: this.deferredQueue.size,
-				primaryPhaseComplete: this.primaryPhaseComplete,
-				activeJobs: { ...this.activeJobs },
-			})
 		}
 
 		this.options.callbacks.onStatus(payload)
@@ -649,6 +594,12 @@ export class PrefetchQueue {
 			const cached = await loadPrefetchCache()
 			if (!cached) return false
 
+			// Check for old cache format (had loadedDirPaths instead of loadedDirFileCounts)
+			if (!cached.loadedDirFileCounts) {
+				await clearPrefetchCache()
+				return false
+			}
+
 			const currentFingerprint = generateShapeFingerprint(rootChildren)
 			this.currentShapeFingerprint = currentFingerprint
 
@@ -659,15 +610,22 @@ export class PrefetchQueue {
 				return false
 			}
 
-			// Restore the state
-			for (const path of cached.loadedDirPaths) {
-				this.loadedDirPaths.add(path)
+			// Restore file counts from cache - this prevents double-counting when we
+			// re-walk directories. We DON'T restore loadedDirPaths because that would
+			// skip directories without enqueuing their children (we don't cache tree data).
+			// Instead, we re-walk everything but use cached counts to compute correct deltas.
+			for (const [path, count] of Object.entries(cached.loadedDirFileCounts)) {
+				this.loadedDirFileCounts.set(path, count)
 			}
 			this.indexedFileCount = cached.indexedFileCount
-			this.lastCacheSaveCount = cached.loadedDirPaths.length
+			this.lastCacheSaveCount = this.loadedDirFileCounts.size
 			this.cacheRestored = true
 
-			return true
+			// Emit status so UI shows the cached indexed count immediately
+			this.emitStatus(false)
+
+			// Return false to still seed the tree - we'll re-walk but won't double-count
+			return false
 		} catch {
 			return false
 		}
@@ -681,12 +639,12 @@ export class PrefetchQueue {
 
 		try {
 			await savePrefetchCache({
-				loadedDirPaths: Array.from(this.loadedDirPaths),
+				loadedDirFileCounts: Object.fromEntries(this.loadedDirFileCounts),
 				indexedFileCount: this.indexedFileCount,
 				shapeFingerprint: this.currentShapeFingerprint,
 				savedAt: Date.now(),
 			})
-			this.lastCacheSaveCount = this.loadedDirPaths.size
+			this.lastCacheSaveCount = this.loadedDirFileCounts.size
 		} catch {
 			// Ignore cache save errors
 		}
@@ -696,7 +654,7 @@ export class PrefetchQueue {
 	 * Maybe save the cache if enough progress has been made since last save.
 	 */
 	private maybeSaveCache(): void {
-		const progress = this.loadedDirPaths.size - this.lastCacheSaveCount
+		const progress = this.loadedDirFileCounts.size - this.lastCacheSaveCount
 		if (progress >= CACHE_SAVE_INTERVAL) {
 			void this.saveToCache()
 		}

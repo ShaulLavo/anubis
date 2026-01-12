@@ -52,6 +52,25 @@ export interface ScrollPosition {
 }
 
 /**
+ * Cursor position within a file.
+ */
+export interface CursorPosition {
+	readonly line: number
+	readonly column: number
+	readonly offset: number
+}
+
+/**
+ * Selection range within a file.
+ * anchor is where selection started (immovable end)
+ * focus is where selection ends (cursor position)
+ */
+export interface SelectionRange {
+	readonly anchor: number
+	readonly focus: number
+}
+
+/**
  * Shared buffer for multi-tab editing.
  * This is the live content that editors read from and write to.
  */
@@ -128,6 +147,12 @@ export interface FileState {
 	/** Scroll position within the file */
 	scrollPosition: Timestamped<ScrollPosition> | null
 
+	/** Cursor position within the file */
+	cursorPosition: CursorPosition | null
+
+	/** Selection ranges (empty array = no selection) */
+	selections: SelectionRange[] | null
+
 	/** Visible content snapshot for instant tab switching */
 	visibleContent: Timestamped<VisibleContentSnapshot> | null
 
@@ -166,6 +191,8 @@ export function createEmptyFileState(path: FilePath): FileState {
 		stats: null,
 		syntax: null,
 		scrollPosition: null,
+		cursorPosition: null,
+		selections: null,
 		visibleContent: null,
 		viewMode: null,
 		loadingState: { status: 'idle' },

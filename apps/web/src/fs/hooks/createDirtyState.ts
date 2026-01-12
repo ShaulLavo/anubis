@@ -11,8 +11,13 @@ const normalizePath = (path: string): string =>
 export const createDirtyState = () => {
 	const [dirtyPaths, setDirtyPaths] = createStore<Record<string, boolean>>({})
 
-	const setDirtyPath = (path: string, isDirty: boolean) => {
-		setDirtyPaths(normalizePath(path), isDirty)
+	const setDirtyPath = (path: string, isDirty?: boolean) => {
+		const p = normalizePath(path)
+		if (isDirty === undefined || isDirty === false) {
+			setDirtyPaths(p, undefined as unknown as boolean)
+		} else {
+			setDirtyPaths(p, isDirty)
+		}
 	}
 
 	const clearDirtyPaths = () => {

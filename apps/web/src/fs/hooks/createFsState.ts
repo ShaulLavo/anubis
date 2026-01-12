@@ -17,6 +17,8 @@ import { createBracketState } from './createBracketState'
 import { createDirtyState } from './createDirtyState'
 import { createErrorState } from './createErrorState'
 import { createScrollPositionState } from './createScrollPositionState'
+import { createCursorPositionState } from './createCursorPositionState'
+import { createSelectionsState } from './createSelectionsState'
 import { createVisibleContentState } from './createVisibleContentState'
 import { createViewModeState } from './createViewModeState'
 
@@ -77,6 +79,10 @@ export const createFsState = () => {
 	const { dirtyPaths, setDirtyPath, clearDirtyPaths } = createDirtyState()
 	const { scrollPositions, setScrollPosition, clearScrollPositions } =
 		createScrollPositionState()
+	const { cursorPositions, setCursorPosition, clearCursorPositions } =
+		createCursorPositionState()
+	const { fileSelections, setSelections, clearSelections } =
+		createSelectionsState()
 	const { visibleContents, setVisibleContent, clearVisibleContents } =
 		createVisibleContentState()
 	const { fileViewModes, setViewMode, getViewMode, clearViewModes } =
@@ -139,6 +145,8 @@ export const createFsState = () => {
 		fileBrackets,
 		fileErrors,
 		scrollPositions,
+		cursorPositions,
+		fileSelections,
 		visibleContents,
 		fileViewModes,
 		get creationState() {
@@ -244,6 +252,16 @@ export const createFsState = () => {
 			if (!path) return undefined
 			return scrollPositions[normalizePath(path)]
 		},
+		get selectedFileCursorPosition() {
+			const path = lastKnownFilePath()
+			if (!path) return undefined
+			return cursorPositions[normalizePath(path)]
+		},
+		get selectedFileSelections() {
+			const path = lastKnownFilePath()
+			if (!path) return undefined
+			return fileSelections[normalizePath(path)]
+		},
 		get selectedFileVisibleContent() {
 			const path = lastKnownFilePath()
 			if (!path) return undefined
@@ -295,6 +313,10 @@ export const createFsState = () => {
 		clearDirtyPaths,
 		setScrollPosition,
 		clearScrollPositions,
+		setCursorPosition,
+		clearCursorPositions,
+		setSelections,
+		clearSelections,
 		setVisibleContent,
 		clearVisibleContents,
 		setViewMode,
