@@ -480,12 +480,7 @@ export function createTextEditorLayout(
 
 	const columnOffset = (lineIndex: number, columnIndex: number): number => {
 		const text = cursor.lines.getLineText(lineIndex)
-		return calculateColumnOffset(
-			text,
-			columnIndex,
-			charWidth(),
-			options.tabSize()
-		)
+		return calculateColumnOffset(text, columnIndex, charWidth(), options.tabSize())
 	}
 
 	const cursorLineIndex = createMemo(() => cursor.state.position.line)

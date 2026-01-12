@@ -211,9 +211,10 @@ body {
 
 	/* Line */
 	.editor-line {
-		@apply absolute left-0 top-0 w-full whitespace-pre text-editor;
+		/* Note: font-size and font-family are inherited from EditorViewport's inline styles
+		   to ensure consistency with canvas-based character width measurements. */
+		@apply absolute left-0 top-0 w-full whitespace-pre;
 		color: var(--editor-foreground);
-		font-family: var(--editor-font-family, 'JetBrains Mono');
 	}
 }
 .transition-display {

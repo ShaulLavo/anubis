@@ -37,9 +37,7 @@ export const measureCharWidth = (
 	}
 
 	ctx.font = `${fontSize}px ${fontFamily}`
-
-	const metrics = ctx.measureText('M')
-	const width = metrics.width
+	const width = ctx.measureText('M').width
 
 	charWidthCache.set(cacheKey, width)
 
