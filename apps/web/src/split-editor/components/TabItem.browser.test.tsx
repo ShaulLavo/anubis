@@ -39,6 +39,7 @@ describe('TabItem Component', () => {
 				cursorPosition: { line: 0, column: 0 },
 			},
 			isDirty: false,
+		viewMode: 'editor' as const,
 		}
 	})
 
@@ -109,12 +110,14 @@ describe('TabItem Component', () => {
 	it('shows dirty indicator (dot) when isDirty', async () => {
 		// Test clean tab (no dirty indicator)
 		const { unmount: unmount1 } = renderTabItem({ ...mockTab, isDirty: false })
+		viewMode: 'editor' as const,
 		let dirtyIndicator = document.querySelector('.bg-primary')
 		expect(dirtyIndicator).toBeFalsy()
 		unmount1()
 
 		// Test dirty tab (should show dirty indicator)
 		renderTabItem({ ...mockTab, isDirty: true })
+		viewMode: 'editor' as const,
 		dirtyIndicator = document.querySelector('.bg-primary')
 		expect(dirtyIndicator).toBeTruthy()
 
