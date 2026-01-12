@@ -86,6 +86,20 @@ interface FileResource {
 
 	/** File loading state (error handling, progress, etc.) */
 	loadingState: FileLoadingState;
+
+	/** Cached line start offsets for instant tab switching */
+	lineStarts?: number[];
+}
+
+/** Build lineStarts array from text (O(n) scan) */
+function buildLineStartsFromText(text: string): number[] {
+	const starts: number[] = [0];
+	let index = text.indexOf('\n');
+	while (index !== -1) {
+		starts.push(index + 1);
+		index = text.indexOf('\n', index + 1);
+	}
+	return starts;
 }
 
 /** Resource Manager interface */
@@ -98,6 +112,9 @@ export interface ResourceManager {
 
 	/** Get loading state for a file */
 	getLoadingState: (filePath: string) => FileLoadingState | undefined;
+
+	/** Get cached line starts for instant tab switching */
+	getLineStarts: (filePath: string) => number[] | undefined;
 
 	/** Register a tab as using a file */
 	registerTabForFile: (tabId: TabId, filePath: string) => void;
@@ -358,14 +375,29 @@ export function createResourceManager(): ResourceManager {
 
 	/** Pre-populate content for a file before any tabs register */
 	function preloadFileContent(filePath: string, content: string): void {
+		console.log('[ResourceManager] preloadFileContent', {
+			filePath,
+			contentLength: content.length,
+		});
 		const resource = getOrCreateResource(filePath);
 		resource.buffer.setContent(content);
 		resource.loadingState.setStatus('loaded');
+		// Cache lineStarts for instant tab switching
+		resource.lineStarts = buildLineStartsFromText(content);
+		console.log('[ResourceManager] lineStarts cached', {
+			filePath,
+			lineCount: resource.lineStarts.length,
+		});
 	}
 
 	/** Get loading state for a file */
 	function getLoadingState(filePath: string): FileLoadingState | undefined {
 		return resources.get(filePath)?.loadingState;
+	}
+
+	/** Get cached line starts for instant tab switching */
+	function getLineStarts(filePath: string): number[] | undefined {
+		return resources.get(filePath)?.lineStarts;
 	}
 
 	/** Set an error for a file */
@@ -409,6 +441,7 @@ export function createResourceManager(): ResourceManager {
 		getBuffer,
 		getHighlightState,
 		getLoadingState,
+		getLineStarts,
 		registerTabForFile,
 		unregisterTabFromFile,
 		hasResourcesForFile,

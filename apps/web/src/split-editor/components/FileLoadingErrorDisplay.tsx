@@ -232,6 +232,7 @@ export function FileLoadingIndicator(props: {
 export function BinaryFileIndicator(props: {
 	filePath: string
 	fileSize?: number
+	onViewAsText?: () => void
 }) {
 	const fileName = () => {
 		const parts = props.filePath.split('/')
@@ -277,6 +278,16 @@ export function BinaryFileIndicator(props: {
 					<p class="text-xs opacity-60">{formatSize(props.fileSize!)}</p>
 				</Show>
 			</div>
+
+			<Show when={props.onViewAsText}>
+				<button
+					type="button"
+					class="mt-2 inline-flex items-center gap-2 rounded-md bg-muted px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
+					onClick={props.onViewAsText}
+				>
+					View as Text
+				</button>
+			</Show>
 
 			<p class="max-w-[200px] text-center text-xs opacity-50">
 				Use an external application to view or edit this file

@@ -149,9 +149,17 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 		props.onLayoutManagerReady?.(layoutManager)
 	})
 
+	// Track files currently being opened to prevent race conditions
+	const filesBeingOpened = new Set<string>()
+
 	const openFileAsTab = async (filePath: string) => {
 		const focusedPaneId = layoutManager.state.focusedPaneId
 		if (!focusedPaneId) return
+
+		// Prevent duplicate opens while file is being loaded
+		if (filesBeingOpened.has(filePath)) {
+			return
+		}
 
 		const existingTab = layoutManager.findTabByFilePath(filePath)
 		if (existingTab) {
@@ -159,6 +167,8 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 			layoutManager.setFocusedPane(existingTab.paneId)
 			return
 		}
+
+		filesBeingOpened.add(filePath)
 
 		const source = state.activeSource ?? DEFAULT_SOURCE
 
@@ -170,14 +180,8 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 		const content = createFileContent(filePath)
 		layoutManager.openTab(focusedPaneId, content)
 
-		// Check if it's a known binary file type first
-		if (isBinaryExtension(filePath)) {
-			// const error = createBinaryFileError(filePath)
-			resourceManager.setFileMetadata(filePath, { isBinary: true })
-			resourceManager.setFileLoadingStatus(filePath, 'loaded')
-			toast.warning(`${filePath.split('/').pop()} is a binary file`)
-			return
-		}
+		// Check if it's a known binary file type (we still load the content)
+		const isBinaryByExtension = isBinaryExtension(filePath)
 
 		try {
 			// Check file size first
@@ -194,19 +198,20 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 			// Read the file content
 			const fileContent = await readFileText(source, filePath)
 
-			// Check if content appears to be binary
+			// Check if content appears to be binary (or we already know from extension)
 			const encoder = new TextEncoder()
 			const buffer = encoder.encode(fileContent).buffer
-			if (isBinaryContent(buffer)) {
+			const isBinaryByContent = isBinaryContent(buffer)
+			const isBinary = isBinaryByExtension || isBinaryByContent
+
+			if (isBinary) {
 				resourceManager.setFileMetadata(filePath, { isBinary: true })
-				resourceManager.setFileLoadingStatus(filePath, 'loaded')
 				toast.warning(
-					`${filePath.split('/').pop()} appears to be a binary file`
+					`${filePath.split('/').pop()} is a binary file`
 				)
-				return
 			}
 
-			// Success - set content and mark as loaded
+			// Always load the content (even for binary files, to allow viewing as text)
 			resourceManager.preloadFileContent(filePath, fileContent)
 			resourceManager.setFileLoadingStatus(filePath, 'loaded')
 		} catch (error) {
@@ -221,6 +226,8 @@ export const SplitEditorPanel = (props: SplitEditorPanelProps) => {
 
 			// Show toast notification
 			toast.error(`${getErrorTitle(fileError.type)}: ${fileError.message}`)
+		} finally {
+			filesBeingOpened.delete(filePath)
 		}
 	}
 

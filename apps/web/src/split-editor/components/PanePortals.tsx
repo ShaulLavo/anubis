@@ -13,6 +13,7 @@ import {
 	createMemo,
 	createSignal,
 	For,
+	Index,
 	onMount,
 	Show,
 	type JSX,
@@ -59,7 +60,13 @@ function PanePortal(props: PanePortalProps) {
 	// Track activeTabId separately to ensure reactivity
 	const activeTabId = createMemo(() => {
 		const p = pane()
-		return p?.activeTabId ?? null
+		const tabId = p?.activeTabId ?? null
+		console.log('[PanePortal] activeTabId memo', {
+			paneId: props.paneId,
+			activeTabId: tabId,
+			tabCount: p?.tabs.length,
+		})
+		return tabId
 	})
 
 	// Track tabs array separately
@@ -73,7 +80,14 @@ function PanePortal(props: PanePortalProps) {
 		const tabId = activeTabId()
 		const tabList = tabs()
 		if (!tabId) return null
-		return tabList.find((t) => t.id === tabId) ?? null
+		const tab = tabList.find((t) => t.id === tabId) ?? null
+		console.log('[PanePortal] activeTab memo', {
+			paneId: props.paneId,
+			tabId,
+			hasTab: !!tab,
+			filePath: tab?.content.type === 'file' ? tab.content.filePath : null,
+		})
+		return tab
 	})
 
 	// Track a signal that changes when we need to re-check for the target element
@@ -103,20 +117,18 @@ function PanePortal(props: PanePortalProps) {
 							class="pane-content absolute inset-0"
 							data-pane-id={props.paneId}
 						>
-							{/* Use keyed Show to force re-render when active tab changes */}
+							{/* Show active tab only - use keyed to force re-render on tab change */}
 							<Show when={activeTab()} keyed>
-								{(tab) => {
-									return (
-										<div class="absolute inset-0" data-tab-id={tab.id}>
-											<Show
-												when={props.renderTabContent}
-												fallback={<TabContent tab={tab} pane={currentPane} />}
-											>
-												{(render) => render()(tab, currentPane)}
-											</Show>
-										</div>
-									)
-								}}
+								{(tab) => (
+									<div class="absolute inset-0" data-tab-id={tab.id}>
+										<Show
+											when={props.renderTabContent}
+											fallback={<TabContent tab={tab} pane={currentPane} />}
+										>
+											{(render) => render()(tab, currentPane)}
+										</Show>
+									</div>
+								)}
 							</Show>
 							<Show when={tabs().length === 0}>
 								<EmptyPaneContent />
