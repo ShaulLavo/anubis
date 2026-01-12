@@ -620,19 +620,24 @@ export function CursorProvider(props: CursorProviderProps) {
 	}
 
 	const initializeFromContent = (content: string) => {
+		const precomputed = props.precomputedLineStarts?.()
+		const usePrecomputed = precomputed && precomputed.length > 0
+
 		console.log('[CursorContext] initializeFromContent called', {
 			contentLength: content.length,
-			contentPreview: content.slice(0, 100),
-			hasPrecomputedLineStarts: !!props.precomputedLineStarts,
-			precomputedValue: props.precomputedLineStarts?.(),
+			hasPrecomputedLineStarts: usePrecomputed,
+			precomputedLineCount: precomputed?.length,
 		})
+
 		const length = content.length
-		const starts = buildLineStartsFromText(content)
-		console.log('[CursorContext] built lineStarts', {
-			lineCount: starts.length,
-			firstFew: starts.slice(0, 10),
-			lastFew: starts.slice(-5),
-		})
+		const starts = usePrecomputed ? precomputed : buildLineStartsFromText(content)
+
+		if (usePrecomputed) {
+			console.log('[CursorContext] using precomputed lineStarts', { lineCount: starts.length })
+		} else {
+			console.log('[CursorContext] built lineStarts from content', { lineCount: starts.length })
+		}
+
 		const ids = createLineIds(starts.length)
 		const data = buildLineDataFromText(content, ids, starts)
 		console.log('[CursorContext] built lineData', {
