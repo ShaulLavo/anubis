@@ -88,17 +88,19 @@ export function registerFontZoomShortcuts(controller: KeymapController) {
 	})
 
 	// Global wheel event listener for Ctrl+scroll/wheel
+	// We use a passive listener and handle zoom without preventDefault.
+	// The browser's native pinch-zoom is blocked via CSS (touch-action: manipulation)
+	// on the root element. This avoids the perf penalty of non-passive wheel listeners.
 	let wheelCleanup: (() => void) | undefined
 
 	onMount(() => {
 		if (typeof window !== 'undefined') {
 			wheelCleanup = makeEventListener(window, 'wheel', (e) => {
-				if (e.ctrlKey) {
-					e.preventDefault()
-					const direction = e.deltaY < 0 ? 'in' : 'out'
-					focusAwareZoom.zoomFocused(direction)
-				}
-			}, { passive: false })
+				// Early exit for the common case (no modifier) - keep this path cheap
+				if (!e.ctrlKey) return
+				const direction = e.deltaY < 0 ? 'in' : 'out'
+				focusAwareZoom.zoomFocused(direction)
+			}, { passive: true })
 		}
 	})
 

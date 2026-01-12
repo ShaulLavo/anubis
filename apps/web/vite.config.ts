@@ -72,10 +72,10 @@ export default defineConfig(() => {
 			tanstackDevtools({
 				eventBusConfig: {
 					port: 4206,
-					debug: true,
+					debug: false,
 				},
 				removeDevtoolsOnBuild: true,
-				enhancedLogs: { enabled: true },
+				enhancedLogs: { enabled: false },
 			}),
 			tailwindcss(),
 			devtools({

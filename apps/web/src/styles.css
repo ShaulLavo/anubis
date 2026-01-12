@@ -39,6 +39,9 @@ body {
 	color: var(--editor-foreground, hsl(0 0% 98%));
 	font-family: var(--ui-font-family, 'Google Sans Flex', sans-serif);
 	font-size: var(--ui-font-size, var(--base-font-size));
+	/* Prevent native browser pinch-zoom so we can use passive wheel listeners.
+	   Our custom Ctrl+wheel zoom still works via useFontZoomShortcuts. */
+	touch-action: manipulation;
 }
 
 /* ghostty-web: ensure the terminal canvas doesn't behave like inline content */

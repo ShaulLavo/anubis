@@ -3,7 +3,7 @@ import {
 	ColorModeScript,
 	createLocalStorageManager,
 } from '@kobalte/core'
-import { type ParentComponent } from 'solid-js'
+import { Show, type ParentComponent } from 'solid-js'
 import { ThemedToaster } from './ThemedToaster'
 import { FocusProvider } from './focus/focusManager'
 import { FsProvider } from './fs/context/FsProvider'
@@ -16,6 +16,8 @@ import { Modal } from '@repo/ui/modal'
 import { ThemeProvider } from '@repo/theme'
 import { CommandPaletteProvider } from './command-palette/CommandPaletteProvider'
 import { CommandPalette } from './command-palette/CommandPalette'
+import { TanStackDevtools } from '@tanstack/solid-devtools'
+import { PerfPanel } from './devtools/performance/PerfPanel'
 
 export const storageManager = createLocalStorageManager('ui-theme')
 
@@ -37,6 +39,29 @@ export const Providers: ParentComponent = (props) => {
 												<Modal />
 												<CommandPalette />
 												{props.children}
+
+												{/* TanStack Devtools - only in dev mode */}
+												<Show when={import.meta.env.DEV}>
+													<TanStackDevtools
+														config={{
+															position: 'bottom-right',
+															hideUntilHover: false,
+															openHotkey: ['Control', 'Shift', 'D'],
+															defaultOpen: true,
+														}}
+														eventBusConfig={{
+															debug: false,
+															connectToServerBus: true,
+														}}
+														plugins={[
+															{
+																name: 'Performance',
+																render: () => <PerfPanel />,
+																defaultOpen: true,
+															},
+														]}
+													/>
+												</Show>
 											</CommandPaletteProvider>
 										</FontRegistryProvider>
 									</FsProvider>
