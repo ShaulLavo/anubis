@@ -8,6 +8,7 @@
 
 import { createEffect, createSignal, onCleanup } from 'solid-js'
 import { makePersisted } from '@solid-primitives/storage'
+import { trackStore } from '@solid-primitives/deep'
 import { dualStorage } from '@repo/utils/DualStorage'
 import {
 	createLayoutManager,
@@ -64,8 +65,22 @@ export function createPersistedLayoutManager(
 
 		debounceTimeout = setTimeout(() => {
 			const layout = baseManager.getLayoutTree()
-
+			// Find the active tab's scroll position for logging
+			const paneNode = layout.nodes.find(n => n.tabs?.length)
+			const activeTab = paneNode?.tabs?.find(t => t.id === paneNode.activeTabId) ?? paneNode?.tabs?.[0]
+			console.log('[PersistedLayoutManager] persistLayout: saving layout', {
+				nodeCount: layout.nodes.length,
+				activeTabScrollTop: activeTab?.state?.scrollTop,
+				activeTabId: activeTab?.id,
+			})
 			setPersistedLayout(layout)
+			// Verify it was saved
+			const verified = persistedLayout()
+			const verifiedPane = verified?.nodes?.find(n => n.tabs?.length)
+			const verifiedTab = verifiedPane?.tabs?.find(t => t.id === verifiedPane.activeTabId) ?? verifiedPane?.tabs?.[0]
+			console.log('[PersistedLayoutManager] persistLayout: verified saved', {
+				savedScrollTop: verifiedTab?.state?.scrollTop,
+			})
 			debounceTimeout = null
 		}, DEBOUNCE_MS)
 	}
@@ -73,33 +88,11 @@ export function createPersistedLayoutManager(
 	// Set up auto-persistence effect at creation time (inside reactive context)
 	// This effect will run whenever the layout state changes
 	createEffect(() => {
-		// Access state properties to track them reactively
+		// Deep track the entire store to detect any nested changes (scroll, cursor, etc.)
+		trackStore(baseManager.state)
+
 		const rootId = baseManager.state.rootId
 		const nodes = baseManager.state.nodes
-		// Track these properties without using their values
-		void baseManager.state.focusedPaneId
-		void baseManager.state.scrollSyncGroups
-
-		// Deep track all nodes and their tabs to detect any changes
-		// This is necessary because SolidJS only tracks accessed properties
-
-		for (const nodeId of Object.keys(nodes)) {
-			const node = nodes[nodeId]
-			if (node && 'tabs' in node) {
-				// Track activeTabId to detect tab selection changes
-				void node.activeTabId
-				// Access tabs array and its length to track changes
-				const tabs = node.tabs
-				// Access each tab's properties to track changes
-				for (const tab of tabs) {
-					void tab.id
-					void tab.content
-					void tab.isDirty
-					void tab.viewMode
-					void tab.state
-				}
-			}
-		}
 
 		// Only persist if we have a valid layout (rootId exists) and we're initialized
 		if (isInitialized && rootId && Object.keys(nodes).length > 0) {
@@ -119,10 +112,19 @@ export function createPersistedLayoutManager(
 	const originalInitialize = baseManager.initialize
 	function initialize(): void {
 		const saved = persistedLayout()
+		const paneNode = saved?.nodes?.find(n => n.tabs?.length)
+		const activeTab = paneNode?.tabs?.find(t => t.id === paneNode.activeTabId) ?? paneNode?.tabs?.[0]
+		console.log('[PersistedLayoutManager] initialize: saved layout', {
+			hasSaved: !!saved,
+			isValid: saved ? isValidLayout(saved) : false,
+			activeTabScrollTop: activeTab?.state?.scrollTop,
+			activeTabId: activeTab?.id,
+		})
 
 		if (saved && isValidLayout(saved)) {
 			try {
 				baseManager.restoreLayout(saved)
+				console.log('[PersistedLayoutManager] initialize: restored layout successfully')
 			} catch (error) {
 				console.error(
 					'[PersistedLayoutManager] Failed to restore layout, initializing fresh:',
@@ -131,6 +133,7 @@ export function createPersistedLayoutManager(
 				originalInitialize()
 			}
 		} else {
+			console.log('[PersistedLayoutManager] initialize: no valid saved layout, initializing fresh')
 			originalInitialize()
 		}
 

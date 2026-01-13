@@ -23,10 +23,10 @@ export interface Position {
 	column: number
 }
 
-/** Text selection range */
+/** Text selection range (using character offsets for Editor compatibility) */
 export interface Selection {
-	start: Position
-	end: Position
+	anchor: number
+	focus: number
 }
 
 /** View settings per pane (shared across all tabs in the pane) */
@@ -55,8 +55,13 @@ export interface TabContent {
 
 /** Per-tab state (independent per tab) */
 export interface TabState {
+	/** Raw pixel scroll position (primary, always accurate) */
 	scrollTop: number
 	scrollLeft: number
+	/** Line index for validation (scrollLineIndex * scrollLineHeight should ≈ scrollTop) */
+	scrollLineIndex: number
+	/** Measured line height at save time (for validation) */
+	scrollLineHeight: number
 	selections: Selection[]
 	cursorPosition: Position
 }
@@ -179,6 +184,8 @@ export function createDefaultTabState(): TabState {
 	return {
 		scrollTop: 0,
 		scrollLeft: 0,
+		scrollLineIndex: 0,
+		scrollLineHeight: 0,
 		selections: [],
 		cursorPosition: { line: 0, column: 0 },
 	}

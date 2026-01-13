@@ -185,7 +185,6 @@ export function FileTab(props: FileTabProps) {
 	})
 
 	const handleScrollPositionChange = (position: ScrollPosition) => {
-		// 		console.log(`[FileTab] handleScrollPositionChange: lineIndex=${position.lineIndex}, scrollLeft=${position.scrollLeft}, tabId=${props.tab.id}`)
 		layoutManager.updateTabState(props.pane.id, props.tab.id, {
 			scrollTop: position.lineIndex,
 			scrollLeft: position.scrollLeft,
@@ -204,14 +203,10 @@ export function FileTab(props: FileTabProps) {
 		scrollSyncCoordinator.handleScroll(scrollEvent)
 	}
 
-	const initialScrollPosition = createMemo((): ScrollPosition => {
-		const pos = {
-			lineIndex: props.tab.state.scrollTop,
-			scrollLeft: props.tab.state.scrollLeft,
-		}
-		// 			console.log(`[FileTab] initialScrollPosition: lineIndex=${pos.lineIndex}, scrollLeft=${pos.scrollLeft}, tabId=${props.tab.id}`)
-		return pos
-	})
+	const initialScrollPosition = createMemo((): ScrollPosition => ({
+		lineIndex: props.tab.state.scrollTop,
+		scrollLeft: props.tab.state.scrollLeft,
+	}))
 
 	// Restore cursor position from persisted tab state
 	// Only provide if we have a non-zero position (user has interacted before)
@@ -225,6 +220,20 @@ export function FileTab(props: FileTabProps) {
 	const handleCursorPositionChange = (position: { line: number; column: number }) => {
 		layoutManager.updateTabState(props.pane.id, props.tab.id, {
 			cursorPosition: position,
+		})
+	}
+
+	// Restore selections from persisted tab state
+	const initialSelections = createMemo(() => {
+		const sels = props.tab.state.selections
+		// Only restore if there are selections
+		if (!sels || sels.length === 0) return undefined
+		return sels
+	})
+
+	const handleSelectionsChange = (selections: { anchor: number; focus: number }[]) => {
+		layoutManager.updateTabState(props.pane.id, props.tab.id, {
+			selections,
 		})
 	}
 
@@ -281,6 +290,8 @@ export function FileTab(props: FileTabProps) {
 			onScrollPositionChange: handleScrollPositionChange,
 			initialCursorPosition: () => initialCursorPosition(),
 			onCursorPositionChange: handleCursorPositionChange,
+			initialSelections: () => initialSelections(),
+			onSelectionsChange: handleSelectionsChange,
 			onEditBlocked: handleEditBlocked,
 			initialVisibleContent: () => undefined,
 			onCaptureVisibleContent: () => {},
