@@ -4,6 +4,7 @@
   "private": true,
   "exports": {
     "./utils": "./src/utils.ts",
+    "./anchor": "./src/anchor.ts",
     "./settings": "./src/settings/index.ts",
     "./*": "./src/*.tsx"
   },
@@ -21,12 +22,16 @@
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@solidjs/testing-library": "^0.8.10",
-    "@types/jsdom": "^27.0.0",
     "@types/node": "^24.10.1",
+    "@vitest/browser": "^4.0.16",
+    "@vitest/browser-playwright": "workspace:*",
     "eslint": "^9.39.1",
     "fast-check": "^4.5.3",
-    "jsdom": "^27.4.0",
-    "typescript": "5.9.2"
+    "happy-dom": "^18.0.1",
+    "playwright": "^1.52.0",
+    "typescript": "5.9.2",
+    "vite-plugin-solid": "^2.11.8",
+    "vitest-browser-solid": "workspace:*"
   },
   "dependencies": {
     "@corvu/accordion": "^0.2.5",
