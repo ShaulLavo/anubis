@@ -16,7 +16,6 @@ import {
 import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsState } from '../types'
 import type { FsContextValue, SelectPathOptions } from '../context/FsContext'
-import { findNode } from '../runtime/tree'
 import type { FileCacheController } from '../cache/fileCacheController'
 import { parseBufferWithTreeSitter } from '../../treeSitter/workerClient'
 import { viewTransitionBatched } from '@repo/utils/viewTransition'
@@ -99,7 +98,7 @@ export const useFileSelection = ({
 			fileCache.clearContent(path)
 		}
 
-		const node = findNode(tree, path)
+		const node = state.pathIndex[createFilePath(path)]
 
 		// If node is found and it's a directory, handle directory selection
 		if (node?.kind === 'dir') {

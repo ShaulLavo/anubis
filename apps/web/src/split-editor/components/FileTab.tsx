@@ -186,13 +186,15 @@ export function FileTab(props: FileTabProps) {
 
 	const handleScrollPositionChange = (position: ScrollPosition) => {
 		layoutManager.updateTabState(props.pane.id, props.tab.id, {
-			scrollTop: position.lineIndex,
+			scrollTop: position.scrollTop,
 			scrollLeft: position.scrollLeft,
+			scrollLineIndex: position.lineIndex,
+			scrollLineHeight: position.lineHeight,
 		})
 
 		const scrollEvent: ScrollEvent = {
 			tabId: props.tab.id,
-			scrollTop: position.lineIndex,
+			scrollTop: position.scrollTop,
 			scrollLeft: position.scrollLeft,
 			scrollHeight: 1000,
 			scrollWidth: 1000,
@@ -204,7 +206,9 @@ export function FileTab(props: FileTabProps) {
 	}
 
 	const initialScrollPosition = createMemo((): ScrollPosition => ({
-		lineIndex: props.tab.state.scrollTop,
+		scrollTop: props.tab.state.scrollTop,
+		lineIndex: props.tab.state.scrollLineIndex,
+		lineHeight: props.tab.state.scrollLineHeight,
 		scrollLeft: props.tab.state.scrollLeft,
 	}))
 

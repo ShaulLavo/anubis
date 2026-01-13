@@ -35,11 +35,13 @@ describe('TabItem Component', () => {
 			state: {
 				scrollTop: 0,
 				scrollLeft: 0,
+				scrollLineIndex: 0,
+				scrollLineHeight: 20,
 				selections: [],
 				cursorPosition: { line: 0, column: 0 },
 			},
 			isDirty: false,
-		viewMode: 'editor' as const,
+			viewMode: 'editor' as const,
 		}
 	})
 

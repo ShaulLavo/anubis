@@ -36,23 +36,23 @@ describe('TabBar Component', () => {
 				{
 					id: 'tab-1',
 					content: { type: 'file', filePath: '/test/file1.txt' },
-					state: { scrollTop: 0, scrollLeft: 0, selections: [], cursorPosition: { line: 0, column: 0 } },
+					state: { scrollTop: 0, scrollLeft: 0, scrollLineIndex: 0, scrollLineHeight: 20, selections: [], cursorPosition: { line: 0, column: 0 } },
 					isDirty: false,
-			viewMode: 'editor' as const,
+					viewMode: 'editor' as const,
 				},
 				{
 					id: 'tab-2',
 					content: { type: 'file', filePath: '/test/file2.js' },
-					state: { scrollTop: 0, scrollLeft: 0, selections: [], cursorPosition: { line: 0, column: 0 } },
+					state: { scrollTop: 0, scrollLeft: 0, scrollLineIndex: 0, scrollLineHeight: 20, selections: [], cursorPosition: { line: 0, column: 0 } },
 					isDirty: true,
-			viewMode: 'editor' as const,
+					viewMode: 'editor' as const,
 				},
 				{
 					id: 'tab-3',
 					content: { type: 'diff' },
-					state: { scrollTop: 0, scrollLeft: 0, selections: [], cursorPosition: { line: 0, column: 0 } },
+					state: { scrollTop: 0, scrollLeft: 0, scrollLineIndex: 0, scrollLineHeight: 20, selections: [], cursorPosition: { line: 0, column: 0 } },
 					isDirty: false,
-			viewMode: 'editor' as const,
+					viewMode: 'editor' as const,
 				}
 			] as Tab[],
 			activeTabId: 'tab-1',
@@ -104,9 +104,9 @@ describe('TabBar Component', () => {
 			tabs: Array.from({ length: 20 }, (_, i) => ({
 				id: `tab-${i}`,
 				content: { type: 'file', filePath: `/test/very-long-filename-${i}.txt` },
-				state: { scrollTop: 0, scrollLeft: 0, selections: [], cursorPosition: { line: 0, column: 0 } },
+				state: { scrollTop: 0, scrollLeft: 0, scrollLineIndex: 0, scrollLineHeight: 20, selections: [], cursorPosition: { line: 0, column: 0 } },
 				isDirty: false,
-			viewMode: 'editor' as const,
+				viewMode: 'editor' as const,
 			})) as Tab[]
 		}
 		

@@ -65,22 +65,7 @@ export function createPersistedLayoutManager(
 
 		debounceTimeout = setTimeout(() => {
 			const layout = baseManager.getLayoutTree()
-			// Find the active tab's scroll position for logging
-			const paneNode = layout.nodes.find(n => n.tabs?.length)
-			const activeTab = paneNode?.tabs?.find(t => t.id === paneNode.activeTabId) ?? paneNode?.tabs?.[0]
-			console.log('[PersistedLayoutManager] persistLayout: saving layout', {
-				nodeCount: layout.nodes.length,
-				activeTabScrollTop: activeTab?.state?.scrollTop,
-				activeTabId: activeTab?.id,
-			})
 			setPersistedLayout(layout)
-			// Verify it was saved
-			const verified = persistedLayout()
-			const verifiedPane = verified?.nodes?.find(n => n.tabs?.length)
-			const verifiedTab = verifiedPane?.tabs?.find(t => t.id === verifiedPane.activeTabId) ?? verifiedPane?.tabs?.[0]
-			console.log('[PersistedLayoutManager] persistLayout: verified saved', {
-				savedScrollTop: verifiedTab?.state?.scrollTop,
-			})
 			debounceTimeout = null
 		}, DEBOUNCE_MS)
 	}
@@ -112,28 +97,14 @@ export function createPersistedLayoutManager(
 	const originalInitialize = baseManager.initialize
 	function initialize(): void {
 		const saved = persistedLayout()
-		const paneNode = saved?.nodes?.find(n => n.tabs?.length)
-		const activeTab = paneNode?.tabs?.find(t => t.id === paneNode.activeTabId) ?? paneNode?.tabs?.[0]
-		console.log('[PersistedLayoutManager] initialize: saved layout', {
-			hasSaved: !!saved,
-			isValid: saved ? isValidLayout(saved) : false,
-			activeTabScrollTop: activeTab?.state?.scrollTop,
-			activeTabId: activeTab?.id,
-		})
 
 		if (saved && isValidLayout(saved)) {
 			try {
 				baseManager.restoreLayout(saved)
-				console.log('[PersistedLayoutManager] initialize: restored layout successfully')
-			} catch (error) {
-				console.error(
-					'[PersistedLayoutManager] Failed to restore layout, initializing fresh:',
-					error
-				)
+			} catch {
 				originalInitialize()
 			}
 		} else {
-			console.log('[PersistedLayoutManager] initialize: no valid saved layout, initializing fresh')
 			originalInitialize()
 		}
 

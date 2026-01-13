@@ -11,6 +11,7 @@ import { useFocusManager } from '~/focus/focusManager'
 import { useFs } from '../../fs/context/FsContext'
 import { useSettings } from '~/settings/SettingsProvider'
 import { Flex } from '@repo/ui/flex'
+import { createFilePath } from '@repo/fs'
 
 import { getTreeSitterWorker } from '../../treeSitter/workerClient'
 
@@ -134,7 +135,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	const tabDirtyStatus = () => {
 		const dirtyStatus: Record<string, boolean> = {}
 		for (const tabId of tabsState()) {
-			dirtyStatus[tabId] = !!state.dirtyPaths[tabId]
+			dirtyStatus[tabId] = !!state.dirtyPaths[createFilePath(tabId)]
 		}
 		return dirtyStatus
 	}
@@ -143,11 +144,9 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 		if (tabPath === state.lastKnownFilePath) {
 			return currentViewMode()
 		}
-		// For other tabs, we need to get their stored view mode with error handling
-		const stats =
-			state.fileStats[tabPath.startsWith('/') ? tabPath.slice(1) : tabPath]
-		const storedMode =
-			state.fileViewModes[tabPath.startsWith('/') ? tabPath.slice(1) : tabPath]
+		const filePath = createFilePath(tabPath)
+		const stats = state.fileStats[filePath]
+		const storedMode = state.fileViewModes[filePath]
 		const requestedMode =
 			storedMode || viewModeRegistry.getDefaultMode(tabPath, stats)
 
@@ -155,8 +154,7 @@ export const SelectedFilePanel = (props: SelectedFilePanelProps) => {
 	}
 
 	const getTabAvailableViewModes = (tabPath: string): ViewMode[] => {
-		const stats =
-			state.fileStats[tabPath.startsWith('/') ? tabPath.slice(1) : tabPath]
+		const stats = state.fileStats[createFilePath(tabPath)]
 		return detectAvailableViewModes(tabPath, stats)
 	}
 

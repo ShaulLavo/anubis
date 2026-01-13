@@ -350,26 +350,20 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 		tabId: TabId,
 		updates: Partial<TabState>
 	): void {
-		console.log('[updateTabState] called:', { paneId, tabId, updates })
 		setState(
 			produce((s) => {
 				const pane = s.nodes[paneId] as EditorPane | undefined
-				if (!pane || !isPane(pane)) {
-					console.log('[updateTabState] pane not found or not a pane')
-					return
-				}
+				if (!pane || !isPane(pane)) return
 
 				const tab = pane.tabs.find((t) => t.id === tabId)
 				if (tab) {
-					console.log('[updateTabState] before update:', { scrollTop: tab.state.scrollTop })
 					// Update individual properties to properly trigger SolidJS store reactivity
 					if (updates.scrollTop !== undefined) tab.state.scrollTop = updates.scrollTop
 					if (updates.scrollLeft !== undefined) tab.state.scrollLeft = updates.scrollLeft
+					if (updates.scrollLineIndex !== undefined) tab.state.scrollLineIndex = updates.scrollLineIndex
+					if (updates.scrollLineHeight !== undefined) tab.state.scrollLineHeight = updates.scrollLineHeight
 					if (updates.cursorPosition !== undefined) tab.state.cursorPosition = updates.cursorPosition
 					if (updates.selections !== undefined) tab.state.selections = updates.selections
-					console.log('[updateTabState] after update:', { scrollTop: tab.state.scrollTop })
-				} else {
-					console.log('[updateTabState] tab not found')
 				}
 			})
 		)
@@ -595,14 +589,6 @@ export function createLayoutManager(options: LayoutManagerOptions = {}) {
 					sizes: node.sizes,
 					children: node.children,
 				}
-			}
-			// Debug: log tab state when serializing
-			for (const t of node.tabs) {
-				console.log('[getLayoutTree] tab state:', {
-					tabId: t.id,
-					scrollTop: t.state.scrollTop,
-					stateRef: t.state,
-				})
 			}
 			return {
 				id: node.id,
