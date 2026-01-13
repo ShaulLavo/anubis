@@ -512,7 +512,6 @@ export function createTextEditorLayout(
 
 	const scrollToLine = (lineIndex: number): void => {
 		const displayIndex = foldMapping.lineToDisplay(lineIndex)
-		// 		console.log(`[createTextEditorLayout] scrollToLine: lineIndex=${lineIndex}, displayIndex=${displayIndex}, willScroll=${displayIndex >= 0}`)
 		if (displayIndex >= 0) {
 			rowVirtualizer.scrollToIndex(displayIndex, { align: 'start' })
 		}

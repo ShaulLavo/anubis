@@ -29,13 +29,24 @@ export const useFoldedStarts = (options: UseFoldedStartsOptions) => {
 		}
 	}
 
+	// Track previous file path to detect actual file switches vs initial load
+	let previousFilePath: string | undefined
+
 	createEffect(
-		on(options.filePath, () => {
-			const element = options.scrollElement()
-			if (element) {
-				element.scrollTop = 0
-				element.scrollLeft = 0
+		on(options.filePath, (currentPath) => {
+			// Only reset scroll when switching from one file to another,
+			// not on initial load (when previousFilePath is undefined)
+			const isFileSwitch = previousFilePath !== undefined && previousFilePath !== currentPath
+
+			if (isFileSwitch) {
+				const element = options.scrollElement()
+				if (element) {
+					element.scrollTop = 0
+					element.scrollLeft = 0
+				}
 			}
+
+			previousFilePath = currentPath
 			foldedStarts.clear()
 		})
 	)

@@ -359,47 +359,81 @@ export const TextEditorView = (props: EditorProps) => {
 
 	let restoreAttemptedForPath: string | undefined
 	let saveTimeoutId: ReturnType<typeof setTimeout> | undefined
+	// Track when we last restored scroll to ignore spurious scroll events
+	let lastScrollRestoreTime = 0
+	const SCROLL_RESTORE_DEBOUNCE_MS = 500
 
 	createEffect(() => {
+		const element = scrollElement()
 		const path = props.document.filePath()
 		const initialPos = props.initialScrollPosition?.()
-		const lineCount = cursor.lines.lineCount()
+		// Read totalSize and virtualItems to re-trigger when virtualizer content is ready
+		const contentSize = layout.totalSize()
+		const items = layout.virtualItems()
+		const currentLineHeight = layout.lineHeight()
 
-		// 		console.log(`[TextEditorView] scroll restore effect: path=${path}, lineIndex=${initialPos?.lineIndex}, lineCount=${lineCount}, restoreAttemptedForPath=${restoreAttemptedForPath}`)
-		//
-		// 		if (!path || lineCount <= 1) {
-		// 			console.log(`[TextEditorView] scroll restore: early return (path=${path}, lineCount=${lineCount})`)
-		// 			return
-		// 		}
+		// Virtualizer must have computed items and reasonable content size
+		const hasVirtualizedContent = items.length > 0 && contentSize > 100
+
+		// Support both new format (scrollTop) and legacy format (lineIndex as pixels)
+		const savedScrollTop = initialPos?.scrollTop ?? initialPos?.lineIndex ?? 0
 
 		if (
+			element &&
+			hasVirtualizedContent &&
 			initialPos &&
 			restoreAttemptedForPath !== path &&
-			initialPos.lineIndex < lineCount
+			savedScrollTop > 0
 		) {
-			// 			console.log(`[TextEditorView] scroll restore: scrolling to line ${initialPos.lineIndex}`)
+			// Validate: if we have lineIndex and lineHeight, check our calculation matches
+			if (initialPos.lineHeight && initialPos.lineIndex !== undefined) {
+				const calculatedScrollTop = initialPos.lineIndex * currentLineHeight
+				const diff = Math.abs(calculatedScrollTop - savedScrollTop)
+				// Allow 1px tolerance for rounding
+				if (diff > 1) {
+					// TODO: Font changed between sessions - lineHeight mismatch
+					// Consider: 1) Store font info and recalculate on mismatch
+					//           2) Fall back to lineIndex-based restore if font differs
+					//           3) Detect font change and warn user
+					console.warn(
+						`[ScrollRestore] Line height mismatch! ` +
+						`saved: ${initialPos.lineHeight}px, current: ${currentLineHeight}px. ` +
+						`Calculated: ${calculatedScrollTop}px vs saved: ${savedScrollTop}px (diff: ${diff}px). ` +
+						`Using saved pixel position.`
+					)
+				}
+			}
+
 			restoreAttemptedForPath = path
-			layout.scrollToLine(initialPos.lineIndex)
+			lastScrollRestoreTime = Date.now()
+			element.scrollTo({ top: savedScrollTop, left: initialPos.scrollLeft ?? 0 })
 		}
 	})
 
 	createEffect(() => {
 		const element = scrollElement()
-		const onScroll = props.onScrollPositionChange
-		console.log(`[TextEditorView] scroll listener effect: hasElement=${!!element}, hasOnScroll=${!!onScroll}`)
-		if (!element || !onScroll) return
+		// Access callback lazily inside handler to maintain reactivity
+		const getOnScroll = () => props.onScrollPositionChange
+		const getLineHeight = () => layout.lineHeight()
+		if (!element) return
 
 		const handleScroll = () => {
 			if (saveTimeoutId != null) clearTimeout(saveTimeoutId)
 			saveTimeoutId = setTimeout(() => {
-				const range = layout.visibleLineRange()
+				const onScroll = getOnScroll()
+				if (!onScroll) return
+
+				const currentLineHeight = getLineHeight()
+				const scrollTop = element.scrollTop
+				const lineIndex = currentLineHeight > 0 ? Math.floor(scrollTop / currentLineHeight) : 0
+
 				const pos = {
-					lineIndex: range.start,
+					scrollTop,
+					lineIndex,
+					lineHeight: currentLineHeight,
 					scrollLeft: element.scrollLeft,
 				}
-				console.log(`[TextEditorView] handleScroll BEFORE onScroll:`, pos)
 				onScroll(pos)
-				console.log(`[TextEditorView] handleScroll AFTER onScroll`)
 			}, 150)
 		}
 

@@ -2,13 +2,24 @@ import type { EditorProps } from '../types'
 import { CursorProvider } from '../cursor'
 import { HistoryProvider } from '../history'
 import { TextEditorView } from './TextEditorView'
+import { splitProps } from 'solid-js'
 
 export const Editor = (props: EditorProps) => {
-	console.log('[Editor] render', {
-		filePath: props.document.filePath(),
-		hasOnScrollPositionChange: !!props.onScrollPositionChange,
-		onScrollPositionChangeType: typeof props.onScrollPositionChange,
+	// Split props to ensure callbacks are passed correctly through SolidJS reactivity
+	const [callbacks, otherProps] = splitProps(props, [
+		'onScrollPositionChange',
+		'onCursorPositionChange',
+		'onSelectionsChange',
+		'onCaptureVisibleContent',
+		'onSave',
+		'onEditBlocked',
+	])
+
+	console.log('[Editor] splitProps result:', {
+		hasOnScrollPositionChange: !!callbacks.onScrollPositionChange,
+		callbackType: typeof callbacks.onScrollPositionChange,
 	})
+
 	return (
 		<CursorProvider
 			filePath={props.document.filePath}
@@ -19,7 +30,15 @@ export const Editor = (props: EditorProps) => {
 			contentVersion={props.contentVersion}
 		>
 			<HistoryProvider document={props.document}>
-				<TextEditorView {...props} />
+				<TextEditorView
+					{...otherProps}
+					onScrollPositionChange={callbacks.onScrollPositionChange}
+					onCursorPositionChange={callbacks.onCursorPositionChange}
+					onSelectionsChange={callbacks.onSelectionsChange}
+					onCaptureVisibleContent={callbacks.onCaptureVisibleContent}
+					onSave={callbacks.onSave}
+					onEditBlocked={callbacks.onEditBlocked}
+				/>
 			</HistoryProvider>
 		</CursorProvider>
 	)

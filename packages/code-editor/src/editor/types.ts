@@ -161,7 +161,12 @@ export type EditorProps = {
 }
 
 export type ScrollPosition = {
+	/** Raw pixel scroll position (primary, always accurate) */
+	scrollTop: number
+	/** Line index for validation (lineIndex * lineHeight should ≈ scrollTop) */
 	lineIndex: number
+	/** Measured line height at save time (for validation) */
+	lineHeight: number
 	scrollLeft: number
 }
 

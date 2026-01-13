@@ -1,4 +1,6 @@
-export const LINE_HEIGHT_RATIO = 1.55
+// JetBrains Mono line height ratio - matches measured DOM value
+// With fontSize 14: 14 * 1.5 = 21px (matches measureLineHeight result)
+export const LINE_HEIGHT_RATIO = 1.5
 export const GUTTER_MODES = [
 	'decimal',
 	'decimal-leading-zero',
