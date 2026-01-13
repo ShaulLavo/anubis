@@ -1,4 +1,5 @@
 import type { FsDirTreeNode } from '@repo/fs'
+import { createFilePath } from '@repo/fs'
 import {
 	createEffect,
 	createSelector,
@@ -14,22 +15,23 @@ import type { FsSource } from '../types'
 import type { ViewMode } from '../types/ViewMode'
 import { getValidViewMode } from '../utils/viewModeDetection'
 import { FsContext, type FsContextValue } from './FsContext'
-import { replaceDirNodeInTree } from '../utils/treeNodes'
 import { makeTreePrefetch } from '../hooks/useTreePrefetch'
-import { createReactiveTree } from '../tree/ReactiveTree'
 import { useDirectoryLoader } from '../hooks/useDirectoryLoader'
 import { useFileSelection } from '../hooks/useFileSelection'
 import { useFsRefresh } from '../hooks/useFsRefresh'
 import { createFileCacheControllerV2 } from '../cache/fileCacheController'
 import { LocalDirectoryFallbackModal } from '../components/LocalDirectoryFallbackModal'
-import { findNode } from '../runtime/tree'
 import { getRootHandle, invalidateFs } from '../runtime/fsRuntime'
 import { useFileSystemObserver } from '../hooks/useFileSystemObserver'
 import { pickNewLocalRoot as doPick } from '@repo/fs'
 export function FsProvider(props: { children: JSX.Element }) {
 	const {
 		state,
-		setTree,
+		setTreeRoot,
+		updateTreeDirectory,
+		addTreeNode,
+		removeTreeNode,
+		getNode,
 		setExpanded,
 		setSelectedPath,
 		setActiveSource,
@@ -102,26 +104,19 @@ export function FsProvider(props: { children: JSX.Element }) {
 		setDirtyPath,
 	})
 
-	// Reactive tree for O(1) prefetch updates
-	const reactiveTree = createReactiveTree()
-
 	const setDirNode = (path: string, node: FsDirTreeNode) => {
-		if (!state.tree) return
 		if (!path) {
-			setTree(() => node)
-			reactiveTree.setRoot(node)
+			// Setting root - use setTreeRoot for full index rebuild
+			setTreeRoot(node)
 			return
 		}
-		const nextTree = replaceDirNodeInTree(state.tree, path, node)
-		if (nextTree === state.tree) return
-		setTree(() => nextTree)
-		// Keep reactive tree in sync for user-initiated directory loads
-		reactiveTree.updateDirectory(path, node.children)
+		// Update directory children - uses incremental index update
+		updateTreeDirectory(path, node.children)
 	}
 
 	const { treePrefetchClient, runPrefetchTask, disposeTreePrefetchClient } =
 		makeTreePrefetch({
-			reactiveTree,
+			updateTreeDirectory,
 			setLastPrefetchedPath,
 			setBackgroundPrefetching,
 			setBackgroundIndexedFileCount,
@@ -175,9 +170,8 @@ export function FsProvider(props: { children: JSX.Element }) {
 
 		// If the file isn't in the tree yet, load all parent directories first
 		// This ensures the file appears in the sidebar after opening from command palette or restore
-		const tree = state.tree
-		if (tree && path) {
-			const node = findNode(tree, path)
+		if (path) {
+			const node = getNode(path)
 			if (!node) {
 				// File not in tree - load parent directories
 				const parentPath = path.split('/').slice(0, -1).join('/')
@@ -188,12 +182,9 @@ export function FsProvider(props: { children: JSX.Element }) {
 		}
 
 		await selectPathInternal(path, options)
-		const latestTree = state.tree
-		if (latestTree) {
-			const node = findNode(latestTree, path)
-			if (node?.kind === 'file') {
-				fileCache.setActiveFile(path)
-			}
+		const node = getNode(path)
+		if (node?.kind === 'file') {
+			fileCache.setActiveFile(path)
 		}
 	}
 
@@ -207,7 +198,7 @@ export function FsProvider(props: { children: JSX.Element }) {
 
 	const { refresh } = useFsRefresh({
 		state,
-		setTree,
+		setTreeRoot,
 		setExpanded,
 		setActiveSource,
 		setLoading,
@@ -226,7 +217,9 @@ export function FsProvider(props: { children: JSX.Element }) {
 	})
 
 	const { createDir, createFile, deleteNode, saveFile } = createFsMutations({
-		setTree,
+		addTreeNode,
+		removeTreeNode,
+		getNode,
 		setExpanded,
 		setSelectedPath,
 		setSelectedFileSize,
@@ -241,10 +234,9 @@ export function FsProvider(props: { children: JSX.Element }) {
 	const ensureDirPathLoaded = async (
 		path: string
 	): Promise<FsDirTreeNode | undefined> => {
-		const tree = state.tree
-		if (!tree) return undefined
+		if (!state.tree) return undefined
 		if (!path) {
-			return tree
+			return state.tree
 		}
 
 		const segments = path.split('/').filter(Boolean)
@@ -255,23 +247,21 @@ export function FsProvider(props: { children: JSX.Element }) {
 			const load = ensureDirLoaded(currentPath)
 			if (load) {
 				await load
-				const latestTree = state.tree
-				if (!latestTree) return undefined
-				const currentNode = findNode(latestTree, currentPath)
+				if (!state.tree) return undefined
+				const currentNode = getNode(currentPath)
 				if (!currentNode || currentNode.kind !== 'dir') {
 					return undefined
 				}
 			} else {
-				const currentNode = findNode(state.tree, currentPath)
+				const currentNode = getNode(currentPath)
 				if (!currentNode || currentNode.kind !== 'dir') {
 					return undefined
 				}
 			}
 		}
 
-		const latestTree = state.tree
-		if (!latestTree) return undefined
-		const node = findNode(latestTree, path)
+		if (!state.tree) return undefined
+		const node = getNode(path)
 		return node && node.kind === 'dir' ? node : undefined
 	}
 
@@ -333,17 +323,11 @@ export function FsProvider(props: { children: JSX.Element }) {
 		const handleSettingsFileChanged = async (event: Event) => {
 			if (!(event instanceof CustomEvent)) return
 			const { path } = event.detail
-			// Clear the cache for this file so editor reloads from disk
-			fileCache.clearContent(path)
+			const normalizedPath = createFilePath(path)
+			fileCache.clearContent(normalizedPath)
 
-			// If this file is currently selected, force reload it
-			const normalizedPath = path.startsWith('/') ? path.slice(1) : path
-			const currentPath = state.lastKnownFilePath
-			const normalizedCurrent = currentPath?.startsWith('/')
-				? currentPath.slice(1)
-				: currentPath
-			if (normalizedCurrent === normalizedPath) {
-				await selectPath(path, { forceReload: true })
+			if (state.lastKnownFilePath === normalizedPath) {
+				await selectPath(normalizedPath, { forceReload: true })
 			}
 		}
 
@@ -369,7 +353,9 @@ export function FsProvider(props: { children: JSX.Element }) {
 		clearDeferredMetadata()
 	})
 
-	const isSelectedPath = createSelector(() => state.selectedPath)
+	const selectedPathSelector = createSelector(() => state.selectedPath)
+	const isSelectedPath = (path: string | undefined) =>
+		selectedPathSelector(path ? createFilePath(path) : undefined)
 
 	const pickNewRoot = async () => {
 		if (state.activeSource !== 'local') return

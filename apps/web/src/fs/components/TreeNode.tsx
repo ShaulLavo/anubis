@@ -1,5 +1,6 @@
 import { For, Show } from 'solid-js'
 import type { FsDirTreeNode, FsTreeNode } from '@repo/fs'
+import { createFilePath } from '@repo/fs'
 import { useFs } from '../context/FsContext'
 import { useTreeNodeHover } from '../hooks/useTreeNodeHover'
 import { useBranchLineTransition } from '../hooks/useBranchLineTransition'
@@ -24,7 +25,7 @@ export const TreeNode = (props: TreeNodeProps) => {
 
 	const isDir = () => props.node.kind === 'dir'
 	const isSelected = () => actions.isSelectedPath(props.node.path)
-	const isOpen = () => isDir() && Boolean(state.expanded[props.node.path])
+	const isOpen = () => isDir() && Boolean(state.expanded[createFilePath(props.node.path)])
 
 	const { showBranchLine, handleRowHover, handleChildHover } = useTreeNodeHover(
 		{

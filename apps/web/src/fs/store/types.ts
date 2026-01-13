@@ -47,7 +47,9 @@ export interface HighlightTransform {
  * Scroll position within a file.
  */
 export interface ScrollPosition {
+	readonly scrollTop: number
 	readonly lineIndex: number
+	readonly lineHeight: number
 	readonly scrollLeft: number
 }
 

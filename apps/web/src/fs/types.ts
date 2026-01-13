@@ -1,4 +1,4 @@
-import type { FsDirTreeNode, FsFileTreeNode, FsTreeNode } from '@repo/fs'
+import type { FsDirTreeNode, FsFileTreeNode, FsTreeNode, FilePath } from '@repo/fs'
 import type { ParseResult, PieceTableSnapshot } from '@repo/utils'
 import type { VisibleContentSnapshot } from '@repo/code-editor'
 import type {
@@ -15,8 +15,9 @@ export type FsSource = 'memory' | 'local' | 'opfs'
 
 export type FsState = {
 	tree?: FsDirTreeNode
-	expanded: Record<string, boolean>
-	selectedPath?: string
+	pathIndex: Record<FilePath, FsTreeNode>
+	expanded: Record<FilePath, boolean>
+	selectedPath?: FilePath
 	activeSource: FsSource
 	selectedFileLoading: boolean
 	selectedFileContent: string
@@ -26,47 +27,47 @@ export type FsState = {
 	saving: boolean
 	backgroundPrefetching: boolean
 	backgroundIndexedFileCount: number
-	lastPrefetchedPath?: string
+	lastPrefetchedPath?: FilePath
 	prefetchError?: string
 	prefetchProcessedCount: number
 	prefetchLastDurationMs: number
 	prefetchAverageDurationMs: number
-	fileStats: Record<string, ParseResult | undefined>
+	fileStats: Record<FilePath, ParseResult | undefined>
 	selectedFileStats?: ParseResult
-	pieceTables: Record<string, PieceTableSnapshot | undefined>
+	pieceTables: Record<FilePath, PieceTableSnapshot | undefined>
 	selectedFilePieceTable?: PieceTableSnapshot
-	fileHighlights: Record<string, TreeSitterCapture[] | undefined>
+	fileHighlights: Record<FilePath, TreeSitterCapture[] | undefined>
 	/** Pending offset transforms for optimistic updates (ordered oldest -> newest) */
-	highlightOffsets: Record<string, HighlightTransform[] | undefined>
+	highlightOffsets: Record<FilePath, HighlightTransform[] | undefined>
 	selectedFileHighlights?: TreeSitterCapture[]
 	selectedFileHighlightOffset?: HighlightTransform[]
-	fileFolds: Record<string, FoldRange[] | undefined>
+	fileFolds: Record<FilePath, FoldRange[] | undefined>
 	selectedFileFolds?: FoldRange[]
-	fileBrackets: Record<string, BracketInfo[] | undefined>
+	fileBrackets: Record<FilePath, BracketInfo[] | undefined>
 	selectedFileBrackets?: BracketInfo[]
-	fileErrors: Record<string, TreeSitterError[] | undefined>
+	fileErrors: Record<FilePath, TreeSitterError[] | undefined>
 	selectedFileErrors?: TreeSitterError[]
 	selectedNode?: FsTreeNode | undefined
 	lastKnownFileNode?: FsFileTreeNode | undefined
-	lastKnownFilePath?: string
-	deferredMetadata: Record<string, DeferredDirMetadata>
-	dirtyPaths: Record<string, boolean>
-	scrollPositions: Record<string, ScrollPosition | undefined>
+	lastKnownFilePath?: FilePath
+	deferredMetadata: Record<FilePath, DeferredDirMetadata>
+	dirtyPaths: Record<FilePath, boolean>
+	scrollPositions: Record<FilePath, ScrollPosition | undefined>
 	selectedFileScrollPosition?: ScrollPosition
 	/** Cursor positions for each file */
-	cursorPositions: Record<string, CursorPosition | undefined>
+	cursorPositions: Record<FilePath, CursorPosition | undefined>
 	selectedFileCursorPosition?: CursorPosition
 	/** Selection ranges for each file */
-	fileSelections: Record<string, SelectionRange[] | undefined>
+	fileSelections: Record<FilePath, SelectionRange[] | undefined>
 	selectedFileSelections?: SelectionRange[]
 	/** Pre-computed visible content for instant tab switching */
-	visibleContents: Record<string, VisibleContentSnapshot | undefined>
+	visibleContents: Record<FilePath, VisibleContentSnapshot | undefined>
 	selectedFileVisibleContent?: VisibleContentSnapshot
 	/** Current view mode for each file */
-	fileViewModes: Record<string, ViewMode>
+	fileViewModes: Record<FilePath, ViewMode>
 	selectedFileViewMode?: ViewMode
 	creationState?: {
 		type: 'file' | 'folder'
-		parentPath: string
+		parentPath: FilePath
 	} | null
 }

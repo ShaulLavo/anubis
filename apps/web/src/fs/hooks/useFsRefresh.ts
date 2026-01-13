@@ -9,7 +9,6 @@ import {
 import { DEFAULT_SOURCE } from '../config/constants'
 import type { FsState, FsSource } from '../types'
 import type { TreePrefetchClient } from '../prefetch/treePrefetchClient'
-
 import { modal } from '@repo/ui/modal'
 
 /**
@@ -50,7 +49,7 @@ const mergeSystemFolder = (
 
 type UseFsRefreshOptions = {
 	state: FsState
-	setTree: SetStoreFunction<FsDirTreeNode>
+	setTreeRoot: (root: FsDirTreeNode | undefined) => void
 	setExpanded: SetStoreFunction<Record<string, boolean>>
 	setActiveSource: (source: FsSource) => void
 	setLoading: (value: boolean) => void
@@ -76,7 +75,7 @@ type UseFsRefreshOptions = {
 
 export const useFsRefresh = ({
 	state,
-	setTree,
+	setTreeRoot,
 	setExpanded,
 	setActiveSource,
 	setLoading,
@@ -191,7 +190,7 @@ export const useFsRefresh = ({
 				const restorablePath = getRestorableFilePath()
 
 				batch(() => {
-					setTree(built)
+					setTreeRoot(built)
 					setActiveSource(source)
 					setExpanded((expanded) => ({
 						...expanded,

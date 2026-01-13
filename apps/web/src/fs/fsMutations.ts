@@ -1,11 +1,9 @@
 import { batch, type Setter } from 'solid-js'
 import type { SetStoreFunction } from 'solid-js/store'
-import type { FsDirTreeNode, FsFileTreeNode } from '@repo/fs'
+import type { FsDirTreeNode, FsFileTreeNode, FsTreeNode } from '@repo/fs'
+import { createFilePath } from '@repo/fs'
 import { ensureFs, resolveSourceForPath } from './runtime/fsRuntime'
 import type { FsSource, FsState } from './types'
-import { addNodeToTree, removeNodeFromTree } from './utils/treeMutations'
-import { findNode } from './runtime/tree'
-
 import {
 	createPieceTableSnapshot,
 	getPieceTableText,
@@ -16,9 +14,11 @@ import { toast } from '@repo/ui/toaster'
 type FsMutationDeps = {
 	getState: () => FsState
 	getActiveSource: () => FsSource
-	setTree: SetStoreFunction<FsDirTreeNode>
+	addTreeNode: (parentPath: string, node: FsTreeNode) => void
+	removeTreeNode: (path: string) => void
+	getNode: (path: string) => FsTreeNode | undefined
 	setExpanded: SetStoreFunction<Record<string, boolean>>
-	setSelectedPath: Setter<string | undefined>
+	setSelectedPath: (value: string | undefined) => void
 	setSelectedFileSize: Setter<number | undefined>
 	setSelectedFileContent: Setter<string>
 	updateSelectedFilePieceTable: (
@@ -35,7 +35,9 @@ const buildPath = (parentPath: string, name: string) =>
 
 export const createFsMutations = ({
 	getActiveSource,
-	setTree,
+	addTreeNode,
+	removeTreeNode,
+	getNode,
 	setExpanded,
 	setSelectedPath,
 	setSelectedFileSize,
@@ -50,12 +52,11 @@ export const createFsMutations = ({
 		if (!trimmed) return
 
 		const state = getState()
-		const tree = state.tree
-		if (!tree) return
+		if (!state.tree) return
 
 		const newPath = buildPath(parentPath, trimmed)
 
-		if (findNode(tree, newPath)) {
+		if (getNode(newPath)) {
 			toast.error(`A folder named "${trimmed}" already exists`)
 			return
 		}
@@ -64,7 +65,7 @@ export const createFsMutations = ({
 			const ctx = await ensureFs(getActiveSource())
 			await ctx.ensureDir(newPath)
 
-			const parentNode = findNode(tree, parentPath)
+			const parentNode = getNode(parentPath)
 			const parentDepth = parentNode?.depth ?? 0
 
 			const newNode: FsDirTreeNode = {
@@ -78,7 +79,7 @@ export const createFsMutations = ({
 			}
 
 			batch(() => {
-				setTree(addNodeToTree(parentPath, newNode))
+				addTreeNode(parentPath, newNode)
 				setExpanded(parentPath, true)
 				setSelectedPath(newPath)
 			})
@@ -98,12 +99,11 @@ export const createFsMutations = ({
 		if (!trimmed) return
 
 		const state = getState()
-		const tree = state.tree
-		if (!tree) return
+		if (!state.tree) return
 
 		const newPath = buildPath(parentPath, trimmed)
 
-		if (findNode(tree, newPath)) {
+		if (getNode(newPath)) {
 			toast.error(`A file named "${trimmed}" already exists`)
 			return
 		}
@@ -113,7 +113,7 @@ export const createFsMutations = ({
 			const fileContent = content ?? ''
 			await ctx.write(newPath, fileContent)
 
-			const parentNode = findNode(tree, parentPath)
+			const parentNode = getNode(parentPath)
 			const parentDepth = parentNode?.depth ?? 0
 
 			const newNode: FsFileTreeNode = {
@@ -126,7 +126,7 @@ export const createFsMutations = ({
 			}
 
 			batch(() => {
-				setTree(addNodeToTree(parentPath, newNode))
+				addTreeNode(parentPath, newNode)
 				setExpanded(parentPath, true)
 				setSelectedPath(newPath)
 				setSelectedFileSize(new Blob([fileContent]).size)
@@ -142,15 +142,14 @@ export const createFsMutations = ({
 		if (path === '') return
 
 		const state = getState()
-		const tree = state.tree
-		if (!tree) return
+		if (!state.tree) return
 
 		try {
 			const ctx = await ensureFs(getActiveSource())
 			await ctx.remove(path, { recursive: true, force: true })
 
 			batch(() => {
-				setTree(removeNodeFromTree(path))
+				removeTreeNode(path)
 
 				if (
 					state.selectedPath === path ||
@@ -177,10 +176,7 @@ export const createFsMutations = ({
 			return
 		}
 
-		// Normalize path for cache lookups
-		const normalizedPath = filePath.startsWith('/')
-			? filePath.slice(1)
-			: filePath
+		const normalizedPath = createFilePath(filePath)
 
 		const stats = state.fileStats[normalizedPath]
 		if (stats && stats.contentKind === 'binary') {
@@ -197,7 +193,6 @@ export const createFsMutations = ({
 				? getPieceTableText(pieceTable)
 				: state.selectedFileContent
 
-			// Route .system paths to OPFS
 			const source = resolveSourceForPath(getActiveSource(), filePath)
 			const ctx = await ensureFs(source)
 			await ctx.write(filePath, content)
@@ -216,16 +211,13 @@ export const createFsMutations = ({
 				setDirtyPath(filePath, false)
 			})
 
-			// Sync settings if this is the user settings file
 			if (normalizedPath === '.system/userSettings.json') {
 				try {
 					const parsed = JSON.parse(content)
-					// Dispatch custom event for settings store to pick up
 					window.dispatchEvent(
 						new CustomEvent('settings-file-saved', { detail: parsed })
 					)
 				} catch {
-					// Settings file saved but JSON parse failed
 				}
 			}
 

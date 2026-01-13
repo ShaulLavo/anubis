@@ -2,6 +2,8 @@ import { createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import type { DeferredDirMetadata } from '../prefetch/treePrefetchWorkerTypes'
 import { createPrefetchIndicators } from './createPrefetchIndicators'
+import type { FilePath } from '@repo/fs'
+import { createFilePath } from '@repo/fs'
 
 export const createPrefetchState = () => {
 	const {
@@ -19,16 +21,17 @@ export const createPrefetchState = () => {
 	const [prefetchAverageDurationMs, setPrefetchAverageDurationMs] =
 		createSignal(0)
 	const [deferredMetadata, setDeferredMetadata] = createStore<
-		Record<string, DeferredDirMetadata>
-	>({})
+		Record<FilePath, DeferredDirMetadata>
+	>({} as Record<FilePath, DeferredDirMetadata>)
 
 	const registerDeferredMetadata = (node: DeferredDirMetadata) => {
-		const key = node.path || `${node.parentPath ?? ''}/${node.name}`
+		const rawKey = node.path || `${node.parentPath ?? ''}/${node.name}`
+		const key = createFilePath(rawKey)
 		setDeferredMetadata(key, () => node)
 	}
 
 	const clearDeferredMetadata = () => {
-		setDeferredMetadata(() => ({}))
+		setDeferredMetadata(() => ({} as Record<FilePath, DeferredDirMetadata>))
 	}
 
 	return {

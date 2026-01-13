@@ -1,8 +1,7 @@
 /* eslint-disable solid/reactivity */
-import type { FsFileTreeNode, FsTreeNode } from '@repo/fs'
+import type { FsFileTreeNode, FsTreeNode, FilePath } from '@repo/fs'
 import { createFilePath } from '@repo/fs'
 import { createEffect, createMemo, createSignal } from 'solid-js'
-import { findNode } from '../runtime/tree'
 import type { FsState } from '../types'
 
 import { createTreeState } from './createTreeState'
@@ -24,7 +23,8 @@ import { createVisibleContentState } from './createVisibleContentState'
 import { createViewModeState } from './createViewModeState'
 
 export const createFsState = () => {
-	const { tree, setTree } = createTreeState()
+	const { tree, pathIndex, setTreeRoot, updateTreeDirectory, addTreeNode, removeTreeNode, getNode } =
+		createTreeState()
 	const { expanded, setExpanded, collapseAll } = createExpandedState()
 	const { selectedPath, setSelectedPath, activeSource, setActiveSource } =
 		createSelectionState()
@@ -86,30 +86,25 @@ export const createFsState = () => {
 	const { fileViewModes, setViewMode, getViewMode, clearViewModes } =
 		createViewModeState()
 
-	const selectedNode = createMemo<FsTreeNode | undefined>(() =>
-		tree ? findNode(tree, selectedPath()) : undefined
-	)
+	const selectedNode = createMemo<FsTreeNode | undefined>(() => {
+		const path = selectedPath()
+		return path ? getNode(path) : undefined
+	})
 
-	// Track the last known file path - this updates whenever a file path is selected,
-	// even if the file isn't in the tree yet (e.g., .system files from OPFS)
 	const [lastKnownFilePathSignal, setLastKnownFilePathSignal] = createSignal<
-		string | undefined
+		FilePath | undefined
 	>(undefined)
 
-	// Update lastKnownFilePath when selectedPath changes to a file
 	createEffect(() => {
 		const path = selectedPath()
 		if (!path) return
 
-		// Check if it's a file path (has an extension or is a known file)
-		const node = tree ? findNode(tree, path) : undefined
+		const node = getNode(path)
 		if (node?.kind === 'file') {
 			setLastKnownFilePathSignal(path)
 			return
 		}
 
-		// If node not found but path looks like a file (has extension), treat it as a file
-		// This handles .system files that might not be in the tree yet
 		if (!node && path.includes('.') && !path.endsWith('/')) {
 			setLastKnownFilePathSignal(path)
 		}
@@ -119,7 +114,7 @@ export const createFsState = () => {
 		const path = lastKnownFilePathSignal()
 		if (!path) return prev
 
-		const node = tree ? findNode(tree, path) : undefined
+		const node = getNode(path)
 		if (node?.kind === 'file') {
 			return node
 		}
@@ -129,11 +124,12 @@ export const createFsState = () => {
 
 	const [creationState, setCreationState] = createSignal<{
 		type: 'file' | 'folder'
-		parentPath: string
+		parentPath: FilePath
 	} | null>(null)
 
 	const state = {
 		tree,
+		pathIndex,
 		expanded,
 		fileStats,
 		pieceTables,
@@ -275,7 +271,11 @@ export const createFsState = () => {
 
 	return {
 		state,
-		setTree,
+		setTreeRoot,
+		updateTreeDirectory,
+		addTreeNode,
+		removeTreeNode,
+		getNode,
 		setExpanded,
 		setSelectedPath,
 		setActiveSource,

@@ -25,7 +25,7 @@ export type FsActions = {
 	setSource: (source: FsSource) => Promise<void>
 	toggleDir: (path: string) => void
 	selectPath: (path: string, options?: SelectPathOptions) => Promise<void>
-	isSelectedPath: (path: string) => boolean
+	isSelectedPath: (path: string | undefined) => boolean
 	createDir: (parentPath: string, name: string) => Promise<void>
 	createFile: (
 		parentPath: string,

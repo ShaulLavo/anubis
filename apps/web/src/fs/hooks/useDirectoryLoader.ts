@@ -1,10 +1,10 @@
 import { batch } from 'solid-js'
 import type { SetStoreFunction } from 'solid-js/store'
-import { findNode } from '../runtime/tree'
 import { buildTree } from '../runtime/fsRuntime'
 import type { FsState } from '../types'
 import { DEFAULT_SOURCE } from '../config/constants'
-import type { FsDirTreeNode } from '@repo/fs'
+import type { FsDirTreeNode, FilePath } from '@repo/fs'
+import { createFilePath } from '@repo/fs'
 import { normalizeDirNodeMetadata } from '../utils/treeNodes'
 import type { TreePrefetchClient } from '../prefetch/treePrefetchClient'
 import { toast } from '@repo/ui/toaster'
@@ -33,6 +33,8 @@ export const useDirectoryLoader = ({
 }: UseDirectoryLoaderOptions) => {
 	const subtreeLoads = new Map<string, Promise<void>>()
 
+	const getNode = (path: string) => state.pathIndex[createFilePath(path)]
+
 	const buildEnsurePaths = () => {
 		const paths = new Set<string>()
 		const selectedNode = state.selectedNode
@@ -48,13 +50,13 @@ export const useDirectoryLoader = ({
 
 	const ensureDirLoaded = (path: string): EnsureDirLoadResult => {
 		if (!state.tree) return
-		const existing = findNode(state.tree, path)
+		const existing = getNode(path)
 		if (!existing || existing.kind !== 'dir') return
 		if (existing.isLoaded !== false) return
 		const inflight = subtreeLoads.get(path)
 		if (inflight) return inflight
 
-		const expandedSnapshot = { ...state.expanded, [path]: true }
+		const expandedSnapshot = { ...state.expanded }
 		const ensurePaths = buildEnsurePaths()
 		const load = (async () => {
 			try {
@@ -65,7 +67,7 @@ export const useDirectoryLoader = ({
 					ensurePaths,
 					operationName: 'fs:buildSubtree',
 				})
-				const latest = state.tree ? findNode(state.tree, path) : undefined
+				const latest = getNode(path)
 				if (!latest || latest.kind !== 'dir') return
 				const normalized = normalizeDirNodeMetadata(
 					subtree,
@@ -93,7 +95,7 @@ export const useDirectoryLoader = ({
 	}
 
 	const toggleDir = (path: string) => {
-		const next = !state.expanded[path]
+		const next = !state.expanded[path as FilePath]
 		batch(() => {
 			setExpanded(path, next)
 			setSelectedPath(path)
@@ -107,7 +109,7 @@ export const useDirectoryLoader = ({
 		if (!state.tree) return
 
 		const targetPath = path || ''
-		const existing = findNode(state.tree, targetPath)
+		const existing = getNode(targetPath)
 		if (!existing || existing.kind !== 'dir') return
 
 		subtreeLoads.delete(targetPath)
@@ -124,7 +126,7 @@ export const useDirectoryLoader = ({
 				operationName: 'fs:reloadDirectory',
 			})
 
-			const latest = state.tree ? findNode(state.tree, targetPath) : undefined
+			const latest = getNode(targetPath)
 			if (!latest || latest.kind !== 'dir') return
 
 			const normalized = normalizeDirNodeMetadata(

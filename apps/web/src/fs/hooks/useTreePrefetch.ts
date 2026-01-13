@@ -1,3 +1,4 @@
+import type { FsTreeNode } from '@repo/fs'
 import { batch, getOwner, onCleanup } from 'solid-js'
 import { createTreePrefetchClient } from '../prefetch/treePrefetchClient'
 import type {
@@ -7,10 +8,9 @@ import type {
 	PrefetchStatusPayload,
 } from '../prefetch/treePrefetchWorkerTypes'
 import { toast } from '@repo/ui/toaster'
-import type { ReactiveTree } from '../tree/ReactiveTree'
 
 type MakeTreePrefetchOptions = {
-	reactiveTree: ReactiveTree
+	updateTreeDirectory: (path: string, children: FsTreeNode[]) => void
 	setLastPrefetchedPath: (path: string | undefined) => void
 	setBackgroundPrefetching: (value: boolean) => void
 	setBackgroundIndexedFileCount: (value: number) => void
@@ -22,7 +22,7 @@ type MakeTreePrefetchOptions = {
 }
 
 export const makeTreePrefetch = ({
-	reactiveTree,
+	updateTreeDirectory,
 	setLastPrefetchedPath,
 	setBackgroundPrefetching,
 	setBackgroundIndexedFileCount,
@@ -65,8 +65,8 @@ export const makeTreePrefetch = ({
 	}
 
 	const handlePrefetchResult = (payload: PrefetchDirectoryLoadedPayload) => {
-		// O(1) update: Map lookup + signal set
-		reactiveTree.updateDirectory(payload.node.path, payload.node.children)
+		// O(1) update: store lookup + incremental index update
+		updateTreeDirectory(payload.node.path, payload.node.children)
 		setLastPrefetchedPath(payload.node.path)
 	}
 

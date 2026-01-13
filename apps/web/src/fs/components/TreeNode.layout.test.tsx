@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createRoot } from 'solid-js'
-import type { FsDirTreeNode, FsFileTreeNode } from '@repo/fs'
+import type { FsDirTreeNode, FsFileTreeNode, FilePath } from '@repo/fs'
+import { createFilePath } from '@repo/fs'
 import type { ParseResult } from '@repo/utils/parse'
 import { TreeNode } from './TreeNode'
 import { FsContext, type FsContextValue } from '../context/FsContext'
@@ -98,13 +99,13 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 			const expandedFolder = createTestDirNode('expanded', 1)
 
 			// Set expanded state
-			mockFsContext[0].expanded[expandedFolder.path] = true
+			;(mockFsContext[0].expanded as Record<FilePath, boolean>)[createFilePath(expandedFolder.path)] = true
 
 			// Test that the component structure is correct (Requirements 2.1, 2.4)
 			expect(collapsedFolder.kind).toBe('dir')
 			expect(expandedFolder.kind).toBe('dir')
-			expect(mockFsContext[0].expanded[collapsedFolder.path]).toBeFalsy()
-			expect(mockFsContext[0].expanded[expandedFolder.path]).toBeTruthy()
+			expect((mockFsContext[0].expanded as Record<FilePath, boolean>)[createFilePath(collapsedFolder.path)]).toBeFalsy()
+			expect((mockFsContext[0].expanded as Record<FilePath, boolean>)[createFilePath(expandedFolder.path)]).toBeTruthy()
 		})
 	})
 
@@ -128,7 +129,7 @@ describe('TreeNode Layout and Alignment Preservation', () => {
 			const parentNode = createTestDirNode('parent', 1, [childNode])
 
 			// Set parent as expanded
-			mockFsContext[0].expanded[parentNode.path] = true
+			;(mockFsContext[0].expanded as Record<FilePath, boolean>)[createFilePath(parentNode.path)] = true
 
 			// Test hierarchy structure (Requirements 2.2, 2.4)
 			expect(parentNode.children).toContain(childNode)
