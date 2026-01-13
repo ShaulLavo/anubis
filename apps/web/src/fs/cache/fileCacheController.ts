@@ -1,4 +1,5 @@
 import { batch } from 'solid-js'
+import { ReactiveMap } from '@solid-primitives/map'
 import type { ParseResult, PieceTableSnapshot } from '@repo/utils'
 import type { VisibleContentSnapshot } from '@repo/code-editor'
 import type {
@@ -15,6 +16,11 @@ import type { SyntaxData, ScrollPosition, CursorPosition, SelectionRange } from 
 import type { ViewMode } from '../types/ViewMode'
 import type { FsState } from '../types'
 import { createLocalStorageCache, type LocalStorageCache } from './LocalStorageCache'
+import {
+	createReactiveFileState,
+	type ReactiveFileState,
+	type FileContentData,
+} from '../store/ReactiveFileState'
 
 export type { ScrollPosition, CursorPosition, SelectionRange }
 
@@ -60,6 +66,12 @@ export type FileCacheController = {
 	setOpenTabs: (paths: string[]) => void
 	getStats: () => Promise<CacheStats>
 	flush: () => Promise<void>
+	/** Get or create a ReactiveFileState for a path (Resource-based) */
+	getFileState: (path: string) => ReactiveFileState
+	/** Check if a ReactiveFileState exists for a path */
+	hasFileState: (path: string) => boolean
+	/** Remove a ReactiveFileState for a path */
+	removeFileState: (path: string) => void
 }
 
 type FileCacheControllerOptions = {
@@ -147,11 +159,6 @@ export const createFileCacheControllerV2 = ({
 	const set = (path: string, entry: FileCacheEntry) => {
 		if (!path || DISABLE_CACHE) return
 		const p = createFilePath(path)
-		console.log('[FileCacheController] set():', {
-			path: p,
-			hasScrollPosition: entry.scrollPosition !== undefined,
-			scrollPosition: entry.scrollPosition,
-		})
 
 		// Update memory state
 		batch(() => {
@@ -415,6 +422,118 @@ export const createFileCacheControllerV2 = ({
 		await store.flush()
 	}
 
+	// === ReactiveFileState management ===
+	const fileStates = new ReactiveMap<FilePath, ReactiveFileState>()
+
+	/**
+	 * Load content data for a path.
+	 * This is used by ReactiveFileState's createResource.
+	 */
+	const loadContentForPath = async (path: FilePath): Promise<FileContentData | undefined> => {
+		if (DISABLE_CACHE) return undefined
+
+		// First check memory
+		const memoryPieceTable = state.pieceTables[path]
+		const memoryStats = state.fileStats[path]
+		const memoryPreview = previews[path]
+
+		if (memoryPieceTable || memoryStats) {
+			return {
+				content: '', // Content will be derived from pieceTable
+				pieceTable: memoryPieceTable ?? null,
+				stats: memoryStats ?? null,
+				previewBytes: memoryPreview ?? null,
+			}
+		}
+
+		// Load from IndexedDB
+		const persistedState = await store.getAsync(path)
+		if (!persistedState) return undefined
+
+		return {
+			content: '',
+			pieceTable: persistedState.pieceTable?.value ?? null,
+			stats: persistedState.stats?.value ?? null,
+			previewBytes: persistedState.previewBytes ?? null,
+		}
+	}
+
+	/**
+	 * Load syntax data for a path.
+	 * This is used by ReactiveFileState's createResource.
+	 */
+	const loadSyntaxForPath = async (path: FilePath): Promise<SyntaxData | undefined> => {
+		if (DISABLE_CACHE) return undefined
+
+		// First check memory
+		const memoryHighlights = state.fileHighlights[path]
+		const memoryFolds = state.fileFolds[path]
+		const memoryBrackets = state.fileBrackets[path]
+		const memoryErrors = state.fileErrors[path]
+
+		if (memoryHighlights || memoryFolds || memoryBrackets || memoryErrors) {
+			return {
+				highlights: memoryHighlights ?? [],
+				folds: memoryFolds ?? [],
+				brackets: memoryBrackets ?? [],
+				errors: memoryErrors ?? [],
+			}
+		}
+
+		// Load from IndexedDB
+		const persistedState = await store.getAsync(path)
+		if (!persistedState?.syntax) return undefined
+
+		return {
+			highlights: persistedState.syntax.value.highlights ?? [],
+			folds: persistedState.syntax.value.folds ?? [],
+			brackets: persistedState.syntax.value.brackets ?? [],
+			errors: persistedState.syntax.value.errors ?? [],
+		}
+	}
+
+	/**
+	 * Get or create a ReactiveFileState for a path.
+	 * Uses Resource-based loading which handles race conditions automatically.
+	 */
+	const getFileState = (path: string): ReactiveFileState => {
+		const p = createFilePath(path)
+		let fileState = fileStates.get(p)
+
+		if (!fileState) {
+			// Get initial view state from localStorage
+			const lsState = lsCache.get(p)
+
+			fileState = createReactiveFileState({
+				path: p,
+				loadContent: loadContentForPath,
+				loadSyntax: loadSyntaxForPath,
+				initialViewState: {
+					scrollPosition: lsState?.scroll ?? undefined,
+					cursorPosition: lsState?.cursor ?? undefined,
+					selections: lsState?.selections ?? undefined,
+					visibleContent: lsState?.visible ?? undefined,
+					viewMode: lsState?.viewMode ?? undefined,
+					isDirty: lsState?.isDirty ?? false,
+				},
+			})
+
+			fileStates.set(p, fileState)
+		}
+
+		return fileState
+	}
+
+	const hasFileState = (path: string): boolean => {
+		const p = createFilePath(path)
+		return fileStates.has(p)
+	}
+
+	const removeFileState = (path: string): void => {
+		const p = createFilePath(path)
+		fileStates.delete(p)
+	}
+
 	return {
 		get,
 		set,
@@ -430,5 +549,8 @@ export const createFileCacheControllerV2 = ({
 		setOpenTabs,
 		getStats,
 		flush,
+		getFileState,
+		hasFileState,
+		removeFileState,
 	}
 }

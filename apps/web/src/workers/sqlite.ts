@@ -33,6 +33,17 @@ const performInit = async (): Promise<{
 	opfsEnabled: boolean
 }> => {
 	if (!sqlite3) {
+		// TODO: Uncomment suppression once we verify OPFS is working
+		// // Temporarily suppress console to avoid spurious OPFS timeout warning
+		// // The warning is logged by sqlite3 internally even when OPFS works
+		// const originalWarn = console.warn
+		// console.warn = (...args: unknown[]) => {
+		// 	const msg = String(args[0] ?? '')
+		// 	if (msg.includes('OPFS') && msg.includes('Timeout')) return
+		// 	originalWarn.apply(console, args)
+		// }
+
+		// try {
 		sqlite3 = await sqlite3InitModule({
 			print: () => {},
 			printErr: () => {},
@@ -42,6 +53,9 @@ const performInit = async (): Promise<{
 			},
 			opfsProxyUrl: proxyUrl,
 		})
+		// } finally {
+		// 	console.warn = originalWarn
+		// }
 	}
 
 	const opfsEnabled = 'opfs' in sqlite3
@@ -52,14 +66,23 @@ const performInit = async (): Promise<{
 
 	await searchImpl.ensureSchema(client)
 
-	return { version: sqlite3.version.libVersion, opfsEnabled }
+	// Verify OPFS is actually working by checking available VFS
+	const vfsList = sqlite3.capi.sqlite3_js_vfs_list?.() ?? []
+	const hasOpfsVfs = vfsList.includes('opfs')
+
+	if (opfsEnabled && !hasOpfsVfs) {
+		console.error('[SQLite] OPFS check passed but VFS not installed! Using:', clientCofig.url)
+	}
+
+	return { version: sqlite3.version.libVersion, opfsEnabled: opfsEnabled && hasOpfsVfs }
 }
 
 const init = async (): Promise<{ version: string; opfsEnabled: boolean }> => {
 	if (client && sqlite3) {
+		const vfsList = sqlite3.capi.sqlite3_js_vfs_list?.() ?? []
 		return {
 			version: sqlite3.version.libVersion,
-			opfsEnabled: 'opfs' in sqlite3,
+			opfsEnabled: 'opfs' in sqlite3 && vfsList.includes('opfs'),
 		}
 	}
 	if (!initPromise) {
