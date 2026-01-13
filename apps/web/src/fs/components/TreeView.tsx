@@ -2,6 +2,8 @@ import { Accessor, For, Show } from 'solid-js'
 import type { FsDirTreeNode } from '@repo/fs'
 import { TreeNode } from './TreeNode'
 import { CreationRow } from './CreationRow'
+import { useFs } from '../context/FsContext'
+import { Button } from '@repo/ui/button'
 
 type TreeViewProps = {
 	tree: Accessor<FsDirTreeNode | undefined>
@@ -11,14 +13,25 @@ type TreeViewProps = {
 }
 
 export const TreeView = (props: TreeViewProps) => {
+	const [, actions] = useFs()
+
 	return (
 		<div class="overflow-auto h-full">
 			<Show
 				when={!props.loading() && props.tree()}
 				fallback={
-					<p class="text-ui text-muted-foreground p-2">
-						{props.loading() ? '' : 'No filesystem loaded.'}
-					</p>
+					<div class="p-2 flex flex-col gap-2">
+						<Show when={!props.loading()}>
+							<p class="text-ui text-muted-foreground">No filesystem loaded.</p>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => actions.pickNewRoot()}
+							>
+								Open Folder
+							</Button>
+						</Show>
+					</div>
 				}
 			>
 				{(tree) => (
