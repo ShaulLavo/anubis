@@ -177,7 +177,6 @@ export default defineConfig(({ mode }) => {
 		},
 		optimizeDeps: {
 			include: [
-				'solid-devtools/setup',
 				'web-tree-sitter',
 				'js-base64',
 				'@tree-sitter-grammars/tree-sitter-markdown',

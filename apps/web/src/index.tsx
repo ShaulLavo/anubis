@@ -1,6 +1,9 @@
 /* @refresh reload */
 import { render } from 'solid-js/web'
-import 'solid-devtools'
+// Only import devtools in development
+if (import.meta.env.DEV) {
+	import('solid-devtools')
+}
 import './styles.css'
 import '@repo/code-editor/styles.css'
 
