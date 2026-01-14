@@ -1,4 +1,6 @@
-# Force Nixpacks to use Bun provider
+# Force Nixpacks to use Bun
+providers = []
+
 [phases.setup]
 nixPkgs = ["bun"]
 
