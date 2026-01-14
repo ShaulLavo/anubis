@@ -1,0 +1,5 @@
+# Nixpacks config for web frontend
+
+[staticAssets]
+# Use custom nginx config for COOP/COEP headers
+nginxConfig = "nginx.conf"
