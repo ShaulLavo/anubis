@@ -1,12 +1,12 @@
-# Use Node with Bun installed
+# Nixpacks config for Bun server
+# Since Nixpacks detects Node, we add bun as additional package
+
 [phases.setup]
 nixPkgs = ["nodejs_22", "bun"]
+aptPkgs = []
 
 [phases.install]
 cmds = ["bun install"]
-
-[phases.build]
-cmds = []
 
 [start]
 cmd = "bun run src/index.ts"
