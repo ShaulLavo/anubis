@@ -4,129 +4,41 @@ import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const appRoot = path.resolve(__dirname, '..')
+const monorepoRoot = path.resolve(appRoot, '..', '..')
 const publicDir = path.join(appRoot, 'public', 'tree-sitter')
 
-const assets = [
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'web-tree-sitter',
-			'tree-sitter.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter.wasm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-javascript',
-			'tree-sitter-javascript.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter-javascript.wasm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-typescript',
-			'tree-sitter-typescript.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter-typescript.wasm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-typescript',
-			'tree-sitter-tsx.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter-tsx.wasm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-typescript',
-			'queries',
-			'highlights.scm'
-		),
-		destination: path.join(publicDir, 'typescript-highlights.scm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-json',
-			'tree-sitter-json.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter-json.wasm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-json',
-			'queries',
-			'highlights.scm'
-		),
-		destination: path.join(publicDir, 'json-highlights.scm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-html',
-			'tree-sitter-html.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter-html.wasm'),
-	},
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'tree-sitter-html',
-			'queries',
-			'highlights.scm'
-		),
-		destination: path.join(publicDir, 'html-highlights.scm'),
-	},
-	/*
-	 * TODO: The @tree-sitter-grammars/tree-sitter-xml package does not include the WASM file by default.
-	 * You must build it using `tree-sitter build-wasm` or download it and place it in the public/tree-sitter directory.
-	 * 
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'@tree-sitter-grammars',
-			'tree-sitter-xml',
-			'tree-sitter-xml.wasm'
-		),
-		destination: path.join(publicDir, 'tree-sitter-xml.wasm'),
-	},
-	*/
-	{
-		source: path.join(
-			appRoot,
-			'node_modules',
-			'@tree-sitter-grammars',
-			'tree-sitter-xml',
-			'queries',
-			'xml',
-			'highlights.scm'
-		),
-		destination: path.join(publicDir, 'xml-highlights.scm'),
-	},
+// Helper to find asset in local or hoisted node_modules
+function findAsset(relativePath: string): string {
+	const localPath = path.join(appRoot, 'node_modules', relativePath)
+	const hoistedPath = path.join(monorepoRoot, 'node_modules', relativePath)
+
+	if (existsSync(localPath)) return localPath
+	if (existsSync(hoistedPath)) return hoistedPath
+	throw new Error(`Missing Tree-sitter asset: ${relativePath} (checked ${localPath} and ${hoistedPath})`)
+}
+
+// Define assets with relative paths from node_modules
+const assetMappings = [
+	{ relativePath: 'web-tree-sitter/tree-sitter.wasm', destName: 'tree-sitter.wasm' },
+	{ relativePath: 'tree-sitter-javascript/tree-sitter-javascript.wasm', destName: 'tree-sitter-javascript.wasm' },
+	{ relativePath: 'tree-sitter-typescript/tree-sitter-typescript.wasm', destName: 'tree-sitter-typescript.wasm' },
+	{ relativePath: 'tree-sitter-typescript/tree-sitter-tsx.wasm', destName: 'tree-sitter-tsx.wasm' },
+	{ relativePath: 'tree-sitter-typescript/queries/highlights.scm', destName: 'typescript-highlights.scm' },
+	{ relativePath: 'tree-sitter-json/tree-sitter-json.wasm', destName: 'tree-sitter-json.wasm' },
+	{ relativePath: 'tree-sitter-json/queries/highlights.scm', destName: 'json-highlights.scm' },
+	{ relativePath: 'tree-sitter-html/tree-sitter-html.wasm', destName: 'tree-sitter-html.wasm' },
+	{ relativePath: 'tree-sitter-html/queries/highlights.scm', destName: 'html-highlights.scm' },
+	{ relativePath: '@tree-sitter-grammars/tree-sitter-xml/queries/xml/highlights.scm', destName: 'xml-highlights.scm' },
 ]
+
+const assets = assetMappings.map(({ relativePath, destName }) => ({
+	source: findAsset(relativePath),
+	destination: path.join(publicDir, destName),
+}))
 
 mkdirSync(publicDir, { recursive: true })
 
 for (const asset of assets) {
-	if (!existsSync(asset.source)) {
-		throw new Error(`Missing Tree-sitter asset: ${asset.source}`)
-	}
-
 	cpSync(asset.source, asset.destination)
 }
 

@@ -12,8 +12,11 @@ COPY turbo.json ./
 COPY packages ./packages
 COPY apps ./apps
 
-# Install all dependencies
-RUN bun install
+# Install all dependencies (skip postinstall to avoid tree-sitter path issues)
+RUN bun install --ignore-scripts
+
+# Run tree-sitter asset copy manually (handles hoisted node_modules)
+RUN bun run --cwd apps/web copy-tree-sitter-assets
 
 # Build submodules first (icons, sqlite-wasm, just-bash)
 RUN bun run build:submodules
