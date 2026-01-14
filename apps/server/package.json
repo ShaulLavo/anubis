@@ -1,5 +1,5 @@
 {
-  "name": "server",
+  "name": "slifer",
   "version": "1.0.50",
   "packageManager": "bun@1.2.22",
   "scripts": {

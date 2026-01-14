@@ -1,4 +1,4 @@
-import type { FsContext } from '@repo/fs'
+import type { RootCtx } from '@repo/fs'
 import type { FsActions } from '../fs/context/FsContext'
 import { gitApi, prepareGitCloneCallbacks } from '../workers/gitClient'
 import type { GitCloneResult, GitFile, GitProgressCallback } from './types'
@@ -21,7 +21,7 @@ const joinPath = (base: string, segment: string) => {
 	return `${base}/${segment}`
 }
 
-const ensureEmptyDir = async (ctx: FsContext, path: string) => {
+const ensureEmptyDir = async (ctx: RootCtx, path: string) => {
 	const normalized = normalizeVfsPath(path)
 	const dir = ctx.dir(normalized)
 
@@ -44,7 +44,7 @@ const ensureEmptyDir = async (ctx: FsContext, path: string) => {
 }
 
 const ensureFileDir = async (
-	ctx: FsContext,
+	ctx: RootCtx,
 	dirPath: string,
 	cache: Set<string>
 ) => {
@@ -54,7 +54,7 @@ const ensureFileDir = async (
 }
 
 const writeGitFile = async (
-	ctx: FsContext,
+	ctx: RootCtx,
 	basePath: string,
 	file: GitFile,
 	cache: Set<string>
@@ -68,7 +68,7 @@ const writeGitFile = async (
 }
 
 export const cloneIntoVfs = async (
-	ctx: FsContext,
+	ctx: RootCtx,
 	actions: FsActions,
 	options: CloneIntoVfsOptions
 ): Promise<GitCloneResult> => {

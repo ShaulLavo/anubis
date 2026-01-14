@@ -1,4 +1,4 @@
-import type { FileContext, DirTreeNode, TreeNode } from '@repo/fs'
+import type { RootCtx, DirTreeNode, TreeNode } from '@repo/fs'
 import type { LocalEchoController } from './localEcho'
 import type { FsSource, FsState } from '../fs/types'
 import type { PathIndex } from '../fs/hooks/createTreeState'
@@ -13,7 +13,7 @@ export type ShellState = {
 export type Shell = {
 	state: ShellState
 	getCwd: () => string
-	getVfsContext: () => Promise<FileContext>
+	getVfsContext: () => Promise<RootCtx>
 }
 
 export type CommandContext = {
@@ -26,5 +26,5 @@ export type ShellContext = {
 	actions: FsActions
 	getCwd: () => string
 	setCwd: (path: string) => void
-	getVfsContext: () => Promise<FileContext>
+	getVfsContext: () => Promise<RootCtx>
 }

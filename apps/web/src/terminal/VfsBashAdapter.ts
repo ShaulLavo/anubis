@@ -7,7 +7,7 @@ import type {
 	FileContent,
 	BufferEncoding,
 } from 'just-bash'
-import type { FileContext, TreeNode, DirTreeNode } from '@repo/fs'
+import type { RootCtx, TreeNode, DirTreeNode } from '@repo/fs'
 import { searchService } from '../search/SearchService'
 
 /**
@@ -15,10 +15,10 @@ import { searchService } from '../search/SearchService'
  * by delegating to the VFS FsContext.
  */
 export class VfsBashAdapter implements IFileSystem {
-	#ctx: FileContext
+	#ctx: RootCtx
 	#tree: DirTreeNode | null = null
 
-	constructor(ctx: FileContext, tree?: DirTreeNode) {
+	constructor(ctx: RootCtx, tree?: DirTreeNode) {
 		this.#ctx = ctx
 		this.#tree = tree ?? null
 	}

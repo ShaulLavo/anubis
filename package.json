@@ -1,5 +1,5 @@
 {
-  "name": "vibe",
+  "name": "anubis",
   "devDependencies": {
     "@tsconfig/bun": "^1.0.10",
     "happy-dom": "^18.0.1",
