@@ -23,7 +23,7 @@ import {
 	VsTrash,
 	VsRefresh,
 } from '@repo/icons/vs'
-import { Card, CardContent } from '@repo/ui/Card'
+import { Card, CardContent } from '@repo/ui/card'
 import { useFontRegistry, FontSource, FontStatus } from '../../../fonts'
 import type { FontEntry } from '../../../fonts'
 import { useFontPreview } from '../hooks/useFontPreview'

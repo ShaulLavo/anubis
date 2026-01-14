@@ -28,7 +28,7 @@ import {
 	VsSettings,
 	VsCheck,
 } from '@repo/icons/vs'
-import { Card, CardContent } from '@repo/ui/Card'
+import { Card, CardContent } from '@repo/ui/card'
 import { useFontRegistry, FontSource } from '../../../fonts'
 import type { FontEntry } from '../../../fonts'
 import { OptimizedFontCard, VirtualFontGrid } from './LazyFontPreview'
