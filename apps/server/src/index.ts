@@ -5,8 +5,10 @@ import { swagger } from '@elysiajs/swagger'
 import { staticPlugin } from '@elysiajs/static'
 import { env } from './env'
 import { routes } from './routes'
+import pkg from '../package.json'
 
 const app = new Elysia()
+	.get('/', () => ({ name: pkg.name, version: pkg.version }))
 	.use(
 		swagger({
 			documentation: {
