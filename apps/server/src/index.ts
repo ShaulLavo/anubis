@@ -1,4 +1,4 @@
-// Server entry point - uses Bun runtime
+// Server entry point - Bun runtime with Elysia
 import { Elysia } from 'elysia'
 import { cors } from '@elysiajs/cors'
 import { swagger } from '@elysiajs/swagger'
