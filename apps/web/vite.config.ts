@@ -110,6 +110,28 @@ export default defineConfig(() => {
 						'../../packages/theme/src/index.ts'
 					),
 				},
+				// Handle @repo/ui .ts files explicitly before the catch-all .tsx pattern
+				{
+					find: '@repo/ui/utils',
+					replacement: path.resolve(
+						__dirname,
+						'../../packages/ui/src/utils.ts'
+					),
+				},
+				{
+					find: '@repo/ui/anchor',
+					replacement: path.resolve(
+						__dirname,
+						'../../packages/ui/src/anchor.ts'
+					),
+				},
+				{
+					find: '@repo/ui/settings',
+					replacement: path.resolve(
+						__dirname,
+						'../../packages/ui/src/settings/index.ts'
+					),
+				},
 				{
 					find: /^@repo\/ui\/(.+)$/,
 					replacement: path.resolve(
